@@ -1,0 +1,3 @@
+[submodule "truffle"]
+	path = truffle
+	url = git@github.com:polyswarm/polyswarm-truffle.git
