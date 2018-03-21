@@ -3,7 +3,7 @@
 import json
 import jsonschema
 import sys
-import webbrowser
+import uuid
 
 import base58
 import requests
@@ -46,6 +46,11 @@ NECTAR_TOKEN_ADDRESS = '0xf3ac3484e2f7262e55e83c85a3f6f0fd26b0ffed'
 BOUNTY_REGISTRY_ADDRESS = '0x7f49ed4680103019ce2849e747a371bc83467029'
 nectar_token = bind_contract(NECTAR_TOKEN_ADDRESS, 'truffle/build/contracts/NectarToken.json')
 bounty_registry = bind_contract(BOUNTY_REGISTRY_ADDRESS, 'truffle/build/contracts/BountyRegistry.json')
+
+BOUNTY_FEE = 62500000000000000
+ASSERTION_FEE = 62500000000000000
+BOUNTY_AMOUNT_MINIMUM = 62500000000000000
+ASSERTION_BID_MINIMUM = 62500000000000000
 
 def success(result=None):
     if result is not None:
@@ -137,13 +142,82 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
 
     return success(r.json())
 
+def wait_for_receipt(tx):
+    while True:
+        receipt = web3.eth.getTransactionReceipt(tx)
+        if receipt:
+            return receipt
+        sleep(1)
+
+def check_transaction(tx):
+    receipt = wait_for_receipt(tx)
+    return receipt.status == 1
+
 @app.route('/bounties', methods=['POST'])
 def post_bounties():
-    pass
+    if active_account is None:
+        return failure('Account unlock requried', 401)
+
+    schema = {
+        'type': 'object',
+        'properties': {
+            'amount': {
+                'type': 'string',
+                'minLength': 1,
+                'maxLength': 64,
+            },
+            'artifactURI': {
+                'type': 'string',
+                'minLength': 1,
+                'maxLength': 100,
+            },
+            'durationBlocks': {
+                'type': 'string',
+                'minLength': 1,
+                'maxLength': 16,
+            },
+        }
+    }
+
+    body = request.get_json()
+    try:
+        jsonschema.validate(body, schema)
+    except:
+        return failure('Invalid JSON', 400)
+
+    guid = uuid.uuid4()
+    amount = int(body['amount'])
+    artifactURI = body['artifactURI']
+    durationBlocks = int(body['durationBlocks'])
+
+    if amount < BOUNTY_AMOUNT_MINIMUM:
+        return failure('Invalid bounty amount', 400)
+
+    if not is_valid_ipfshash(artifactURI):
+        return failure('Invalid artifact URI (should be IPFS hash)', 400)
+
+    if durationBlocks < 0:
+        return failure('Invalid duration blocks', 400)
+
+    approveAmount = amount + BOUNTY_FEE
+
+    tx = nectar_token.functions.approve(bounty_registry.address, approveAmount).transact({'from': active_account, 'gasLimit': 200000 })
+    if not check_transaction(tx):
+        return failure('Approve transaction failed, verify parameters and try again', 400)
+    tx = bounty_registry.functions.postBounty(guid.int, amount, artifactURI, durationBlocks).transact({'from': active_account, 'gasLimit': 200000 })
+    if not check_transaction(tx):
+        return failure('Approve transaction failed, verify parameters and try again', 400)
+
+    return success(str(guid))
 
 @app.route('/bounties', methods=['GET'])
 def get_bounties():
-    pass
+    num_bounties = bounty_registry.functions.getNumberOfBounties().call()
+    bounties = []
+    for i in range(num_bounties):
+        bounties.append(str(uuid.UUID(int=bounty_registry.functions.bountyGuids(i).call())))
+
+    return success(bounties)
 
 @app.route('/bounties/active', methods=['GET'])
 def get_bounties_active():
@@ -155,7 +229,9 @@ def get_bounties_pending():
 
 @app.route('/bounties/<uuid:guid>', methods=['GET'])
 def get_bounties_guid(guid):
-    pass
+    x = bounty_registry.functions.bountiesByGuid(guid.int).call()
+    print(x)
+    return success()
 
 @app.route('/bounties/<uuid:guid>/settle', methods=['POST'])
 def post_bounties_guid_settle(guid):
@@ -269,4 +345,3 @@ def events(ws):
 if __name__ == '__main__':
     server = pywsgi.WSGIServer(('', 8000), app, handler_class=WebSocketHandler)
     server.serve_forever()
-#webbrowser.open_new_tab('http://localhost:8000')
