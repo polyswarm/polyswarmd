@@ -448,6 +448,13 @@ def post_accounts():
 def get_accounts():
     return success(web3.personal.listAccounts)
 
+@app.route('/accounts/active', methods=['GET'])
+def get_accounts_active():
+    if active_account:
+        return success(active_account)
+    else:
+        return failure('No active account, unlock required', 401)
+
 @app.route('/accounts/<address>/unlock', methods=['POST'])
 def post_accounts_address_unlock(address):
     global active_account
@@ -546,5 +553,5 @@ def events(ws):
         sleep(1)
 
 if __name__ == '__main__':
-    server = pywsgi.WSGIServer(('', 8000), app, handler_class=WebSocketHandler)
+    server = pywsgi.WSGIServer(('', 8080), app, handler_class=WebSocketHandler)
     server.serve_forever()
