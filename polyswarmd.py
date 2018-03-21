@@ -172,6 +172,15 @@ def bounty_to_dict(bounty):
         'verdicts': int_to_bool_list(bounty[6]),
     }
 
+def new_bounty_event_to_dict(new_bounty_event):
+    return {
+        'guid': str(uuid.UUID(int=new_bounty_event.guid)),
+        'author': new_bounty_event.author,
+        'amount': str(new_bounty_event.amount),
+        'uri': new_bounty_event.artifactURI,
+        'expiration': str(new_bounty_event.expirationBlock),
+    }
+
 def assertion_to_dict(assertion):
     return {
         'author': assertion[0],
@@ -179,6 +188,23 @@ def assertion_to_dict(assertion):
         'mask': int_to_bool_list(assertion[2]),
         'verdicts': int_to_bool_list(assertion[3]),
         'metadata': assertion[4],
+    }
+
+def new_assertion_event_to_dict(new_assertion_event):
+    return {
+        'bounty_guid': str(uuid.UUID(int=new_assertion_event.bountyGuid)),
+        'author': new_assertion_event.author,
+        'index': new_assertion_event.index,
+        'bid': str(new_assertion_event.bid),
+        'mask': int_to_bool_list(new_assertion_event.mask),
+        'verdicts': int_to_bool_list(new_assertion_event.verdicts),
+        'metadata': new_assertion_event.metadata,
+    }
+
+def new_verdict_event_to_dict(new_verdict_event):
+    return {
+        'bounty_guid': str(uuid.UUID(int=new_verdict_event.bountyGuid)),
+        'verdicts': int_to_bool_list(new_verdict_event.verdicts),
     }
 
 @app.route('/bounties', methods=['POST'])
@@ -234,15 +260,8 @@ def post_bounties():
 
     receipt = web3.eth.getTransactionReceipt(tx)
     new_bounty_event = bounty_registry.events.NewBounty().processReceipt(receipt)[0]['args']
-    new_bounty = {
-        'guid': str(uuid.UUID(int=new_bounty_event.guid)),
-        'author': new_bounty_event.author,
-        'amount': str(new_bounty_event.amount),
-        'uri': new_bounty_event.artifactURI,
-        'expiration': str(new_bounty_event.expirationBlock),
-    }
 
-    return success(new_bounty)
+    return success(new_bounty_event_to_dict(new_bounty_event))
 
 # TODO: Caching layer for this
 @app.route('/bounties', methods=['GET'])
@@ -319,18 +338,13 @@ def post_bounties_guid_settle(guid):
 
     verdicts = bool_list_to_int(body['verdicts'])
 
-    tx = bounty_registry.functions.settleBounty(guid.int, verdicts).transact({'from': active_account, 'gasLimit': 200000 })
+    tx = bounty_registry.functions.settleBounty(guid.int, verdicts).transact({'from': active_account, 'gasLimit': 1000000 })
     if not check_transaction(tx):
         return failure('Settle bounty transaction failed, verify parameters and try again', 400)
 
     receipt = web3.eth.getTransactionReceipt(tx)
     new_verdict_event = bounty_registry.events.NewVerdict().processReceipt(receipt)[0]['args']
-    new_verdict = {
-        'bounty_guid': str(uuid.UUID(int=new_verdict_event.bountyGuid)),
-        'verdicts': int_to_bool_list(new_verdict_event.verdicts),
-    }
-
-    return success(new_verdict)
+    return success(new_verdict_event_to_dict(new_verdict_event))
 
 @app.route('/bounties/<uuid:guid>/assertions', methods=['POST'])
 def post_bounties_guid_assertions(guid):
@@ -389,17 +403,7 @@ def post_bounties_guid_assertions(guid):
 
     receipt = web3.eth.getTransactionReceipt(tx)
     new_assertion_event = bounty_registry.events.NewAssertion().processReceipt(receipt)[0]['args']
-    new_assertion = {
-        'bounty_guid': str(uuid.UUID(int=new_assertion_event.bountyGuid)),
-        'author': new_assertion_event.author,
-        'index': new_assertion_event.index,
-        'bid': str(new_assertion_event.bid),
-        'mask': int_to_bool_list(new_assertion_event.mask),
-        'verdicts': int_to_bool_list(new_assertion_event.verdicts),
-        'metadata': new_assertion_event.metadata,
-    }
-
-    return success(new_assertion)
+    return success(new_assertion_event_to_dict(new_assertion_event))
 
 @app.route('/bounties/<uuid:guid>/assertions', methods=['GET'])
 def get_bounties_guid_assertions(guid):
@@ -507,8 +511,38 @@ def post_accounts_address_balance_nct(address):
 
 @sockets.route('/events')
 def events(ws):
+    block_filter = web3.eth.filter('latest')
+    bounty_filter = bounty_registry.eventFilter('NewBounty')
+    assertion_filter = bounty_registry.eventFilter('NewAssertion')
+    verdict_filter = bounty_registry.eventFilter('NewVerdict')
+
     while not ws.closed:
-        ws.send('hello')
+        for event in block_filter.get_new_entries():
+            ws.send(json.dumps({
+                'event': 'block',
+                'data': {
+                    'number': web3.eth.blockNumber,
+                },
+            }))
+
+        for event in bounty_filter.get_new_entries():
+            ws.send(json.dumps({
+                'event': 'bounty',
+                'data': new_bounty_event_to_dict(event.args),
+            }))
+
+        for event in assertion_filter.get_new_entries():
+            ws.send(json.dumps({
+                'event': 'assertion',
+                'data': new_assertion_event_to_dict(event.args),
+            }))
+
+        for event in verdict_filter.get_new_entries():
+            ws.send(json.dumps({
+                'event': 'verdict',
+                'data': new_verdict_event_to_dict(event.args),
+            }))
+
         sleep(1)
 
 if __name__ == '__main__':
