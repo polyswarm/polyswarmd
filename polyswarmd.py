@@ -42,6 +42,7 @@ def bind_contract(address, artifact):
 
     return web3.eth.contract(address=web3.toChecksumAddress(address), abi=abi) 
 
+ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 NECTAR_TOKEN_ADDRESS = '0xf3ac3484e2f7262e55e83c85a3f6f0fd26b0ffed'
 BOUNTY_REGISTRY_ADDRESS = '0x7f49ed4680103019ce2849e747a371bc83467029'
 nectar_token = bind_contract(NECTAR_TOKEN_ADDRESS, 'truffle/build/contracts/NectarToken.json')
@@ -153,6 +154,33 @@ def check_transaction(tx):
     receipt = wait_for_receipt(tx)
     return receipt.status == 1
 
+def bool_list_to_int(bs):
+    return sum([1 << n if b else 0 for n, b in enumerate(bs)])
+
+def int_to_bool_list(i):
+    s = format(i, 'b')
+    return [x == '1' for x in s[::-1]]
+
+def bounty_to_dict(bounty):
+    return {
+        'guid': str(uuid.UUID(int=bounty[0])),
+        'author': bounty[1],
+        'amount': str(bounty[2]),
+        'uri': bounty[3],
+        'expiration': bounty[4],
+        'resolved': bounty[5],
+        'verdicts': int_to_bool_list(bounty[6]),
+    }
+
+def assertion_to_dict(assertion):
+    return {
+        'author': assertion[0],
+        'bid': str(assertion[1]),
+        'mask': int_to_bool_list(assertion[2]),
+        'verdicts': int_to_bool_list(assertion[3]),
+        'metadata': assertion[4],
+    }
+
 @app.route('/bounties', methods=['POST'])
 def post_bounties():
     if active_account is None:
@@ -166,17 +194,16 @@ def post_bounties():
                 'minLength': 1,
                 'maxLength': 64,
             },
-            'artifactURI': {
+            'uri': {
                 'type': 'string',
                 'minLength': 1,
                 'maxLength': 100,
             },
-            'durationBlocks': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 16,
+            'duration': {
+                'type': 'integer',
+                'minimum': 1,
             },
-        }
+        },
     }
 
     body = request.get_json()
@@ -187,17 +214,14 @@ def post_bounties():
 
     guid = uuid.uuid4()
     amount = int(body['amount'])
-    artifactURI = body['artifactURI']
-    durationBlocks = int(body['durationBlocks'])
+    artifactURI = body['uri']
+    durationBlocks = body['duration']
 
     if amount < BOUNTY_AMOUNT_MINIMUM:
         return failure('Invalid bounty amount', 400)
 
     if not is_valid_ipfshash(artifactURI):
         return failure('Invalid artifact URI (should be IPFS hash)', 400)
-
-    if durationBlocks < 0:
-        return failure('Invalid duration blocks', 400)
 
     approveAmount = amount + BOUNTY_FEE
 
@@ -206,48 +230,193 @@ def post_bounties():
         return failure('Approve transaction failed, verify parameters and try again', 400)
     tx = bounty_registry.functions.postBounty(guid.int, amount, artifactURI, durationBlocks).transact({'from': active_account, 'gasLimit': 200000 })
     if not check_transaction(tx):
-        return failure('Approve transaction failed, verify parameters and try again', 400)
+        return failure('Post bounty transaction failed, verify parameters and try again', 400)
 
-    return success(str(guid))
+    receipt = web3.eth.getTransactionReceipt(tx)
+    new_bounty_event = bounty_registry.events.NewBounty().processReceipt(receipt)[0]['args']
+    new_bounty = {
+        'guid': str(uuid.UUID(int=new_bounty_event.guid)),
+        'author': new_bounty_event.author,
+        'amount': str(new_bounty_event.amount),
+        'uri': new_bounty_event.artifactURI,
+        'expiration': str(new_bounty_event.expirationBlock),
+    }
 
+    return success(new_bounty)
+
+# TODO: Caching layer for this
 @app.route('/bounties', methods=['GET'])
 def get_bounties():
     num_bounties = bounty_registry.functions.getNumberOfBounties().call()
     bounties = []
     for i in range(num_bounties):
-        bounties.append(str(uuid.UUID(int=bounty_registry.functions.bountyGuids(i).call())))
+        guid = bounty_registry.functions.bountyGuids(i).call()
+        bounty = bounty_to_dict(bounty_registry.functions.bountiesByGuid(guid).call())
+        bounties.append(bounty)
 
     return success(bounties)
 
+# TODO: Caching layer for this
 @app.route('/bounties/active', methods=['GET'])
 def get_bounties_active():
-    pass
+    current_block = web3.eth.blockNumber
+    num_bounties = bounty_registry.functions.getNumberOfBounties().call()
+    bounties = []
+    for i in range(num_bounties):
+        guid = bounty_registry.functions.bountyGuids(i).call()
+        bounty = bounty_to_dict(bounty_registry.functions.bountiesByGuid(guid).call())
 
+        if bounty['expiration'] > current_block:
+            bounties.append(bounty)
+
+    return success(bounties)
+
+# TODO: Caching layer for this
 @app.route('/bounties/pending', methods=['GET'])
 def get_bounties_pending():
-    pass
+    current_block = web3.eth.blockNumber
+    num_bounties = bounty_registry.functions.getNumberOfBounties().call()
+    bounties = []
+    for i in range(num_bounties):
+        guid = bounty_registry.functions.bountyGuids(i).call()
+        bounty = bounty_to_dict(bounty_registry.functions.bountiesByGuid(guid).call())
+
+        if bounty['expiration'] <= current_block and not bounty['resolved']:
+            bounties.append(bounty)
+
+    return success(bounties)
 
 @app.route('/bounties/<uuid:guid>', methods=['GET'])
 def get_bounties_guid(guid):
-    x = bounty_registry.functions.bountiesByGuid(guid.int).call()
-    print(x)
-    return success()
+    bounty = bounty_to_dict(bounty_registry.functions.bountiesByGuid(guid.int).call())
+    if bounty['author'] == ZERO_ADDRESS:
+        return failure('Bounty not found', 404)
+    else:
+        return success(bounty)
 
 @app.route('/bounties/<uuid:guid>/settle', methods=['POST'])
 def post_bounties_guid_settle(guid):
-    pass
+    if active_account is None:
+        return failure('Account unlock requried', 401)
+
+    schema = {
+        'type': 'object',
+        'properties': {
+            'verdicts': {
+                'type': 'array',
+                'items': {
+                    'type': 'boolean',
+                },
+            },
+        },
+    }
+
+    body = request.get_json()
+    try:
+        jsonschema.validate(body, schema)
+    except:
+        return failure('Invalid JSON', 400)
+
+    verdicts = bool_list_to_int(body['verdicts'])
+
+    tx = bounty_registry.functions.settleBounty(guid.int, verdicts).transact({'from': active_account, 'gasLimit': 200000 })
+    if not check_transaction(tx):
+        return failure('Settle bounty transaction failed, verify parameters and try again', 400)
+
+    receipt = web3.eth.getTransactionReceipt(tx)
+    new_verdict_event = bounty_registry.events.NewVerdict().processReceipt(receipt)[0]['args']
+    new_verdict = {
+        'bounty_guid': str(uuid.UUID(int=new_verdict_event.bountyGuid)),
+        'verdicts': int_to_bool_list(new_verdict_event.verdicts),
+    }
+
+    return success(new_verdict)
 
 @app.route('/bounties/<uuid:guid>/assertions', methods=['POST'])
 def post_bounties_guid_assertions(guid):
-    pass
+    if active_account is None:
+        return failure('Account unlock requried', 401)
+
+    schema = {
+        'type': 'object',
+        'properties': {
+            'bid': {
+                'type': 'string',
+                'minLength': 1,
+                'maxLength': 64,
+            },
+            'mask': {
+                'type': 'array',
+                'items': {
+                    'type': 'boolean',
+                },
+            },
+            'verdicts': {
+                'type': 'array',
+                'items': {
+                    'type': 'boolean',
+                },
+            },
+            'metadata': {
+                'type': 'string',
+                'maxLength': 1024,
+            },
+        },
+    }
+
+    body = request.get_json()
+    try:
+        jsonschema.validate(body, schema)
+    except:
+        return failure('Invalid JSON', 400)
+
+    bid = int(body['bid'])
+    mask = bool_list_to_int(body['mask'])
+    verdicts = bool_list_to_int(body['verdicts'])
+    metadata = body['metadata']
+
+    if bid < ASSERTION_BID_MINIMUM:
+        return failure('Invalid assertion bid', 400)
+
+    approveAmount = bid + ASSERTION_FEE
+
+    tx = nectar_token.functions.approve(bounty_registry.address, approveAmount).transact({'from': active_account, 'gasLimit': 200000 })
+    if not check_transaction(tx):
+        return failure('Approve transaction failed, verify parameters and try again', 400)
+    tx = bounty_registry.functions.postAssertion(guid.int, bid, mask, verdicts, metadata).transact({'from': active_account, 'gasLimit': 200000 })
+    if not check_transaction(tx):
+        return failure('Post assertion transaction failed, verify parameters and try again', 400)
+
+    receipt = web3.eth.getTransactionReceipt(tx)
+    new_assertion_event = bounty_registry.events.NewAssertion().processReceipt(receipt)[0]['args']
+    new_assertion = {
+        'bounty_guid': str(uuid.UUID(int=new_assertion_event.bountyGuid)),
+        'author': new_assertion_event.author,
+        'index': new_assertion_event.index,
+        'bid': str(new_assertion_event.bid),
+        'mask': int_to_bool_list(new_assertion_event.mask),
+        'verdicts': int_to_bool_list(new_assertion_event.verdicts),
+        'metadata': new_assertion_event.metadata,
+    }
+
+    return success(new_assertion)
 
 @app.route('/bounties/<uuid:guid>/assertions', methods=['GET'])
 def get_bounties_guid_assertions(guid):
-    pass
+    num_assertions = bounty_registry.functions.getNumberOfAssertions(guid.int).call()
+    assertions = []
+    for i in range(num_assertions):
+        assertion = assertion_to_dict(bounty_registry.functions.assertionsByGuid(guid.int, i).call())
+        assertions.append(assertion)
+
+    return success(assertions)
 
 @app.route('/bounties/<uuid:guid>/assertions/<int:id_>', methods=['GET'])
-def get_bounties_guid_assertions_id(guid):
-    pass
+def get_bounties_guid_assertions_id(guid, id_):
+    try:
+        return success(assertion_to_dict(bounty_registry.functions.assertionsByGuid(guid.int, id_).call()))
+    except:
+        return failure('Assertion not found', 404)
 
 @app.route('/accounts', methods=['POST'])
 def post_accounts():
@@ -258,8 +427,8 @@ def post_accounts():
                 'type': 'string',
                 'minLength': 1,
                 'maxLength': 1024,
-            }
-        }
+            },
+        },
     }
 
     body = request.get_json()
@@ -288,8 +457,8 @@ def post_accounts_address_unlock(address):
                 'type': 'string',
                 'minLength': 1,
                 'maxLength': 1024,
-            }
-        }
+            },
+        },
     }
 
     body = request.get_json()
