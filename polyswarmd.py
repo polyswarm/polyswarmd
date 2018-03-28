@@ -2,12 +2,14 @@
 
 import json
 import jsonschema
+import os
 import sys
 import uuid
+from datetime import datetime
 
 import base58
 import requests
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_sockets import Sockets
 from gevent import pywsgi, sleep
 from geventwebsocket.handler import WebSocketHandler
@@ -24,7 +26,13 @@ def install_error_handlers(app):
     for code in default_exceptions.keys():
         app.register_error_handler(code, make_json_error)
 
-app = Flask('polyswarmd')
+def whereami():
+    if hasattr(sys, 'frozen') and sys.frozen in ('windows_exe', 'console_exe'):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    else:
+        return os.path.dirname(os.path.abspath(__file__))
+
+app = Flask('polyswarmd', static_folder=os.path.join(whereami(), 'frontend', 'build', 'static'))
 install_error_handlers(app)
 sockets = Sockets(app)
 
@@ -37,7 +45,7 @@ web3 = Web3(HTTPProvider(ETH_URI))
 active_account = None
 
 def bind_contract(address, artifact):
-    with open(artifact, 'r') as f:
+    with open(os.path.join(whereami(), artifact), 'r') as f:
         abi = json.load(f)['abi']
 
     return web3.eth.contract(address=web3.toChecksumAddress(address), abi=abi) 
@@ -48,6 +56,7 @@ BOUNTY_REGISTRY_ADDRESS = '0x7f49ed4680103019ce2849e747a371bc83467029'
 nectar_token = bind_contract(NECTAR_TOKEN_ADDRESS, 'truffle/build/contracts/NectarToken.json')
 bounty_registry = bind_contract(BOUNTY_REGISTRY_ADDRESS, 'truffle/build/contracts/BountyRegistry.json')
 
+# Keep these in sync with the contract
 BOUNTY_FEE = 62500000000000000
 ASSERTION_FEE = 62500000000000000
 BOUNTY_AMOUNT_MINIMUM = 62500000000000000
@@ -516,6 +525,11 @@ def post_accounts_address_balance_nct(address):
     address = web3.toChecksumAddress(address)
     return success(nectar_token.functions.balanceOf(address).call())
 
+@app.route('/', defaults={'path': 'index.html'})
+@app.route('/<path:path>')
+def catch_all(path):
+    return send_from_directory(os.path.join(whereami(), 'frontend', 'build'), path)
+
 @sockets.route('/events')
 def events(ws):
     block_filter = web3.eth.filter('latest')
@@ -551,6 +565,10 @@ def events(ws):
             }))
 
         sleep(1)
+
+@app.before_request
+def before_request():
+    print(datetime.now(), request.method, request.path)
 
 if __name__ == '__main__':
     server = pywsgi.WSGIServer(('', 8080), app, handler_class=WebSocketHandler)
