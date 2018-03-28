@@ -45,15 +45,12 @@ def whereami():
         return os.path.dirname(os.path.abspath(__file__))
 
 app = Flask('polyswarmd', static_folder=os.path.join(whereami(), 'frontend', 'build', 'static'))
+app.config.from_pyfile(os.path.join(whereami(), 'polyswarmd.cfg'))
 install_error_handlers(app)
 sockets = Sockets(app)
 
-# TEMP
-IPFS_URI = 'http://localhost:5001'
-ETH_URI = 'http://localhost:8545'
-
 # Ok to use globals as gevent is single threaded
-web3 = Web3(HTTPProvider(ETH_URI))
+web3 = Web3(HTTPProvider(app.config['ETH_URI']))
 active_account = None
 
 def bind_contract(address, artifact):
@@ -63,10 +60,8 @@ def bind_contract(address, artifact):
     return web3.eth.contract(address=web3.toChecksumAddress(address), abi=abi) 
 
 ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
-NECTAR_TOKEN_ADDRESS = '0xf3ac3484e2f7262e55e83c85a3f6f0fd26b0ffed'
-BOUNTY_REGISTRY_ADDRESS = '0x7f49ed4680103019ce2849e747a371bc83467029'
-nectar_token = bind_contract(NECTAR_TOKEN_ADDRESS, 'truffle/build/contracts/NectarToken.json')
-bounty_registry = bind_contract(BOUNTY_REGISTRY_ADDRESS, 'truffle/build/contracts/BountyRegistry.json')
+nectar_token = bind_contract(app.config['NECTAR_TOKEN_ADDRESS'], 'truffle/build/contracts/NectarToken.json')
+bounty_registry = bind_contract(app.config['BOUNTY_REGISTRY_ADDRESS'], 'truffle/build/contracts/BountyRegistry.json')
 
 # Keep these in sync with the contract
 BOUNTY_FEE = 62500000000000000
@@ -93,7 +88,7 @@ def is_valid_ipfshash(ipfshash):
     return False
 
 def list_artifacts(ipfshash):
-    r = requests.get(IPFS_URI + '/api/v0/ls', params={'arg': ipfshash})
+    r = requests.get(app.config['IPFS_URI'] + '/api/v0/ls', params={'arg': ipfshash})
     if r.status_code != 200:
         return []
 
@@ -106,7 +101,7 @@ def list_artifacts(ipfshash):
 @app.route('/artifacts', methods=['POST'])
 def post_artifacts():
     files = [('file', (f.filename, f, 'application/octet-stream')) for f in request.files.getlist(key='file')]
-    r = requests.post(IPFS_URI + '/api/v0/add', files=files, params={'wrap-with-directory': True})
+    r = requests.post(app.config['IPFS_URI'] + '/api/v0/add', files=files, params={'wrap-with-directory': True})
     if r.status_code != 200:
         return failure(r.text, r.status_code)
 
@@ -138,7 +133,7 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
         
     artifact = artifacts[id_]
 
-    r = requests.get(IPFS_URI + '/api/v0/cat', params={'arg': artifact})
+    r = requests.get(app.config['IPFS_URI'] + '/api/v0/cat', params={'arg': artifact})
     if r.status_code != 200:
         return failure(r.text, r.status_code)
 
@@ -158,7 +153,7 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
         
     artifact = artifacts[id_]
 
-    r = requests.get(IPFS_URI + '/api/v0/object/stat', params={'arg': artifact})
+    r = requests.get(app.config['IPFS_URI'] + '/api/v0/object/stat', params={'arg': artifact})
     if r.status_code != 200:
         return failure(r.text, r.status_code)
 
