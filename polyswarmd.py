@@ -13,9 +13,21 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_sockets import Sockets
 from gevent import pywsgi, sleep
 from geventwebsocket.handler import WebSocketHandler
-from web3 import Web3, HTTPProvider
 from werkzeug.exceptions import default_exceptions, HTTPException
 from werkzeug.utils import secure_filename
+
+from web3 import Web3, HTTPProvider
+# See https://github.com/ethereum/web3.py/issues/549
+from web3.middleware.pythonic import (
+    pythonic_middleware,
+    to_hexbytes,
+)
+
+size_extraData_for_poa = 200   # can change
+
+web3 = Web3(HTTPProvider('http://localhost:8545', request_kwargs={'timeout': 1200}))
+pythonic_middleware.__closure__[2].cell_contents['eth_getBlockByNumber'].args[1].args[0]['extraData'] = to_hexbytes(size_extraData_for_poa, variable_length=True)
+pythonic_middleware.__closure__[2].cell_contents['eth_getBlockByHash'].args[1].args[0]['extraData'] = to_hexbytes(size_extraData_for_poa, variable_length=True)
 
 def install_error_handlers(app):
     def make_json_error(e):
@@ -537,34 +549,37 @@ def events(ws):
     assertion_filter = bounty_registry.eventFilter('NewAssertion')
     verdict_filter = bounty_registry.eventFilter('NewVerdict')
 
-    while not ws.closed:
-        for event in block_filter.get_new_entries():
-            ws.send(json.dumps({
-                'event': 'block',
-                'data': {
-                    'number': web3.eth.blockNumber,
-                },
-            }))
+    try:
+        while not ws.closed:
+            for event in block_filter.get_new_entries():
+                ws.send(json.dumps({
+                    'event': 'block',
+                    'data': {
+                        'number': web3.eth.blockNumber,
+                    },
+                }))
 
-        for event in bounty_filter.get_new_entries():
-            ws.send(json.dumps({
-                'event': 'bounty',
-                'data': new_bounty_event_to_dict(event.args),
-            }))
+            for event in bounty_filter.get_new_entries():
+                ws.send(json.dumps({
+                    'event': 'bounty',
+                    'data': new_bounty_event_to_dict(event.args),
+                }))
 
-        for event in assertion_filter.get_new_entries():
-            ws.send(json.dumps({
-                'event': 'assertion',
-                'data': new_assertion_event_to_dict(event.args),
-            }))
+            for event in assertion_filter.get_new_entries():
+                ws.send(json.dumps({
+                    'event': 'assertion',
+                    'data': new_assertion_event_to_dict(event.args),
+                }))
 
-        for event in verdict_filter.get_new_entries():
-            ws.send(json.dumps({
-                'event': 'verdict',
-                'data': new_verdict_event_to_dict(event.args),
-            }))
+            for event in verdict_filter.get_new_entries():
+                ws.send(json.dumps({
+                    'event': 'verdict',
+                    'data': new_verdict_event_to_dict(event.args),
+                }))
 
-        sleep(1)
+            sleep(1)
+    except:
+        return
 
 @app.before_request
 def before_request():
