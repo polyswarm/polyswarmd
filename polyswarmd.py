@@ -524,7 +524,7 @@ def post_accounts_address_balance_eth(address):
         return failure('Invalid address', 400)
 
     address = web3.toChecksumAddress(address)
-    return success(web3.eth.getBalance(address))
+    return success(str(web3.eth.getBalance(address)))
 
 @app.route('/accounts/<address>/balance/nct', methods=['GET'])
 def post_accounts_address_balance_nct(address):
@@ -532,7 +532,7 @@ def post_accounts_address_balance_nct(address):
         return failure('Invalid address', 400)
 
     address = web3.toChecksumAddress(address)
-    return success(nectar_token.functions.balanceOf(address).call())
+    return success(str(nectar_token.functions.balanceOf(address).call()))
 
 @app.route('/', defaults={'path': 'index.html'})
 @app.route('/<path:path>')
