@@ -7,3 +7,4 @@ polyswarmd.dev.cfg
 build/
 dist/
 deb_dist/
+polyswarmd.spec
