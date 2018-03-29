@@ -20,6 +20,14 @@ from web3.middleware import geth_poa_middleware
 from werkzeug.exceptions import default_exceptions, HTTPException
 from werkzeug.utils import secure_filename
 
+def whereami():
+    if hasattr(sys, 'frozen') and sys.frozen in ('windows_exe', 'console_exe'):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    else:
+        return os.path.dirname(os.path.abspath(__file__))
+
+load_dotenv(dotenv_path=os.path.join(whereami(), '.env'))
+
 # Ok to use globals as gevent is single threaded
 active_account = None
 web3 = Web3(HTTPProvider(os.environ['ETH_URI']))
@@ -34,14 +42,7 @@ def install_error_handlers(app):
     for code in default_exceptions.keys():
         app.register_error_handler(code, make_json_error)
 
-def whereami():
-    if hasattr(sys, 'frozen') and sys.frozen in ('windows_exe', 'console_exe'):
-        return os.path.dirname(os.path.abspath(sys.executable))
-    else:
-        return os.path.dirname(os.path.abspath(__file__))
-
 # We need to do some weird stuff here to help flask find our files
-load_dotenv(dotenv_path=os.path.join(whereami(), '.env'))
 network = os.environ.get('POLYSWARMD_NETWORK', None)
 config_file = 'polyswarmd.cfg' if not network else 'polyswarmd.{}.cfg'.format(network)
 app = Flask('polyswarmd', root_path=whereami(), instance_path=whereami(), static_folder=os.path.join(whereami(), 'frontend', 'build', 'static'))
