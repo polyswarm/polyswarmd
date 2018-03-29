@@ -20,7 +20,9 @@ from web3.middleware import geth_poa_middleware
 from werkzeug.exceptions import default_exceptions, HTTPException
 from werkzeug.utils import secure_filename
 
-web3 = Web3(HTTPProvider('http://localhost:8545', request_kwargs={'timeout': 1200}))
+# Ok to use globals as gevent is single threaded
+active_account = None
+web3 = Web3(HTTPProvider(os.environ['ETH_URI']))
 web3.middleware_stack.inject(geth_poa_middleware, layer=0)
 
 def install_error_handlers(app):
@@ -46,10 +48,6 @@ app = Flask('polyswarmd', root_path=whereami(), instance_path=whereami(), static
 app.config.from_pyfile(os.path.join(whereami(), config_file))
 install_error_handlers(app)
 sockets = Sockets(app)
-
-# Ok to use globals as gevent is single threaded
-web3 = Web3(HTTPProvider(os.environ['ETH_URI']))
-active_account = None
 
 def bind_contract(address, artifact):
     with open(os.path.join(whereami(), artifact), 'r') as f:
