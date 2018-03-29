@@ -9,25 +9,18 @@ from datetime import datetime
 
 import base58
 import requests
+from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 from flask_sockets import Sockets
 from gevent import pywsgi, sleep
 from geventwebsocket.handler import WebSocketHandler
+from web3 import Web3, HTTPProvider
+from web3.middleware import geth_poa_middleware
 from werkzeug.exceptions import default_exceptions, HTTPException
 from werkzeug.utils import secure_filename
 
-from web3 import Web3, HTTPProvider
-# See https://github.com/ethereum/web3.py/issues/549
-from web3.middleware.pythonic import (
-    pythonic_middleware,
-    to_hexbytes,
-)
-
-size_extraData_for_poa = 200   # can change
-
 web3 = Web3(HTTPProvider('http://localhost:8545', request_kwargs={'timeout': 1200}))
-pythonic_middleware.__closure__[2].cell_contents['eth_getBlockByNumber'].args[1].args[0]['extraData'] = to_hexbytes(size_extraData_for_poa, variable_length=True)
-pythonic_middleware.__closure__[2].cell_contents['eth_getBlockByHash'].args[1].args[0]['extraData'] = to_hexbytes(size_extraData_for_poa, variable_length=True)
+web3.middleware_stack.inject(geth_poa_middleware, layer=0)
 
 def install_error_handlers(app):
     def make_json_error(e):
@@ -44,8 +37,12 @@ def whereami():
     else:
         return os.path.dirname(os.path.abspath(__file__))
 
+load_dotenv(dotenv_path=os.path.join(whereami(), '.env'))
+network = os.environ.get('POLYSWARMD_NETWORK', None)
+config_file = 'polyswarmd.cfg' if not network else 'polyswarmd.{}.cfg'.format(network)
+print(config_file)
 app = Flask('polyswarmd', static_folder=os.path.join(whereami(), 'frontend', 'build', 'static'))
-app.config.from_pyfile(os.path.join(whereami(), 'polyswarmd.cfg'))
+app.config.from_pyfile(os.path.join(whereami(), config_file))
 install_error_handlers(app)
 sockets = Sockets(app)
 
@@ -101,6 +98,9 @@ def list_artifacts(ipfshash):
 @app.route('/artifacts', methods=['POST'])
 def post_artifacts():
     files = [('file', (f.filename, f, 'application/octet-stream')) for f in request.files.getlist(key='file')]
+    if len(files) > 256:
+        return failure('Too many artifacts', 400)
+
     r = requests.post(app.config['IPFS_URI'] + '/api/v0/add', files=files, params={'wrap-with-directory': True})
     if r.status_code != 200:
         return failure(r.text, r.status_code)
@@ -116,6 +116,8 @@ def get_artifacts_ipfshash(ipfshash):
     artifacts = list_artifacts(ipfshash)
     if not artifacts:
         return failure('Could not locate IPFS resource', 404)
+    if len(artifacts) > 256:
+        return failure('Invalid IPFS resource, too many links', 400)
 
     return success(artifacts)
 
@@ -128,7 +130,7 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
     if not artifacts:
         return failure('Could not locate IPFS resource', 404)
 
-    if id_ < 0 or id_ >= len(artifacts):
+    if id_ < 0 or id_ > 256 or id_ >= len(artifacts):
         return failure('Could not locate artifact ID', 404)
         
     artifact = artifacts[id_]
@@ -148,7 +150,7 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
     if not artifacts:
         return failure('Could not locate IPFS resource', 404)
 
-    if id_ < 0 or id_ >= len(artifacts):
+    if id_ < 0 or id_ > 256 or id_ >= len(artifacts):
         return failure('Could not locate artifact ID', 404)
         
     artifact = artifacts[id_]
