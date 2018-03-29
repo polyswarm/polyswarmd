@@ -37,17 +37,17 @@ def whereami():
     else:
         return os.path.dirname(os.path.abspath(__file__))
 
+# We need to do some weird stuff here to help flask find our files
 load_dotenv(dotenv_path=os.path.join(whereami(), '.env'))
 network = os.environ.get('POLYSWARMD_NETWORK', None)
 config_file = 'polyswarmd.cfg' if not network else 'polyswarmd.{}.cfg'.format(network)
-print(config_file)
-app = Flask('polyswarmd', static_folder=os.path.join(whereami(), 'frontend', 'build', 'static'))
+app = Flask('polyswarmd', root_path=whereami(), instance_path=whereami(), static_folder=os.path.join(whereami(), 'frontend', 'build', 'static'))
 app.config.from_pyfile(os.path.join(whereami(), config_file))
 install_error_handlers(app)
 sockets = Sockets(app)
 
 # Ok to use globals as gevent is single threaded
-web3 = Web3(HTTPProvider(app.config['ETH_URI']))
+web3 = Web3(HTTPProvider(os.environ['ETH_URI']))
 active_account = None
 
 def bind_contract(address, artifact):
@@ -85,7 +85,7 @@ def is_valid_ipfshash(ipfshash):
     return False
 
 def list_artifacts(ipfshash):
-    r = requests.get(app.config['IPFS_URI'] + '/api/v0/ls', params={'arg': ipfshash})
+    r = requests.get(os.environ['IPFS_URI'] + '/api/v0/ls', params={'arg': ipfshash})
     if r.status_code != 200:
         return []
 
@@ -101,7 +101,7 @@ def post_artifacts():
     if len(files) > 256:
         return failure('Too many artifacts', 400)
 
-    r = requests.post(app.config['IPFS_URI'] + '/api/v0/add', files=files, params={'wrap-with-directory': True})
+    r = requests.post(os.environ['IPFS_URI'] + '/api/v0/add', files=files, params={'wrap-with-directory': True})
     if r.status_code != 200:
         return failure(r.text, r.status_code)
 
@@ -135,7 +135,7 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
         
     artifact = artifacts[id_]
 
-    r = requests.get(app.config['IPFS_URI'] + '/api/v0/cat', params={'arg': artifact})
+    r = requests.get(os.environ['IPFS_URI'] + '/api/v0/cat', params={'arg': artifact})
     if r.status_code != 200:
         return failure(r.text, r.status_code)
 
@@ -155,7 +155,7 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
         
     artifact = artifacts[id_]
 
-    r = requests.get(app.config['IPFS_URI'] + '/api/v0/object/stat', params={'arg': artifact})
+    r = requests.get(os.environ['IPFS_URI'] + '/api/v0/object/stat', params={'arg': artifact})
     if r.status_code != 200:
         return failure(r.text, r.status_code)
 

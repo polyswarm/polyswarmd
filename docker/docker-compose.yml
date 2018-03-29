@@ -1,0 +1,30 @@
+version: '3'
+services:
+    polyswarmd:
+        image: "polyswarm/polyswarmd"
+        depends_on:
+            - geth
+            - ipfs
+        environment:
+            - IPFS_URI=ipfs:5001
+            - ETH_URI=geth:8545
+    geth:
+        image: "ethereum/client-go:alpine"
+        ports:
+            - "30303:30303"
+        volumes:
+            - "ethereum:/root/.ethereum"
+        command: ["--fast"]
+    ipfs:
+        image: "polyswarm/ipfs"
+        environment:
+            - IPFS_BIND_IP=0.0.0.0
+        ports:
+            - "4001:4001"
+        volumes:
+            - "ipfs-export:/export"
+            - "ipfs-data:/data/ipfs"
+volumes:
+    ethereum:
+    ipfs-export:
+    ipfs-data:

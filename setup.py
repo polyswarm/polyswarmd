@@ -1,9 +1,8 @@
-import os
 from setuptools import setup
-from glob import iglob
 
-def listdir(d):
-    return [g for g in iglob(os.path.join(d, '**', '*'), recursive=True) if os.path.isfile(g)]
+def parse_requirements():
+    with open('requirements.txt', 'r') as f:
+        return f.read().splitlines()
 
 setup(name='polyswarmd',
       version='0.1',
@@ -11,11 +10,15 @@ setup(name='polyswarmd',
       author = 'PolySwarm Developers',
       author_email = 'info@polyswarm.io',
       url='https://github.com/polyswarm/polyswarmd',
-      entry_points = {
-          'gui_scripts': ['polyswarmd=polyswarmd:main'],
+      install_requires=parse_requirements(),
+      packages=['polyswarmd'],
+      package_dir={
+          'polyswarmd': '.',
       },
-      data_files=[
-          ('frontend', listdir(os.path.join('frontend', 'build'))),
-          ('truffle', listdir(os.path.join('truffle', 'build'))),
-      ]
+      package_data={
+          'polyswarmd': ['polyswarmd.cfg', 'frontend/build/**/*', 'truffle/build/**/*'],
+      },
+      entry_points = {
+          'gui_scripts': ['polyswarmd=polyswarmd.polyswarmd:main'],
+      },
 )
