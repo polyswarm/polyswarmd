@@ -344,6 +344,7 @@ def post_bounties_guid_settle(guid):
         'properties': {
             'verdicts': {
                 'type': 'array',
+                'maxItems': 256,
                 'items': {
                     'type': 'boolean',
                 },
@@ -382,12 +383,14 @@ def post_bounties_guid_assertions(guid):
             },
             'mask': {
                 'type': 'array',
+                'maxItems': 256,
                 'items': {
                     'type': 'boolean',
                 },
             },
             'verdicts': {
                 'type': 'array',
+                'maxItems': 256,
                 'items': {
                     'type': 'boolean',
                 },
