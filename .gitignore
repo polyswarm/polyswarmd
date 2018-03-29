@@ -4,3 +4,6 @@ venv/
 __pycache__/
 .env
 polyswarmd.dev.cfg
+build/
+dist/
+deb_dist/

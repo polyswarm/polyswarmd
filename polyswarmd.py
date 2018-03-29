@@ -582,6 +582,9 @@ def events(ws):
 def before_request():
     print(datetime.now(), request.method, request.path)
 
-if __name__ == '__main__':
+def main():
     server = pywsgi.WSGIServer(('', 8080), app, handler_class=WebSocketHandler)
     server.serve_forever()
+
+if __name__ == '__main__':
+    main()
