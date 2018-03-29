@@ -28,9 +28,12 @@ def whereami():
 
 load_dotenv(dotenv_path=os.path.join(whereami(), '.env'))
 
+ETH_URI = os.environ.get('ETH_URI', 'http://localhost:8545')
+IPFS_URI = os.environ.get('IFPS_URI', 'http://localhost:5001')
+
 # Ok to use globals as gevent is single threaded
 active_account = None
-web3 = Web3(HTTPProvider(os.environ['ETH_URI']))
+web3 = Web3(HTTPProvider(ETH_URI))
 web3.middleware_stack.inject(geth_poa_middleware, layer=0)
 
 def install_error_handlers(app):
@@ -85,7 +88,7 @@ def is_valid_ipfshash(ipfshash):
     return False
 
 def list_artifacts(ipfshash):
-    r = requests.get(os.environ['IPFS_URI'] + '/api/v0/ls', params={'arg': ipfshash})
+    r = requests.get(IPFS_URI + '/api/v0/ls', params={'arg': ipfshash})
     if r.status_code != 200:
         return []
 
@@ -101,7 +104,7 @@ def post_artifacts():
     if len(files) > 256:
         return failure('Too many artifacts', 400)
 
-    r = requests.post(os.environ['IPFS_URI'] + '/api/v0/add', files=files, params={'wrap-with-directory': True})
+    r = requests.post(IPFS_URI + '/api/v0/add', files=files, params={'wrap-with-directory': True})
     if r.status_code != 200:
         return failure(r.text, r.status_code)
 
@@ -135,7 +138,7 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
         
     artifact = artifacts[id_]
 
-    r = requests.get(os.environ['IPFS_URI'] + '/api/v0/cat', params={'arg': artifact})
+    r = requests.get(IPFS_URI + '/api/v0/cat', params={'arg': artifact})
     if r.status_code != 200:
         return failure(r.text, r.status_code)
 
@@ -155,7 +158,7 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
         
     artifact = artifacts[id_]
 
-    r = requests.get(os.environ['IPFS_URI'] + '/api/v0/object/stat', params={'arg': artifact})
+    r = requests.get(IPFS_URI + '/api/v0/object/stat', params={'arg': artifact})
     if r.status_code != 200:
         return failure(r.text, r.status_code)
 
