@@ -48,7 +48,7 @@ def install_error_handlers(app):
 # We need to do some weird stuff here to help flask find our files
 network = os.environ.get('POLYSWARMD_NETWORK', None)
 config_file = 'polyswarmd.cfg' if not network else 'polyswarmd.{}.cfg'.format(network)
-app = Flask('polyswarmd', root_path=whereami(), instance_path=whereami(), static_folder=os.path.join(whereami(), 'frontend', 'build', 'static'))
+app = Flask('polyswarmd', root_path=whereami(), instance_path=whereami())
 app.config.from_pyfile(os.path.join(whereami(), config_file))
 install_error_handlers(app)
 sockets = Sockets(app)
@@ -539,11 +539,6 @@ def post_accounts_address_balance_nct(address):
 
     address = web3.toChecksumAddress(address)
     return success(str(nectar_token.functions.balanceOf(address).call()))
-
-@app.route('/', defaults={'path': 'index.html'})
-@app.route('/<path:path>')
-def catch_all(path):
-    return send_from_directory(os.path.join(whereami(), 'frontend', 'build'), path)
 
 @sockets.route('/events')
 def events(ws):
