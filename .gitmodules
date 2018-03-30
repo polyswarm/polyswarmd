@@ -1,6 +1,6 @@
 [submodule "truffle"]
 	path = truffle
-	url = git@github.com:polyswarm/polyswarm-truffle.git
+	url = https://github.com/polyswarm/polyswarm-truffle.git
 [submodule "frontend"]
 	path = frontend
-	url = git@github.com:polyswarm/bounty-management.git
+	url = https://github.com/polyswarm/bounty-management.git
