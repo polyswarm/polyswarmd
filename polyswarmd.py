@@ -588,6 +588,4 @@ def main():
     server.serve_forever()
 
 if __name__ == '__main__':
-    print('Hosting interface on http://localhost:8080, opening browser...')
-    webbrowser.open_new_tab('http://localhost:8080')
     main()
