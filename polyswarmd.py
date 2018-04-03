@@ -540,6 +540,10 @@ def post_accounts_address_balance_nct(address):
     address = web3.toChecksumAddress(address)
     return success(str(nectar_token.functions.balanceOf(address).call()))
 
+@app.route('/syncing', methods=['GET'])
+def get_syncing():
+    return jsonify(dict(web3.eth.syncing))
+
 @sockets.route('/events')
 def events(ws):
     block_filter = web3.eth.filter('latest')
