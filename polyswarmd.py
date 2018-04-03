@@ -589,10 +589,10 @@ def before_request():
     print(datetime.now(), request.method, request.path)
 
 def main():
-    server = pywsgi.WSGIServer(('', 8080), app, handler_class=WebSocketHandler)
+    server = pywsgi.WSGIServer(('', 31337), app, handler_class=WebSocketHandler)
     server.serve_forever()
 
 if __name__ == '__main__':
-    print('Hosting interface on http://localhost:8080, opening browser...')
-    webbrowser.open_new_tab('http://localhost:8080')
+    print('Hosting interface on http://localhost:31337, opening browser...')
+    webbrowser.open_new_tab('http://localhost:31337')
     main()
