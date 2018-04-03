@@ -542,7 +542,10 @@ def post_accounts_address_balance_nct(address):
 
 @app.route('/syncing', methods=['GET'])
 def get_syncing():
-    return jsonify(dict(web3.eth.syncing))
+    if not web3.eth.syncing:
+        return success(False)
+    else:
+        return success(dict(web3.eth.syncing))
 
 @sockets.route('/events')
 def events(ws):
