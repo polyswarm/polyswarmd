@@ -83,8 +83,12 @@ Steps:
 7) Run server with ``python3 polyswarmd.py``
 
 Docker
-~~~~~~
+------
 
 0) Build a docker image from ``docker/Dockerfile``, tag as
     ``polyswarm/polyswarmd``
-1) Run with ``docker-compose -f docker/docker-compose.yml up``
+1) Build a docker image from ``docker/Dockerfile.ipfs``, tag as
+    ``polyswarm/ipfs`` (This dockerfile from
+    https://github.com/ipfs/go-ipfs/blob/master/Dockerfile.fast )
+2) Run with ``docker-compose -f docker/docker-compose.yml up``
+
