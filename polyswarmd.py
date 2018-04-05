@@ -3,6 +3,7 @@
 import json
 import jsonschema
 import os
+import re
 import sys
 import uuid
 import webbrowser
@@ -92,9 +93,9 @@ def list_artifacts(ipfshash):
     if r.status_code != 200:
         return []
 
-    links = [l['Hash'] for l in r.json()['Objects'][0]['Links']]
+    links = [(l['Name'], l['Hash']) for l in r.json()['Objects'][0]['Links']]
     if not links:
-        links = [r.json()['Objects'][0]['Hash']]
+        links = ['', r.json()['Objects'][0]['Hash']]
 
     return links
 
@@ -122,7 +123,7 @@ def get_artifacts_ipfshash(ipfshash):
     if len(artifacts) > 256:
         return failure('Invalid IPFS resource, too many links', 400)
 
-    return success(artifacts)
+    return success([{'name': a[0], 'hash': a[1]} for a in artifacts])
 
 @app.route('/artifacts/<ipfshash>/<int:id_>', methods=['GET'])
 def get_artifacts_ipfshash_id(ipfshash, id_):
@@ -136,7 +137,7 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
     if id_ < 0 or id_ > 256 or id_ >= len(artifacts):
         return failure('Could not locate artifact ID', 404)
         
-    artifact = artifacts[id_]
+    artifact = artifacts[id_][1]
 
     r = requests.get(IPFS_URI + '/api/v0/cat', params={'arg': artifact})
     if r.status_code != 200:
@@ -156,13 +157,17 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
     if id_ < 0 or id_ > 256 or id_ >= len(artifacts):
         return failure('Could not locate artifact ID', 404)
         
-    artifact = artifacts[id_]
+    artifact = artifacts[id_][1]
 
     r = requests.get(IPFS_URI + '/api/v0/object/stat', params={'arg': artifact})
     if r.status_code != 200:
         return failure(r.text, r.status_code)
 
-    return success(r.json())
+    # Convert stats to snake_case
+    stats = {re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', k).lower(): v for k, v in r.json().items()}
+    stats['name'] = artifacts[id_][0]
+
+    return success(stats)
 
 def wait_for_receipt(tx):
     while True:
