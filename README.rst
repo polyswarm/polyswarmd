@@ -115,3 +115,16 @@ Examples
 
 **Settle bounty (arbiter)**
 `curl -H 'Content-Type: application/json' -d '{"verdicts": [true]}' http://localhost:31337/bounties/5caa7538-3cb6-44ca-9def-ca0c87e6f0fa/settle`
+
+Common issues and solutions
+---------------------------
+
+tuple index out of range
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+This error appears when you have the wrong contract addresses. Not an issue on main net, but if using a private testnet you need to edit ``polyswarm.cfg`` with the correct addresses from when you deployed. 
+
+Transaction always fails or ran out of gas
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This error message appears when you post an assertion that targets an expired bounty. 
