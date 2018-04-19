@@ -124,7 +124,7 @@ tuple index out of range
 
 This error appears when you have the wrong contract addresses. Not an issue on main net, but if using a private testnet you need to edit ``polyswarm.cfg`` with the correct addresses from when you deployed. 
 
-Transaction always fails or ran out of gas
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gas required exceeds allowance or always failing transaction
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This error message appears when you post an assertion that targets an expired bounty. 
