@@ -16,6 +16,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_sockets import Sockets
 from gevent import pywsgi, sleep
 from geventwebsocket.handler import WebSocketHandler
+from jsonschema.exceptions import ValidationError
 from web3 import Web3, HTTPProvider
 from web3.middleware import geth_poa_middleware
 from werkzeug.exceptions import default_exceptions, HTTPException
@@ -253,6 +254,7 @@ def post_bounties():
                 'type': 'string',
                 'minLength': 1,
                 'maxLength': 64,
+                'pattern': r'^\d+$',
             },
             'uri': {
                 'type': 'string',
@@ -264,13 +266,14 @@ def post_bounties():
                 'minimum': 1,
             },
         },
+        'required': ['amount', 'uri', 'duration'],
     }
 
     body = request.get_json()
     try:
         jsonschema.validate(body, schema)
-    except:
-        return failure('Invalid JSON', 400)
+    except ValidationError as e:
+        return failure('Invalid JSON: ' + e.message, 400)
 
     guid = uuid.uuid4()
     amount = int(body['amount'])
@@ -366,13 +369,14 @@ def post_bounties_guid_settle(guid):
                 },
             },
         },
+        'required': ['verdicts'],
     }
 
     body = request.get_json()
     try:
         jsonschema.validate(body, schema)
-    except:
-        return failure('Invalid JSON', 400)
+    except ValidationError as e:
+        return failure('Invalid JSON: ' + e.message, 400)
 
     verdicts = bool_list_to_int(body['verdicts'])
 
@@ -399,6 +403,7 @@ def post_bounties_guid_assertions(guid):
                 'type': 'string',
                 'minLength': 1,
                 'maxLength': 64,
+                'pattern': r'^\d+$',
             },
             'mask': {
                 'type': 'array',
@@ -419,13 +424,14 @@ def post_bounties_guid_assertions(guid):
                 'maxLength': 1024,
             },
         },
+        'required': ['bid', 'mask', 'verdicts', 'metadata'],
     }
 
     body = request.get_json()
     try:
         jsonschema.validate(body, schema)
-    except:
-        return failure('Invalid JSON', 400)
+    except ValidationError as e:
+        return failure('Invalid JSON: ' + e.message, 400)
 
     bid = int(body['bid'])
     mask = bool_list_to_int(body['mask'])
@@ -479,13 +485,14 @@ def post_accounts():
                 'maxLength': 1024,
             },
         },
+        'required': ['password'],
     }
 
     body = request.get_json()
     try:
         jsonschema.validate(body, schema)
-    except:
-        return failure('Invalid JSON', 400)
+    except ValidationError as e:
+        return failure('Invalid JSON: ' + e.message, 400)
 
     password = body['password']
     return success(web3.personal.newAccount(password))
@@ -516,13 +523,14 @@ def post_accounts_address_unlock(address):
                 'maxLength': 1024,
             },
         },
+        'required': ['password'],
     }
 
     body = request.get_json()
     try:
         jsonschema.validate(body, schema)
-    except:
-        return failure('Invalid JSON', 400)
+    except ValidationError as e:
+        return failure('Invalid JSON: ' + e.message, 400)
 
     password = body['password']
     address = web3.toChecksumAddress(address)
