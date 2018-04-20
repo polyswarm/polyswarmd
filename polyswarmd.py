@@ -89,8 +89,10 @@ def is_valid_ipfshash(ipfshash):
     return False
 
 def list_artifacts(ipfshash):
-    r = requests.get(IPFS_URI + '/api/v0/ls', params={'arg': ipfshash})
-    if r.status_code != 200:
+    try:
+        r = requests.get(IPFS_URI + '/api/v0/ls', params={'arg': ipfshash}, timeout=1)
+        r.raise_for_status()
+    except:
         return []
 
     links = [(l['Name'], l['Hash']) for l in r.json()['Objects'][0]['Links']]
@@ -105,9 +107,11 @@ def post_artifacts():
     if len(files) > 256:
         return failure('Too many artifacts', 400)
 
-    r = requests.post(IPFS_URI + '/api/v0/add', files=files, params={'wrap-with-directory': True})
-    if r.status_code != 200:
-        return failure(r.text, r.status_code)
+    try:
+        r = requests.post(IPFS_URI + '/api/v0/add', files=files, params={'wrap-with-directory': True})
+        r.raise_for_status()
+    except:
+        return failure("Could not add artifacts to IPFS", 400)
 
     ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
     return success(ipfshash)
@@ -139,9 +143,11 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
         
     artifact = artifacts[id_][1]
 
-    r = requests.get(IPFS_URI + '/api/v0/cat', params={'arg': artifact})
-    if r.status_code != 200:
-        return failure(r.text, r.status_code)
+    try:
+        r = requests.get(IPFS_URI + '/api/v0/cat', params={'arg': artifact}, timeout=1)
+        r.raise_for_status()
+    except:
+        return failure("Could not locate IPFS resource", 404)
 
     return r.content
 
@@ -159,9 +165,11 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
         
     artifact = artifacts[id_][1]
 
-    r = requests.get(IPFS_URI + '/api/v0/object/stat', params={'arg': artifact})
-    if r.status_code != 200:
-        return failure(r.text, r.status_code)
+    try:
+        r = requests.get(IPFS_URI + '/api/v0/object/stat', params={'arg': artifact})
+        r.raise_for_status()
+    except:
+        return failure("Could not locate IPFS resource", 400)
 
     # Convert stats to snake_case
     stats = {re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', k).lower(): v for k, v in r.json().items()}
