@@ -293,7 +293,10 @@ def post_bounties():
         return failure('Post bounty transaction failed, verify parameters and try again', 400)
 
     receipt = web3.eth.getTransactionReceipt(tx)
-    new_bounty_event = bounty_registry.events.NewBounty().processReceipt(receipt)[0]['args']
+    processed = bounty_registry.events.NewBounty().processReceipt(receipt)
+    if len(processed) == 0:
+        return failure('Invalid transaction receipt, no events emitted. Check contract addresses', 400)
+    new_bounty_event = processed[0]['args']
 
     return success(new_bounty_event_to_dict(new_bounty_event))
 
@@ -378,7 +381,10 @@ def post_bounties_guid_settle(guid):
         return failure('Settle bounty transaction failed, verify parameters and try again', 400)
 
     receipt = web3.eth.getTransactionReceipt(tx)
-    new_verdict_event = bounty_registry.events.NewVerdict().processReceipt(receipt)[0]['args']
+    processed = bounty_registry.events.NewVerdict().processReceipt(receipt)
+    if len(processed) == 0:
+        return failure('Invalid transaction receipt, no events emitted. Check contract addresses', 400)
+    new_verdict_event = processed[0]['args']
     return success(new_verdict_event_to_dict(new_verdict_event))
 
 @app.route('/bounties/<uuid:guid>/assertions', methods=['POST'])
@@ -439,7 +445,10 @@ def post_bounties_guid_assertions(guid):
         return failure('Post assertion transaction failed, verify parameters and try again', 400)
 
     receipt = web3.eth.getTransactionReceipt(tx)
-    new_assertion_event = bounty_registry.events.NewAssertion().processReceipt(receipt)[0]['args']
+    processed = bounty_registry.events.NewAssertion().processReceipt(receipt)
+    if len(processed) == 0:
+        return failure('Invalid transaction receipt, no events emitted. Check contract addresses', 400)
+    new_assertion_event = processed[0]['args']
     return success(new_assertion_event_to_dict(new_assertion_event))
 
 @app.route('/bounties/<uuid:guid>/assertions', methods=['GET'])
