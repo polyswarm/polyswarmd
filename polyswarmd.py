@@ -559,7 +559,7 @@ def post_accounts_address_unlock(address):
         return failure('Invalid JSON: ' + e.message, 400)
 
     address = web3.toChecksumAddress(address)
-    if web3.personal.unlockAccount(address, body['password']):
+    if web3.personal.unlockAccount(address, body['password'], 9223372036):
         active_account = address
         return success(active_account)
     else:
