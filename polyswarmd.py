@@ -1,16 +1,16 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python3
 
+import base58
+import datetime
 import json
 import jsonschema
 import os
 import re
+import requests
 import sys
 import uuid
 import webbrowser
-from datetime import datetime
 
-import base58
-import requests
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 from flask_sockets import Sockets
@@ -59,11 +59,17 @@ def bind_contract(address, artifact):
     with open(os.path.join(whereami(), artifact), 'r') as f:
         abi = json.load(f)['abi']
 
-    return web3.eth.contract(address=web3.toChecksumAddress(address), abi=abi) 
+    return web3.eth.contract(address=web3.toChecksumAddress(address), abi=abi)
 
 ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
-nectar_token = bind_contract(app.config['NECTAR_TOKEN_ADDRESS'], 'truffle/build/contracts/NectarToken.json')
-bounty_registry = bind_contract(app.config['BOUNTY_REGISTRY_ADDRESS'], 'truffle/build/contracts/BountyRegistry.json')
+nectar_token = bind_contract(
+    app.config['NECTAR_TOKEN_ADDRESS'],
+    'truffle/build/contracts/NectarToken.json'
+)
+bounty_registry = bind_contract(
+    app.config['BOUNTY_REGISTRY_ADDRESS'],
+    'truffle/build/contracts/BountyRegistry.json'
+)
 
 # Keep these in sync with the contract
 BOUNTY_FEE = 62500000000000000
@@ -104,12 +110,18 @@ def list_artifacts(ipfshash):
 
 @app.route('/artifacts', methods=['POST'])
 def post_artifacts():
-    files = [('file', (f.filename, f, 'application/octet-stream')) for f in request.files.getlist(key='file')]
+    files = [
+        ('file', (f.filename, f, 'application/octet-stream'))
+        for f in request.files.getlist(key='file')
+    ]
     if len(files) > 256:
         return failure('Too many artifacts', 400)
 
     try:
-        r = requests.post(IPFS_URI + '/api/v0/add', files=files, params={'wrap-with-directory': True})
+        r = requests.post(
+            IPFS_URI + '/api/v0/add', files=files,
+            params={'wrap-with-directory': True}
+        )
         r.raise_for_status()
     except:
         return failure("Could not add artifacts to IPFS", 400)
@@ -141,7 +153,7 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
 
     if id_ < 0 or id_ > 256 or id_ >= len(artifacts):
         return failure('Could not locate artifact ID', 404)
-        
+
     artifact = artifacts[id_][1]
 
     try:
@@ -163,7 +175,7 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
 
     if id_ < 0 or id_ > 256 or id_ >= len(artifacts):
         return failure('Could not locate artifact ID', 404)
-        
+
     artifact = artifacts[id_][1]
 
     try:
@@ -245,7 +257,7 @@ def new_verdict_event_to_dict(new_verdict_event):
 @app.route('/bounties', methods=['POST'])
 def post_bounties():
     if active_account is None:
-        return failure('Account unlock requried', 401)
+        return failure('Account unlock required', 401)
 
     schema = {
         'type': 'object',
@@ -288,10 +300,15 @@ def post_bounties():
 
     approveAmount = amount + BOUNTY_FEE
 
-    tx = nectar_token.functions.approve(bounty_registry.address, approveAmount).transact({'from': active_account, 'gasLimit': 200000 })
+    tx = nectar_token.functions.approve(
+        bounty_registry.address, approveAmount
+    ).transact({'from': active_account, 'gasLimit': 200000})
     if not check_transaction(tx):
         return failure('Approve transaction failed, verify parameters and try again', 400)
-    tx = bounty_registry.functions.postBounty(guid.int, amount, artifactURI, durationBlocks).transact({'from': active_account, 'gasLimit': 200000 })
+
+    tx = bounty_registry.functions.postBounty(
+        guid.int, amount, artifactURI, durationBlocks
+    ).transact({'from': active_account, 'gasLimit': 200000})
     if not check_transaction(tx):
         return failure('Post bounty transaction failed, verify parameters and try again', 400)
 
@@ -300,7 +317,6 @@ def post_bounties():
     if len(processed) == 0:
         return failure('Invalid transaction receipt, no events emitted. Check contract addresses', 400)
     new_bounty_event = processed[0]['args']
-
     return success(new_bounty_event_to_dict(new_bounty_event))
 
 # TODO: Caching layer for this
@@ -310,8 +326,9 @@ def get_bounties():
     bounties = []
     for i in range(num_bounties):
         guid = bounty_registry.functions.bountyGuids(i).call()
-        bounty = bounty_to_dict(bounty_registry.functions.bountiesByGuid(guid).call())
-        bounties.append(bounty)
+        bounties.append(bounty_to_dict(
+            bounty_registry.functions.bountiesByGuid(guid).call()
+        ))
 
     return success(bounties)
 
@@ -323,7 +340,9 @@ def get_bounties_active():
     bounties = []
     for i in range(num_bounties):
         guid = bounty_registry.functions.bountyGuids(i).call()
-        bounty = bounty_to_dict(bounty_registry.functions.bountiesByGuid(guid).call())
+        bounty = bounty_to_dict(
+            bounty_registry.functions.bountiesByGuid(guid).call()
+        )
 
         if bounty['expiration'] > current_block:
             bounties.append(bounty)
@@ -356,7 +375,7 @@ def get_bounties_guid(guid):
 @app.route('/bounties/<uuid:guid>/settle', methods=['POST'])
 def post_bounties_guid_settle(guid):
     if active_account is None:
-        return failure('Account unlock requried', 401)
+        return failure('Account unlock required', 401)
 
     schema = {
         'type': 'object',
@@ -380,7 +399,9 @@ def post_bounties_guid_settle(guid):
 
     verdicts = bool_list_to_int(body['verdicts'])
 
-    tx = bounty_registry.functions.settleBounty(guid.int, verdicts).transact({'from': active_account, 'gasLimit': 1000000 })
+    tx = bounty_registry.functions.settleBounty(
+        guid.int, verdicts
+    ).transact({'from': active_account, 'gasLimit': 1000000})
     if not check_transaction(tx):
         return failure('Settle bounty transaction failed, verify parameters and try again', 400)
 
@@ -394,7 +415,7 @@ def post_bounties_guid_settle(guid):
 @app.route('/bounties/<uuid:guid>/assertions', methods=['POST'])
 def post_bounties_guid_assertions(guid):
     if active_account is None:
-        return failure('Account unlock requried', 401)
+        return failure('Account unlock required', 401)
 
     schema = {
         'type': 'object',
@@ -443,10 +464,15 @@ def post_bounties_guid_assertions(guid):
 
     approveAmount = bid + ASSERTION_FEE
 
-    tx = nectar_token.functions.approve(bounty_registry.address, approveAmount).transact({'from': active_account, 'gasLimit': 200000 })
+    tx = nectar_token.functions.approve(
+        bounty_registry.address, approveAmount
+    ).transact({'from': active_account, 'gasLimit': 200000})
     if not check_transaction(tx):
         return failure('Approve transaction failed, verify parameters and try again', 400)
-    tx = bounty_registry.functions.postAssertion(guid.int, bid, mask, verdicts, metadata).transact({'from': active_account, 'gasLimit': 200000 })
+
+    tx = bounty_registry.functions.postAssertion(
+        guid.int, bid, mask, verdicts, metadata
+    ).transact({'from': active_account, 'gasLimit': 200000})
     if not check_transaction(tx):
         return failure('Post assertion transaction failed, verify parameters and try again', 400)
 
@@ -532,9 +558,8 @@ def post_accounts_address_unlock(address):
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
-    password = body['password']
     address = web3.toChecksumAddress(address)
-    if web3.personal.unlockAccount(address, password):
+    if web3.personal.unlockAccount(address, body['password'], 9223372036):
         active_account = address
         return success(active_account)
     else:
@@ -618,7 +643,7 @@ def events(ws):
 
 @app.before_request
 def before_request():
-    print(datetime.now(), request.method, request.path)
+    print(datetime.datetime.now(), request.method, request.path)
 
 def main():
     server = pywsgi.WSGIServer(('', 31337), app, handler_class=WebSocketHandler)
