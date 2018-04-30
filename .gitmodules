@@ -1,7 +1,4 @@
 [submodule "truffle"]
 	path = truffle
-	url = https://github.com/polyswarm/polyswarm-truffle.git
+	url = https://gitlab.com/polyswarm/polyswarm-truffle.git
 	ignore = untracked
-[submodule "frontend"]
-	path = frontend
-	url = https://github.com/polyswarm/bounty-management.git
