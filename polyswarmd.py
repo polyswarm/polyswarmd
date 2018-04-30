@@ -104,7 +104,7 @@ def list_artifacts(ipfshash):
 
     links = [(l['Name'], l['Hash']) for l in r.json()['Objects'][0]['Links']]
     if not links:
-        links = ['', r.json()['Objects'][0]['Hash']]
+        links = [('', r.json()['Objects'][0]['Hash'])]
 
     return links
 
