@@ -1,0 +1,35 @@
+version: '3'
+services:
+    polyswarmd:
+        image: "polyswarm/polyswarmd"
+        depends_on:
+            - geth
+            - ipfs
+        entrypoint:
+            - polyswarmd
+        environment:
+            - ETH_URI=http://geth:8545
+            - IPFS_URI=http://ipfs:5001
+        ports:
+            - "31337:31337"
+    geth:
+        image: "registry.gitlab.com/polyswarm/eth-networks/priv-testnet"
+        ports:
+            - "30303:30303"
+            - "8545:8545"
+        volumes:
+            - "ethereum:/root/.ethereum"
+        command: ["--rpcvhosts", "geth"]
+    ipfs:
+        image: "ipfs/go-ipfs"
+        environment:
+            - IPFS_BIND_IP=0.0.0.0
+        ports:
+            - "4001:4001"
+        volumes:
+            - "ipfs-export:/export"
+            - "ipfs-data:/data/ipfs"
+volumes:
+    ethereum:
+    ipfs-export:
+    ipfs-data:
