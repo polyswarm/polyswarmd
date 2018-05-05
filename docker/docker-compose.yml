@@ -5,16 +5,20 @@ services:
         depends_on:
             - geth
             - ipfs
+        entrypoint:
+            - polyswarmd
         environment:
-            - IPFS_URI=ipfs:5001
-            - ETH_URI=geth:8545
+            - ETH_URI=http://geth:8545
+            - IPFS_URI=http://ipfs:5001
+        ports:
+            - "31337:31337"
     geth:
         image: "ethereum/client-go:alpine"
         ports:
             - "30303:30303"
         volumes:
             - "ethereum:/root/.ethereum"
-        command: ["--fast"]
+        command: ["--fast", "--rpc", "--rpcaddr", "0.0.0.0", "--rpcvhosts", "geth", "--rpcapi", "eth,web3,personal,net"]
     ipfs:
         image: "ipfs/go-ipfs"
         environment:

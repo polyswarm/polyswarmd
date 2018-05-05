@@ -1,4 +1,3 @@
 [submodule "truffle"]
 	path = truffle
 	url = https://github.com/polyswarm/polyswarm-contracts.git
-	ignore = untracked
