@@ -19,7 +19,7 @@ services:
             - "8545:8545"
         volumes:
             - "ethereum:/root/.ethereum"
-        command: ["--rpcvhosts", "geth"]
+        command: ["--rpcvhosts", "localhost,geth"]
     ipfs:
         image: "ipfs/go-ipfs"
         environment:
