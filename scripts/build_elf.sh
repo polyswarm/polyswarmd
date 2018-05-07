@@ -1,5 +1,5 @@
 #!/bin/bash
-pyinstaller polyswarmd.py -y --clean
+pyinstaller polyswarmd/__main__.py -n polyswarmd -y --clean
 mkdir -p dist/polyswarmd/truffle
 cp -r truffle/build/ dist/polyswarmd/truffle/
-cp polyswarmd.cfg dist/polyswarmd/
+cp polyswarmd.yml dist/polyswarmd/
