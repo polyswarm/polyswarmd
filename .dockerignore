@@ -7,7 +7,5 @@ polyswarmd.dev.cfg
 build/
 dist/
 deb_dist/
-fronend/
-!frontend/build/
 truffle/
 !truffle/build/

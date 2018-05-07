@@ -10,6 +10,7 @@ services:
         environment:
             - ETH_URI=http://geth:8545
             - IPFS_URI=http://ipfs:5001
+            - POLYSWARMD_NETWORK=docker
         ports:
             - "31337:31337"
     geth:

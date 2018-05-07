@@ -124,7 +124,8 @@ def post_artifacts():
         )
         r.raise_for_status()
     except:
-        return failure("Could not add artifacts to IPFS", 400)
+        raise
+        #return failure("Could not add artifacts to IPFS", 400)
 
     ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
     return success(ipfshash)
