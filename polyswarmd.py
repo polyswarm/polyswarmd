@@ -31,7 +31,7 @@ def whereami():
 load_dotenv(dotenv_path=os.path.join(whereami(), '.env'))
 
 ETH_URI = os.environ.get('ETH_URI', 'http://localhost:8545')
-IPFS_URI = os.environ.get('IFPS_URI', 'http://localhost:5001')
+IPFS_URI = os.environ.get('IPFS_URI', 'http://localhost:5001')
 
 # Ok to use globals as gevent is single threaded
 active_account = None
