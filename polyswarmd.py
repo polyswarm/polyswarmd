@@ -33,8 +33,6 @@ load_dotenv(dotenv_path=os.path.join(whereami(), '.env'))
 ETH_URI = os.environ.get('ETH_URI', 'http://localhost:8545')
 IPFS_URI = os.environ.get('IPFS_URI', 'http://localhost:5001')
 
-# Ok to use globals as gevent is single threaded
-active_account = None
 web3 = Web3(HTTPProvider(ETH_URI))
 web3.middleware_stack.inject(geth_poa_middleware, layer=0)
 
@@ -256,8 +254,9 @@ def new_verdict_event_to_dict(new_verdict_event):
 
 @app.route('/bounties', methods=['POST'])
 def post_bounties():
-    if active_account is None:
-        return failure('Account unlock required', 401)
+    account = request.args.get('account')
+    if not account or not web3.isAddress(account):
+        return failure('Source account required', 401)
 
     schema = {
         'type': 'object',
@@ -300,17 +299,17 @@ def post_bounties():
 
     approveAmount = amount + BOUNTY_FEE
 
-    tx = nectar_token.functions.approve(
-        bounty_registry.address, approveAmount
-    ).transact({'from': active_account, 'gasLimit': 200000})
-    if not check_transaction(tx):
-        return failure('Approve transaction failed, verify parameters and try again', 400)
-
-    tx = bounty_registry.functions.postBounty(
-        guid.int, amount, artifactURI, durationBlocks
-    ).transact({'from': active_account, 'gasLimit': 200000})
-    if not check_transaction(tx):
-        return failure('Post bounty transaction failed, verify parameters and try again', 400)
+#    tx = nectar_token.functions.approve(
+#        bounty_registry.address, approveAmount
+#    ).transact({'from': active_account, 'gasLimit': 200000})
+#    if not check_transaction(tx):
+#        return failure('Approve transaction failed, verify parameters and try again', 400)
+#
+#    tx = bounty_registry.functions.postBounty(
+#        guid.int, amount, artifactURI, durationBlocks
+#    ).transact({'from': active_account, 'gasLimit': 200000})
+#    if not check_transaction(tx):
+#        return failure('Post bounty transaction failed, verify parameters and try again', 400)
 
     receipt = web3.eth.getTransactionReceipt(tx)
     processed = bounty_registry.events.NewBounty().processReceipt(receipt)
@@ -374,8 +373,9 @@ def get_bounties_guid(guid):
 
 @app.route('/bounties/<uuid:guid>/settle', methods=['POST'])
 def post_bounties_guid_settle(guid):
-    if active_account is None:
-        return failure('Account unlock required', 401)
+    account = request.args.get('account')
+    if not account or not web3.isAddress(account):
+        return failure('Source account required', 401)
 
     schema = {
         'type': 'object',
@@ -399,11 +399,11 @@ def post_bounties_guid_settle(guid):
 
     verdicts = bool_list_to_int(body['verdicts'])
 
-    tx = bounty_registry.functions.settleBounty(
-        guid.int, verdicts
-    ).transact({'from': active_account, 'gasLimit': 1000000})
-    if not check_transaction(tx):
-        return failure('Settle bounty transaction failed, verify parameters and try again', 400)
+#    tx = bounty_registry.functions.settleBounty(
+#        guid.int, verdicts
+#    ).transact({'from': active_account, 'gasLimit': 1000000})
+#    if not check_transaction(tx):
+#        return failure('Settle bounty transaction failed, verify parameters and try again', 400)
 
     receipt = web3.eth.getTransactionReceipt(tx)
     processed = bounty_registry.events.NewVerdict().processReceipt(receipt)
@@ -414,8 +414,9 @@ def post_bounties_guid_settle(guid):
 
 @app.route('/bounties/<uuid:guid>/assertions', methods=['POST'])
 def post_bounties_guid_assertions(guid):
-    if active_account is None:
-        return failure('Account unlock required', 401)
+    account = request.args.get('account')
+    if not account or not web3.isAddress(account):
+        return failure('Source account required', 401)
 
     schema = {
         'type': 'object',
@@ -464,17 +465,17 @@ def post_bounties_guid_assertions(guid):
 
     approveAmount = bid + ASSERTION_FEE
 
-    tx = nectar_token.functions.approve(
-        bounty_registry.address, approveAmount
-    ).transact({'from': active_account, 'gasLimit': 200000})
-    if not check_transaction(tx):
-        return failure('Approve transaction failed, verify parameters and try again', 400)
-
-    tx = bounty_registry.functions.postAssertion(
-        guid.int, bid, mask, verdicts, metadata
-    ).transact({'from': active_account, 'gasLimit': 200000})
-    if not check_transaction(tx):
-        return failure('Post assertion transaction failed, verify parameters and try again', 400)
+#    tx = nectar_token.functions.approve(
+#        bounty_registry.address, approveAmount
+#    ).transact({'from': active_account, 'gasLimit': 200000})
+#    if not check_transaction(tx):
+#        return failure('Approve transaction failed, verify parameters and try again', 400)
+#
+#    tx = bounty_registry.functions.postAssertion(
+#        guid.int, bid, mask, verdicts, metadata
+#    ).transact({'from': active_account, 'gasLimit': 200000})
+#    if not check_transaction(tx):
+#        return failure('Post assertion transaction failed, verify parameters and try again', 400)
 
     receipt = web3.eth.getTransactionReceipt(tx)
     processed = bounty_registry.events.NewAssertion().processReceipt(receipt)
@@ -500,95 +501,16 @@ def get_bounties_guid_assertions_id(guid, id_):
     except:
         return failure('Assertion not found', 404)
 
-@app.route('/accounts', methods=['POST'])
-def post_accounts():
-    schema = {
-        'type': 'object',
-        'properties': {
-            'password': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 1024,
-            },
-        },
-        'required': ['password'],
-    }
-
-    body = request.get_json()
-    try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
-        return failure('Invalid JSON: ' + e.message, 400)
-
-    password = body['password']
-    return success(web3.personal.newAccount(password))
-
-@app.route('/accounts', methods=['GET'])
-def get_accounts():
-    return success(web3.personal.listAccounts)
-
-@app.route('/accounts/active', methods=['GET'])
-def get_accounts_active():
-    if active_account:
-        return success(active_account)
-    else:
-        return failure('No active account, unlock required', 401)
-
-@app.route('/accounts/<address>/unlock', methods=['POST'])
-def post_accounts_address_unlock(address):
-    global active_account
-    if not web3.isAddress(address):
-        return failure('Invalid address', 400)
-
-    schema = {
-        'type': 'object',
-        'properties': {
-            'password': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 1024,
-            },
-        },
-        'required': ['password'],
-    }
-
-    body = request.get_json()
-    try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
-        return failure('Invalid JSON: ' + e.message, 400)
-
-    address = web3.toChecksumAddress(address)
-    if web3.personal.unlockAccount(address, body['password'], 9223372036):
-        active_account = address
-        return success(active_account)
-    else:
-        return failure('Incorrect password', 401)
-
-@app.route('/accounts/<address>/lock', methods=['POST'])
-def post_accounts_address_lock(address):
-    global active_account
-    if not web3.isAddress(address):
-        return failure('Invalid address', 400)
-
-    address = web3.toChecksumAddress(address)
-    if active_account == address:
-        web3.personal.lockAccount(address)
-        active_account = None
-        return success()
-    else:
-        return failure('Account not unlocked', 401)
-
-@app.route('/accounts/<address>/balance/eth', methods=['GET'])
-def post_accounts_address_balance_eth(address):
+@app.route('/balance/<address>/eth', methods=['GET'])
+def get_balance_address_eth(address):
     if not web3.isAddress(address):
         return failure('Invalid address', 400)
 
     address = web3.toChecksumAddress(address)
     return success(str(web3.eth.getBalance(address)))
 
-@app.route('/accounts/<address>/balance/nct', methods=['GET'])
-def post_accounts_address_balance_nct(address):
+@app.route('/balance/<address>/nct', methods=['GET'])
+def get_balance_address_nct(address):
     if not web3.isAddress(address):
         return failure('Invalid address', 400)
 
@@ -640,6 +562,18 @@ def events(ws):
             sleep(1)
     except:
         return
+
+@sockets.route('/transactions')
+def transactions(ws):
+    pass
+
+@app.route('/')
+def index():
+    account = request.args.get('account')
+    if not account or not web3.isAddress(account):
+        return failure('Source account required', 401)
+
+    return success(account)
 
 @app.before_request
 def before_request():
