@@ -16,7 +16,7 @@ setup(name='polyswarmd',
           'polyswarmd': '.',
       },
       package_data={
-          'polyswarmd': ['polyswarmd.cfg', 'frontend/build/**/*', 'truffle/build/**/*'],
+          'polyswarmd': ['polyswarmd.cfg', 'polyswarmd.docker.cfg', 'truffle/build/**/*'],
       },
       entry_points = {
           'console_scripts': ['polyswarmd=polyswarmd.polyswarmd:main'],
