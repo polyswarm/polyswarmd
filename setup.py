@@ -13,7 +13,7 @@ setup(name='polyswarmd',
       install_requires=parse_requirements(),
       packages=['polyswarmd'],
       package_dir={
-          'polyswarmd': '.',
+          'polyswarmd': 'src',
       },
       package_data={
           'polyswarmd': ['polyswarmd.yml', 'polyswarmd.docker.yml', 'truffle/build/**/*'],

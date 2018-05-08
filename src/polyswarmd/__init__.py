@@ -3,8 +3,6 @@
 import datetime
 
 from flask import Flask, request
-from gevent import pywsgi
-from geventwebsocket.handler import WebSocketHandler
 
 from polyswarmd.config import init_config, whereami
 init_config()
@@ -26,6 +24,10 @@ app.register_blueprint(bounties, url_prefix='/bounties')
 init_websockets(app)
 
 
+@app.before_request
+def before_request():
+    print(datetime.datetime.now(), request.method, request.path)
+    
 # TODO: Keep this?
 @app.route('/syncing', methods=['GET'])
 def get_syncing():
@@ -33,14 +35,3 @@ def get_syncing():
         return success(False)
     else:
         return success(dict(web3.eth.syncing))
-
-
-@app.before_request
-def before_request():
-    print(datetime.datetime.now(), request.method, request.path)
-
-
-def main():
-    server = pywsgi.WSGIServer(
-        ('', 31337), app, handler_class=WebSocketHandler)
-    server.serve_forever()
