@@ -302,5 +302,3 @@ def get_bounties_guid_assertions_id(guid, id_):
         return success(assertion_to_dict(bounty_registry.functions.assertionsByGuid(guid.int, id_).call()))
     except:
         return failure('Assertion not found', 404)
-
-

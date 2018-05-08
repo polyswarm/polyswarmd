@@ -111,5 +111,3 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
     stats['name'] = artifacts[id_][0]
 
     return success(stats)
-
-

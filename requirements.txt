@@ -2,10 +2,10 @@ base58==0.2.5
 gevent==1.2.2
 gevent-websocket==0.10.1
 jsonschema==2.6.0
-Flask==0.12.2
+Flask==1.0.2
 Flask-Sockets==0.2.1
 PyYaml==3.12
 python-dotenv==0.7.1
 requests==2.18.4
-web3==4.0.0b11
+web3==4.2.0
 Werkzeug==0.14.1
