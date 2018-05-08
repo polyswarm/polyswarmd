@@ -8,6 +8,7 @@ from polyswarmd.response import success, failure
 
 bounties = Blueprint('bounties', __name__)
 
+
 def bounty_to_dict(bounty):
     return {
         'guid': str(uuid.UUID(int=bounty[0])),
@@ -19,6 +20,7 @@ def bounty_to_dict(bounty):
         'verdicts': int_to_bool_list(bounty[6]),
     }
 
+
 def new_bounty_event_to_dict(new_bounty_event):
     return {
         'guid': str(uuid.UUID(int=new_bounty_event.guid)),
@@ -28,6 +30,7 @@ def new_bounty_event_to_dict(new_bounty_event):
         'expiration': str(new_bounty_event.expirationBlock),
     }
 
+
 def assertion_to_dict(assertion):
     return {
         'author': assertion[0],
@@ -36,6 +39,7 @@ def assertion_to_dict(assertion):
         'verdicts': int_to_bool_list(assertion[3]),
         'metadata': assertion[4],
     }
+
 
 def new_assertion_event_to_dict(new_assertion_event):
     return {
@@ -48,11 +52,13 @@ def new_assertion_event_to_dict(new_assertion_event):
         'metadata': new_assertion_event.metadata,
     }
 
+
 def new_verdict_event_to_dict(new_verdict_event):
     return {
         'bounty_guid': str(uuid.UUID(int=new_verdict_event.bountyGuid)),
         'verdicts': int_to_bool_list(new_verdict_event.verdicts),
     }
+
 
 @bounties.route('', methods=['POST'])
 def post_bounties():
@@ -101,24 +107,27 @@ def post_bounties():
 
     approveAmount = amount + eth.bounty_fee()
 
-#    tx = nectar_token.functions.approve(
-#        bounty_registry.address, approveAmount
-#    ).transact({'from': active_account, 'gasLimit': 200000})
-#    if not check_transaction(tx):
-#        return failure('Approve transaction failed, verify parameters and try again', 400)
-#
-#    tx = bounty_registry.functions.postBounty(
-#        guid.int, amount, artifactURI, durationBlocks
-#    ).transact({'from': active_account, 'gasLimit': 200000})
-#    if not check_transaction(tx):
-#        return failure('Post bounty transaction failed, verify parameters and try again', 400)
+    #    tx = nectar_token.functions.approve(
+    #        bounty_registry.address, approveAmount
+    #    ).transact({'from': active_account, 'gasLimit': 200000})
+    #    if not check_transaction(tx):
+    #        return failure('Approve transaction failed, verify parameters and try again', 400)
+    #
+    #    tx = bounty_registry.functions.postBounty(
+    #        guid.int, amount, artifactURI, durationBlocks
+    #    ).transact({'from': active_account, 'gasLimit': 200000})
+    #    if not check_transaction(tx):
+    #        return failure('Post bounty transaction failed, verify parameters and try again', 400)
 
     receipt = web3.eth.getTransactionReceipt(tx)
     processed = bounty_registry.events.NewBounty().processReceipt(receipt)
     if len(processed) == 0:
-        return failure('Invalid transaction receipt, no events emitted. Check contract addresses', 400)
+        return failure(
+            'Invalid transaction receipt, no events emitted. Check contract addresses',
+            400)
     new_bounty_event = processed[0]['args']
     return success(new_bounty_event_to_dict(new_bounty_event))
+
 
 # TODO: Caching layer for this
 @bounties.route('', methods=['GET'])
@@ -127,11 +136,12 @@ def get_bounties():
     bounties = []
     for i in range(num_bounties):
         guid = bounty_registry.functions.bountyGuids(i).call()
-        bounties.append(bounty_to_dict(
-            bounty_registry.functions.bountiesByGuid(guid).call()
-        ))
+        bounties.append(
+            bounty_to_dict(
+                bounty_registry.functions.bountiesByGuid(guid).call()))
 
     return success(bounties)
+
 
 # TODO: Caching layer for this
 @bounties.route('/active', methods=['GET'])
@@ -142,13 +152,13 @@ def get_bounties_active():
     for i in range(num_bounties):
         guid = bounty_registry.functions.bountyGuids(i).call()
         bounty = bounty_to_dict(
-            bounty_registry.functions.bountiesByGuid(guid).call()
-        )
+            bounty_registry.functions.bountiesByGuid(guid).call())
 
         if bounty['expiration'] > current_block:
             bounties.append(bounty)
 
     return success(bounties)
+
 
 # TODO: Caching layer for this
 @bounties.route('/pending', methods=['GET'])
@@ -158,20 +168,24 @@ def get_bounties_pending():
     bounties = []
     for i in range(num_bounties):
         guid = bounty_registry.functions.bountyGuids(i).call()
-        bounty = bounty_to_dict(bounty_registry.functions.bountiesByGuid(guid).call())
+        bounty = bounty_to_dict(
+            bounty_registry.functions.bountiesByGuid(guid).call())
 
         if bounty['expiration'] <= current_block and not bounty['resolved']:
             bounties.append(bounty)
 
     return success(bounties)
 
+
 @bounties.route('/<uuid:guid>', methods=['GET'])
 def get_bounties_guid(guid):
-    bounty = bounty_to_dict(bounty_registry.functions.bountiesByGuid(guid.int).call())
+    bounty = bounty_to_dict(
+        bounty_registry.functions.bountiesByGuid(guid.int).call())
     if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
     else:
         return success(bounty)
+
 
 @bounties.route('/<uuid:guid>/settle', methods=['POST'])
 def post_bounties_guid_settle(guid):
@@ -201,18 +215,21 @@ def post_bounties_guid_settle(guid):
 
     verdicts = bool_list_to_int(body['verdicts'])
 
-#    tx = bounty_registry.functions.settleBounty(
-#        guid.int, verdicts
-#    ).transact({'from': active_account, 'gasLimit': 1000000})
-#    if not check_transaction(tx):
-#        return failure('Settle bounty transaction failed, verify parameters and try again', 400)
+    #    tx = bounty_registry.functions.settleBounty(
+    #        guid.int, verdicts
+    #    ).transact({'from': active_account, 'gasLimit': 1000000})
+    #    if not check_transaction(tx):
+    #        return failure('Settle bounty transaction failed, verify parameters and try again', 400)
 
     receipt = web3.eth.getTransactionReceipt(tx)
     processed = bounty_registry.events.NewVerdict().processReceipt(receipt)
     if len(processed) == 0:
-        return failure('Invalid transaction receipt, no events emitted. Check contract addresses', 400)
+        return failure(
+            'Invalid transaction receipt, no events emitted. Check contract addresses',
+            400)
     new_verdict_event = processed[0]['args']
     return success(new_verdict_event_to_dict(new_verdict_event))
+
 
 @bounties.route('/<uuid:guid>/assertions', methods=['POST'])
 def post_bounties_guid_assertions(guid):
@@ -267,38 +284,47 @@ def post_bounties_guid_assertions(guid):
 
     approveAmount = bid + eth.assertion_fee()
 
-#    tx = nectar_token.functions.approve(
-#        bounty_registry.address, approveAmount
-#    ).transact({'from': active_account, 'gasLimit': 200000})
-#    if not check_transaction(tx):
-#        return failure('Approve transaction failed, verify parameters and try again', 400)
-#
-#    tx = bounty_registry.functions.postAssertion(
-#        guid.int, bid, mask, verdicts, metadata
-#    ).transact({'from': active_account, 'gasLimit': 200000})
-#    if not check_transaction(tx):
-#        return failure('Post assertion transaction failed, verify parameters and try again', 400)
+    #    tx = nectar_token.functions.approve(
+    #        bounty_registry.address, approveAmount
+    #    ).transact({'from': active_account, 'gasLimit': 200000})
+    #    if not check_transaction(tx):
+    #        return failure('Approve transaction failed, verify parameters and try again', 400)
+    #
+    #    tx = bounty_registry.functions.postAssertion(
+    #        guid.int, bid, mask, verdicts, metadata
+    #    ).transact({'from': active_account, 'gasLimit': 200000})
+    #    if not check_transaction(tx):
+    #        return failure('Post assertion transaction failed, verify parameters and try again', 400)
 
     receipt = web3.eth.getTransactionReceipt(tx)
     processed = bounty_registry.events.NewAssertion().processReceipt(receipt)
     if len(processed) == 0:
-        return failure('Invalid transaction receipt, no events emitted. Check contract addresses', 400)
+        return failure(
+            'Invalid transaction receipt, no events emitted. Check contract addresses',
+            400)
     new_assertion_event = processed[0]['args']
     return success(new_assertion_event_to_dict(new_assertion_event))
 
+
 @bounties.route('/<uuid:guid>/assertions', methods=['GET'])
 def get_bounties_guid_assertions(guid):
-    num_assertions = bounty_registry.functions.getNumberOfAssertions(guid.int).call()
+    num_assertions = bounty_registry.functions.getNumberOfAssertions(
+        guid.int).call()
     assertions = []
     for i in range(num_assertions):
-        assertion = assertion_to_dict(bounty_registry.functions.assertionsByGuid(guid.int, i).call())
+        assertion = assertion_to_dict(
+            bounty_registry.functions.assertionsByGuid(guid.int, i).call())
         assertions.append(assertion)
 
     return success(assertions)
 
+
 @bounties.route('/<uuid:guid>/assertions/<int:id_>', methods=['GET'])
 def get_bounties_guid_assertions_id(guid, id_):
     try:
-        return success(assertion_to_dict(bounty_registry.functions.assertionsByGuid(guid.int, id_).call()))
+        return success(
+            assertion_to_dict(
+                bounty_registry.functions.assertionsByGuid(guid.int,
+                                                           id_).call()))
     except:
         return failure('Assertion not found', 404)

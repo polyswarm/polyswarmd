@@ -25,6 +25,7 @@ app.register_blueprint(balances, url_prefix='/balances')
 app.register_blueprint(bounties, url_prefix='/bounties')
 init_websockets(app)
 
+
 # TODO: Keep this?
 @app.route('/syncing', methods=['GET'])
 def get_syncing():
@@ -33,10 +34,13 @@ def get_syncing():
     else:
         return success(dict(web3.eth.syncing))
 
+
 @app.before_request
 def before_request():
     print(datetime.datetime.now(), request.method, request.path)
 
+
 def main():
-    server = pywsgi.WSGIServer(('', 31337), app, handler_class=WebSocketHandler)
+    server = pywsgi.WSGIServer(
+        ('', 31337), app, handler_class=WebSocketHandler)
     server.serve_forever()

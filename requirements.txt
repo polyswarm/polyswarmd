@@ -5,6 +5,7 @@ jsonschema==2.6.0
 Flask==1.0.2
 Flask-Sockets==0.2.1
 PyYaml==3.12
+pytest==3.5.1
 python-dotenv==0.7.1
 requests==2.18.4
 web3==4.2.0

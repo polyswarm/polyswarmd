@@ -8,6 +8,7 @@ from polyswarmd.response import success, failure
 
 artifacts = Blueprint('artifacts', __name__)
 
+
 def is_valid_ipfshash(ipfshash):
     # TODO: Further multihash validation
     try:
@@ -17,9 +18,11 @@ def is_valid_ipfshash(ipfshash):
 
     return False
 
+
 def list_artifacts(ipfshash):
     try:
-        r = requests.get(ipfs_uri + '/api/v0/ls', params={'arg': ipfshash}, timeout=1)
+        r = requests.get(
+            ipfs_uri + '/api/v0/ls', params={'arg': ipfshash}, timeout=1)
         r.raise_for_status()
     except:
         return []
@@ -30,26 +33,26 @@ def list_artifacts(ipfshash):
 
     return links
 
+
 @artifacts.route('', methods=['POST'])
 def post_artifacts():
-    files = [
-        ('file', (f.filename, f, 'application/octet-stream'))
-        for f in request.files.getlist(key='file')
-    ]
+    files = [('file', (f.filename, f, 'application/octet-stream'))
+             for f in request.files.getlist(key='file')]
     if len(files) > 256:
         return failure('Too many artifacts', 400)
 
     try:
         r = requests.post(
-            ipfs_uri + '/api/v0/add', files=files,
-            params={'wrap-with-directory': True}
-        )
+            ipfs_uri + '/api/v0/add',
+            files=files,
+            params={'wrap-with-directory': True})
         r.raise_for_status()
     except:
         return failure("Could not add artifacts to IPFS", 400)
 
     ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
     return success(ipfshash)
+
 
 @artifacts.route('/<ipfshash>', methods=['GET'])
 def get_artifacts_ipfshash(ipfshash):
@@ -63,6 +66,7 @@ def get_artifacts_ipfshash(ipfshash):
         return failure('Invalid IPFS resource, too many links', 400)
 
     return success([{'name': a[0], 'hash': a[1]} for a in artifacts])
+
 
 @artifacts.route('/<ipfshash>/<int:id_>', methods=['GET'])
 def get_artifacts_ipfshash_id(ipfshash, id_):
@@ -79,12 +83,14 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
     artifact = artifacts[id_][1]
 
     try:
-        r = requests.get(ipfs_uri + '/api/v0/cat', params={'arg': artifact}, timeout=1)
+        r = requests.get(
+            ipfs_uri + '/api/v0/cat', params={'arg': artifact}, timeout=1)
         r.raise_for_status()
     except:
         return failure("Could not locate IPFS resource", 404)
 
     return r.content
+
 
 @artifacts.route('/<ipfshash>/<int:id_>/stat', methods=['GET'])
 def get_artifacts_ipfshash_id_stat(ipfshash, id_):
@@ -101,13 +107,17 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
     artifact = artifacts[id_][1]
 
     try:
-        r = requests.get(ipfs_uri + '/api/v0/object/stat', params={'arg': artifact})
+        r = requests.get(
+            ipfs_uri + '/api/v0/object/stat', params={'arg': artifact})
         r.raise_for_status()
     except:
         return failure("Could not locate IPFS resource", 400)
 
     # Convert stats to snake_case
-    stats = {re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', k).lower(): v for k, v in r.json().items()}
+    stats = {
+        re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', k).lower(): v
+        for k, v in r.json().items()
+    }
     stats['name'] = artifacts[id_][0]
 
     return success(stats)

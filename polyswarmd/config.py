@@ -10,11 +10,13 @@ network = ''
 nectar_token_address = ''
 bounty_registry_address = ''
 
+
 def whereami():
     if hasattr(sys, 'frozen') and sys.frozen in ('windows_exe', 'console_exe'):
         return os.path.dirname(os.path.abspath(sys.executable))
     else:
         return os.path.dirname(os.path.abspath(__file__))
+
 
 def init_config():
     global eth_uri, ipfs_uri, network, nectar_token_address, bounty_registry_address
@@ -25,7 +27,8 @@ def init_config():
     ipfs_uri = os.environ.get('IPFS_URI', 'http://localhost:5001')
     network = os.environ.get('POLYSWARMD_NETWORK', None)
 
-    config_file = 'polyswarmd.yml' if not network else 'polyswarmd.{}.yml'.format(network)
+    config_file = 'polyswarmd.yml' if not network else 'polyswarmd.{}.yml'.format(
+        network)
     config_file = os.path.abspath(os.path.join(whereami(), '..', config_file))
 
     with open(config_file, 'r') as f:
