@@ -29,7 +29,8 @@ def init_config():
 
     config_file = 'polyswarmd.yml' if not network else 'polyswarmd.{}.yml'.format(
         network)
-    config_file = os.path.abspath(os.path.join(whereami(), '..', config_file))
+    config_file = os.path.abspath(
+        os.path.join(whereami(), 'config', config_file))
 
     with open(config_file, 'r') as f:
         y = yaml.load(f.read())

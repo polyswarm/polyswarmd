@@ -2,7 +2,7 @@ import json
 import os
 import unittest
 import polyswarmd
-from polyswarmd import check_transaction
+from polyswarmd.eth import check_transaction
 from flask import request_started, g
 
 from web3.module import Module

@@ -2,7 +2,7 @@ from flask_sockets import Sockets
 from gevent import sleep
 
 from polyswarmd.eth import web3, bounty_registry
-from polyswarmd.bounty import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict
+from polyswarmd.bounties import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict
 
 
 def init_websockets(app):

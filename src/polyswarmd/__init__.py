@@ -27,7 +27,8 @@ init_websockets(app)
 @app.before_request
 def before_request():
     print(datetime.datetime.now(), request.method, request.path)
-    
+
+
 # TODO: Keep this?
 @app.route('/syncing', methods=['GET'])
 def get_syncing():

@@ -19,12 +19,12 @@ def bind_contract(address, artifact):
 zero_address = '0x0000000000000000000000000000000000000000'
 
 nectar_token = bind_contract(nectar_token_address,
-                             os.path.join('..', 'truffle', 'build',
-                                          'contracts', 'NectarToken.json'))
+                             os.path.join('truffle', 'build', 'contracts',
+                                          'NectarToken.json'))
 
-bounty_registry = bind_contract(
-    bounty_registry_address,
-    os.path.join('..', 'truffle', 'build', 'contracts', 'BountyRegistry.json'))
+bounty_registry = bind_contract(bounty_registry_address,
+                                os.path.join('truffle', 'build', 'contracts',
+                                             'BountyRegistry.json'))
 
 
 def wait_for_receipt(tx):
