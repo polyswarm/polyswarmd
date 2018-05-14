@@ -79,7 +79,7 @@ Steps:
 4) Build truffle project ``truffle compile``
 5) Deploy truffle project onto (local private) Ethereum chain
    ``truffle migrate``
-6) Install python dependencies ``pip install -r requirements.txt``
+6) Install python dependencies ``pip3 install -r requirements.txt``
 7) Run server with ``python3 polyswarmd.py``
 
 Docker
