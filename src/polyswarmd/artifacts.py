@@ -1,8 +1,9 @@
 import base58
+import json
 import re
 import requests
 
-from flask import Blueprint
+from flask import Blueprint, request
 from polyswarmd.config import ipfs_uri
 from polyswarmd.response import success, failure
 
