@@ -1,30 +1,55 @@
 import json
+import jsonschema
 import gevent
 import gevent.queue
 
 from flask_sockets import Sockets
+from hexbytes import HexBytes
+from jsonschema.exceptions import ValidationError
 
 from polyswarmd.eth import web3, bounty_registry
 from polyswarmd.bounties import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict
 
 
+# TODO: This needs some tweaking to work for multiple accounts / concurrent
+# requests, mostly dealing with nonce calculation
 class TransactionQueue(object):
     def __init__(self):
         self.inner = gevent.queue.Queue()
         self.lock = gevent.lock.Semaphore()
         self.dict = dict()
-        self.chain_id = web3.net.version
+        self.chain_id = int(web3.net.version)
+        self.id_ = 0
+        self.pending = 0
+
+    def acquire(self):
+        self.lock.acquire()
+
+    def release(self):
+        self.lock.release()
+
+    def complete(self, id_, txhash):
+        self.dict[id_].set_result(txhash)
 
     def send_transaction(self, call, account):
-        nonce = web3.eth.getTransactionCount(account)
-        tx = call.buildTransaction({'nonce:': nonce, 'chainId': self.chain_id})
+        self.acquire()
 
+        nonce = web3.eth.getTransactionCount(account) + self.pending
+        self.pending += 1
+
+        tx = call.buildTransaction({
+            'nonce': nonce,
+            'chainId': self.chain_id,
+        })
         result = gevent.event.AsyncResult()
 
-        self.lock.acquire()
-        self.dict[nonce] = (result, tx)
-        self.inner.put(tx)
-        self.lock.release()
+        self.dict[self.id_] = result
+        self.inner.put((self.id_, tx))
+        self.id_ += 1
+
+        self.release()
+
+        return result
 
     def __iter__(self):
         return iter(self.inner)
@@ -83,15 +108,51 @@ def init_websockets(app):
 
                 gevent.sleep(1)
         except:
-            return
+            pass
 
     @sockets.route('/transactions')
     def transactions(ws):
         def queue_greenlet():
-            for tx in transaction_queue:
-                ws.send(json.dumps(tx))
+            for (id_, tx) in transaction_queue:
+                ws.send(json.dumps({'id': id_, 'data': tx}))
 
-        def websocket_greenlet():
-            pass
+        qgl = gevent.spawn(queue_greenlet)
 
-        gevent.joinall([gevent.spawn(queue_greenlet)])
+        schema = {
+            'type': 'object',
+            'properties': {
+                'id': {
+                    'type': 'integer',
+                },
+                'data': {
+                    'type': 'string',
+                    'maxLength': 4096,
+                },
+            },
+            'required': ['id', 'data'],
+        }
+
+        try:
+            while not ws.closed:
+                msg = ws.receive()
+                if not msg:
+                    break
+
+                body = json.loads(msg)
+                try:
+                    jsonschema.validate(body, schema)
+                except ValidationError as e:
+                    print('Invalid JSON: ' + e.message)
+
+                id_ = body['id']
+                data = body['data']
+
+                transaction_queue.acquire()
+
+                txhash = web3.eth.sendRawTransaction(HexBytes(data))
+                transaction_queue.complete(id_, txhash)
+
+                transaction_queue.release()
+
+        finally:
+            qgl.kill()

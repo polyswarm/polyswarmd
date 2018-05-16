@@ -5,6 +5,7 @@ from flask import Blueprint, request
 from jsonschema.exceptions import ValidationError
 from polyswarmd.eth import web3, nectar_token, bounty_registry
 from polyswarmd.response import success, failure
+from polyswarmd.websockets import transaction_queue
 
 bounties = Blueprint('bounties', __name__)
 
@@ -107,17 +108,19 @@ def post_bounties():
 
     approveAmount = amount + eth.bounty_fee()
 
-    #    tx = nectar_token.functions.approve(
-    #        bounty_registry.address, approveAmount
-    #    ).transact({'from': active_account, 'gasLimit': 200000})
-    #    if not check_transaction(tx):
-    #        return failure('Approve transaction failed, verify parameters and try again', 400)
-    #
-    #    tx = bounty_registry.functions.postBounty(
-    #        guid.int, amount, artifactURI, durationBlocks
-    #    ).transact({'from': active_account, 'gasLimit': 200000})
-    #    if not check_transaction(tx):
-    #        return failure('Post bounty transaction failed, verify parameters and try again', 400)
+    tx = transaction_queue.send_transaction(
+        nectar_token.functions.approve(bounty_registry.address, approveAmount),
+        account).get()
+    if not check_transaction(tx):
+        return failure(
+            'Approve transaction failed, verify parameters and try again', 400)
+    tx = transaction_queue(
+        bounty_registry.functions.postBounty(guid.int, amount, artifactURI,
+                                             durationBlocks), account).get()
+    if not check_transaction(tx):
+        return failure(
+            'Post bounty transaction failed, verify parameters and try again',
+            400)
 
     receipt = web3.eth.getTransactionReceipt(tx)
     processed = bounty_registry.events.NewBounty().processReceipt(receipt)
@@ -215,11 +218,13 @@ def post_bounties_guid_settle(guid):
 
     verdicts = bool_list_to_int(body['verdicts'])
 
-    #    tx = bounty_registry.functions.settleBounty(
-    #        guid.int, verdicts
-    #    ).transact({'from': active_account, 'gasLimit': 1000000})
-    #    if not check_transaction(tx):
-    #        return failure('Settle bounty transaction failed, verify parameters and try again', 400)
+    tx = transaction_queue.send_transaction(
+        bounty_registry.functions.settleBounty(guid.int, verdicts),
+        account).get()
+    if not check_transaction(tx):
+        return failure(
+            'Settle bounty transaction failed, verify parameters and try again',
+            400)
 
     receipt = web3.eth.getTransactionReceipt(tx)
     processed = bounty_registry.events.NewVerdict().processReceipt(receipt)
@@ -284,17 +289,20 @@ def post_bounties_guid_assertions(guid):
 
     approveAmount = bid + eth.assertion_fee()
 
-    #    tx = nectar_token.functions.approve(
-    #        bounty_registry.address, approveAmount
-    #    ).transact({'from': active_account, 'gasLimit': 200000})
-    #    if not check_transaction(tx):
-    #        return failure('Approve transaction failed, verify parameters and try again', 400)
-    #
-    #    tx = bounty_registry.functions.postAssertion(
-    #        guid.int, bid, mask, verdicts, metadata
-    #    ).transact({'from': active_account, 'gasLimit': 200000})
-    #    if not check_transaction(tx):
-    #        return failure('Post assertion transaction failed, verify parameters and try again', 400)
+    tx = transaction_queue.send_transaction(
+        nectar_token.functions.approve(bounty_registry.address, approveAmount),
+        account).get()
+    if not check_transaction(tx):
+        return failure(
+            'Approve transaction failed, verify parameters and try again', 400)
+
+    tx = transaction_queue.send_transaction(
+        bounty_registry.functions.postAssertion(guid.int, bid, mask, verdicts,
+                                                metadata), account).get()
+    if not check_transaction(tx):
+        return failure(
+            'Post assertion transaction failed, verify parameters and try again',
+            400)
 
     receipt = web3.eth.getTransactionReceipt(tx)
     processed = bounty_registry.events.NewAssertion().processReceipt(receipt)

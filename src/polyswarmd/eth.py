@@ -1,5 +1,6 @@
-import os
 import json
+import gevent
+import os
 
 from polyswarmd.config import eth_uri, nectar_token_address, bounty_registry_address, whereami
 from web3 import Web3, HTTPProvider
@@ -32,7 +33,7 @@ def wait_for_receipt(tx):
         receipt = web3.eth.getTransactionReceipt(tx)
         if receipt:
             return receipt
-        sleep(1)
+        gevent.sleep(1)
 
 
 def check_transaction(tx):
