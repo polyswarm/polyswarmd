@@ -55,7 +55,7 @@ app.config.from_pyfile(os.path.join(whereami(), config_file))
 #If environment variables are set and of the right format, ignore the previous config
 #and app.config to these values instead
 if ("NECTAR_TOKEN_ADDRESS" in os.environ) and ("BOUNTY_REGISTRY_ADDRESS" in os.environ):
-	if (os.environ.get('NECTAR_TOKEN_ADDRESS'[0:2]="0x") and (os.environ.get('BOUNTY_REGISTRY_ADDRESS')[0:2]="0x"):
+	if os.environ.get('NECTAR_TOKEN_ADDRESS'[0:2]) == "0x" and os.environ.get('BOUNTY_REGISTRY_ADDRESS')[0:2] == "0x":
 		app.config['NECTAR_TOKEN_ADDRESS'] = os.environ.get('NECTAR_TOKEN_ADDRESS')
 		app.config['BOUNTY_REGISTRY_ADDRESS'] = os.environ.get('BOUNTY_REGISTRY_ADDRESS')
 install_error_handlers(app)
