@@ -54,9 +54,13 @@ app = Flask('polyswarmd', root_path=whereami(), instance_path=whereami())
 app.config.from_pyfile(os.path.join(whereami(), config_file))
 #If environment variables are set and of the right format, ignore the previous config
 #and app.config to these values instead
-if ("NECTAR_TOKEN_ADDRESS" in os.environ) and ("BOUNTY_REGISTRY_ADDRESS" in os.environ):
-	if os.environ.get('NECTAR_TOKEN_ADDRESS'[0:2]) == "0x" and os.environ.get('BOUNTY_REGISTRY_ADDRESS')[0:2] == "0x":
+if ("NECTAR_TOKEN_ADDRESS" in os.environ): 
+	if os.environ.get('NECTAR_TOKEN_ADDRESS')[0:2] == "0x":
+		print ("read in nectar_token_address")
 		app.config['NECTAR_TOKEN_ADDRESS'] = os.environ.get('NECTAR_TOKEN_ADDRESS')
+if ("BOUNTY_REGISTRY_ADDRESS" in os.environ):
+	if os.environ.get('BOUNTY_REGISTRY_ADDRESS')[0:2] == "0x":
+		print ("read in bounty_registry_address")
 		app.config['BOUNTY_REGISTRY_ADDRESS'] = os.environ.get('BOUNTY_REGISTRY_ADDRESS')
 install_error_handlers(app)
 sockets = Sockets(app)
@@ -321,7 +325,7 @@ def post_bounties():
     receipt = web3.eth.getTransactionReceipt(tx)
     processed = bounty_registry.events.NewBounty().processReceipt(receipt)
     if len(processed) == 0:
-        return failure('Invalid transaction receipt, no events emitted. Check contract addresses', 400)
+        return failure('Invalid transaction receipt, no events emitted. Check contract addresses or env vars', 400)
     new_bounty_event = processed[0]['args']
     return success(new_bounty_event_to_dict(new_bounty_event))
 
