@@ -8,7 +8,7 @@ from hexbytes import HexBytes
 from jsonschema.exceptions import ValidationError
 
 from polyswarmd.eth import web3, bounty_registry
-from polyswarmd.bounties import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict
+from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict
 
 
 # TODO: This needs some tweaking to work for multiple accounts / concurrent
