@@ -29,7 +29,10 @@ class TransactionQueue(object):
         self.lock.release()
 
     def complete(self, id_, txhash):
+        self.acquire()
         self.dict[id_].set_result(txhash)
+        self.pending -= 1
+        self.release()
 
     def send_transaction(self, call, account):
         self.acquire()
@@ -147,12 +150,9 @@ def init_websockets(app):
                 id_ = body['id']
                 data = body['data']
 
-                transaction_queue.acquire()
-
                 txhash = web3.eth.sendRawTransaction(HexBytes(data))
+                print('GOT TXHASH:', txhash)
                 transaction_queue.complete(id_, txhash)
-
-                transaction_queue.release()
 
         finally:
             qgl.kill()

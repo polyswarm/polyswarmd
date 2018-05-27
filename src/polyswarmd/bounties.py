@@ -76,7 +76,6 @@ def post_bounties():
         return failure(
             'Post bounty transaction failed, verify parameters and try again',
             400)
-
     receipt = web3.eth.getTransactionReceipt(tx)
     processed = bounty_registry.events.NewBounty().processReceipt(receipt)
     if not processed:

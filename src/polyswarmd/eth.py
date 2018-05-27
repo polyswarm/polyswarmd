@@ -29,17 +29,9 @@ bounty_registry = bind_contract(bounty_registry_address,
                                              'BountyRegistry.json'))
 
 
-def wait_for_receipt(tx):
-    while True:
-        receipt = web3.eth.getTransactionReceipt(tx)
-        if receipt:
-            return receipt
-        gevent.sleep(1)
-
-
 def check_transaction(tx):
-    receipt = wait_for_receipt(tx)
-    return receipt.status == 1
+    receipt = web3.eth.waitForTransactionReceipt(tx)
+    return receipt and receipt.status == 1
 
 
 def bounty_fee():
