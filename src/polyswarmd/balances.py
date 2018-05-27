@@ -1,5 +1,6 @@
 from flask import Blueprint
 
+from polyswarmd.eth import web3, nectar_token
 from polyswarmd.response import success, failure
 
 balances = Blueprint('balances', __name__)

@@ -14,8 +14,8 @@ bounty_registry_address = ''
 def whereami():
     if hasattr(sys, 'frozen') and sys.frozen in ('windows_exe', 'console_exe'):
         return os.path.dirname(os.path.abspath(sys.executable))
-    else:
-        return os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.dirname(os.path.abspath(__file__))
 
 
 def init_config():

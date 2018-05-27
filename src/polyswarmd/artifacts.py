@@ -1,9 +1,10 @@
-import base58
 import json
 import re
-import requests
 
+import base58
+import requests
 from flask import Blueprint, request
+
 from polyswarmd.config import ipfs_uri
 from polyswarmd.response import success, failure
 
@@ -60,13 +61,13 @@ def get_artifacts_ipfshash(ipfshash):
     if not is_valid_ipfshash(ipfshash):
         return failure('Invalid IPFS hash', 400)
 
-    artifacts = list_artifacts(ipfshash)
-    if not artifacts:
+    arts = list_artifacts(ipfshash)
+    if not arts:
         return failure('Could not locate IPFS resource', 404)
-    if len(artifacts) > 256:
+    if len(arts) > 256:
         return failure('Invalid IPFS resource, too many links', 400)
 
-    return success([{'name': a[0], 'hash': a[1]} for a in artifacts])
+    return success([{'name': a[0], 'hash': a[1]} for a in arts])
 
 
 @artifacts.route('/<ipfshash>/<int:id_>', methods=['GET'])
@@ -74,14 +75,14 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
     if not is_valid_ipfshash(ipfshash):
         return failure('Invalid IPFS hash', 400)
 
-    artifacts = list_artifacts(ipfshash)
-    if not artifacts:
+    arts = list_artifacts(ipfshash)
+    if not arts:
         return failure('Could not locate IPFS resource', 404)
 
-    if id_ < 0 or id_ > 256 or id_ >= len(artifacts):
+    if id_ < 0 or id_ > 256 or id_ >= len(arts):
         return failure('Could not locate artifact ID', 404)
 
-    artifact = artifacts[id_][1]
+    artifact = arts[id_][1]
 
     try:
         r = requests.get(
@@ -98,14 +99,14 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
     if not is_valid_ipfshash(ipfshash):
         return failure('Invalid IPFS hash', 400)
 
-    artifacts = list_artifacts(ipfshash)
-    if not artifacts:
+    arts = list_artifacts(ipfshash)
+    if not arts:
         return failure('Could not locate IPFS resource', 404)
 
-    if id_ < 0 or id_ > 256 or id_ >= len(artifacts):
+    if id_ < 0 or id_ > 256 or id_ >= len(arts):
         return failure('Could not locate artifact ID', 404)
 
-    artifact = artifacts[id_][1]
+    artifact = arts[id_][1]
 
     try:
         r = requests.get(
@@ -119,6 +120,6 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
         re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', k).lower(): v
         for k, v in r.json().items()
     }
-    stats['name'] = artifacts[id_][0]
+    stats['name'] = arts[id_][0]
 
     return success(stats)

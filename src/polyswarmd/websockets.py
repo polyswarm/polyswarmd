@@ -1,11 +1,11 @@
 import json
+
 import jsonschema
+from jsonschema.exceptions import ValidationError
+from flask_sockets import Sockets
 import gevent
 import gevent.queue
-
-from flask_sockets import Sockets
 from hexbytes import HexBytes
-from jsonschema.exceptions import ValidationError
 
 from polyswarmd.eth import web3, bounty_registry
 from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict

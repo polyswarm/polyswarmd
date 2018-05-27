@@ -1,12 +1,16 @@
 import uuid
+
 import jsonschema
+from jsonschema.exceptions import ValidationError
 
 from flask import Blueprint, request
-from jsonschema.exceptions import ValidationError
-from polyswarmd.eth import web3, nectar_token, bounty_registry
+
+from polyswarmd import eth
+from polyswarmd.artifacts import is_valid_ipfshash
+from polyswarmd.eth import web3, check_transaction, nectar_token, bounty_registry, zero_address
 from polyswarmd.response import success, failure
 from polyswarmd.websockets import transaction_queue
-from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict
+from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict
 
 bounties = Blueprint('bounties', __name__)
 
@@ -16,6 +20,7 @@ def post_bounties():
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
+    account = web3.toChecksumAddress(account)
 
     schema = {
         'type': 'object',
@@ -50,7 +55,7 @@ def post_bounties():
     artifactURI = body['uri']
     durationBlocks = body['duration']
 
-    if amount < eth.bounty_amount_min:
+    if amount < eth.bounty_amount_min():
         return failure('Invalid bounty amount', 400)
 
     if not is_valid_ipfshash(artifactURI):
@@ -64,7 +69,7 @@ def post_bounties():
     if not check_transaction(tx):
         return failure(
             'Approve transaction failed, verify parameters and try again', 400)
-    tx = transaction_queue(
+    tx = transaction_queue.send_transaction(
         bounty_registry.functions.postBounty(guid.int, amount, artifactURI,
                                              durationBlocks), account).get()
     if not check_transaction(tx):
@@ -74,7 +79,7 @@ def post_bounties():
 
     receipt = web3.eth.getTransactionReceipt(tx)
     processed = bounty_registry.events.NewBounty().processReceipt(receipt)
-    if len(processed) == 0:
+    if not processed:
         return failure(
             'Invalid transaction receipt, no events emitted. Check contract addresses',
             400)
@@ -86,14 +91,14 @@ def post_bounties():
 @bounties.route('', methods=['GET'])
 def get_bounties():
     num_bounties = bounty_registry.functions.getNumberOfBounties().call()
-    bounties = []
+    ret = []
     for i in range(num_bounties):
         guid = bounty_registry.functions.bountyGuids(i).call()
-        bounties.append(
+        ret.append(
             bounty_to_dict(
                 bounty_registry.functions.bountiesByGuid(guid).call()))
 
-    return success(bounties)
+    return success(ret)
 
 
 # TODO: Caching layer for this
@@ -101,16 +106,16 @@ def get_bounties():
 def get_bounties_active():
     current_block = web3.eth.blockNumber
     num_bounties = bounty_registry.functions.getNumberOfBounties().call()
-    bounties = []
+    ret = []
     for i in range(num_bounties):
         guid = bounty_registry.functions.bountyGuids(i).call()
         bounty = bounty_to_dict(
             bounty_registry.functions.bountiesByGuid(guid).call())
 
         if bounty['expiration'] > current_block:
-            bounties.append(bounty)
+            ret.append(bounty)
 
-    return success(bounties)
+    return success(ret)
 
 
 # TODO: Caching layer for this
@@ -118,26 +123,26 @@ def get_bounties_active():
 def get_bounties_pending():
     current_block = web3.eth.blockNumber
     num_bounties = bounty_registry.functions.getNumberOfBounties().call()
-    bounties = []
+    ret = []
     for i in range(num_bounties):
         guid = bounty_registry.functions.bountyGuids(i).call()
         bounty = bounty_to_dict(
             bounty_registry.functions.bountiesByGuid(guid).call())
 
         if bounty['expiration'] <= current_block and not bounty['resolved']:
-            bounties.append(bounty)
+            ret.append(bounty)
 
-    return success(bounties)
+    return success(ret)
 
 
 @bounties.route('/<uuid:guid>', methods=['GET'])
 def get_bounties_guid(guid):
     bounty = bounty_to_dict(
         bounty_registry.functions.bountiesByGuid(guid.int).call())
-    if bounty['author'] == ZERO_ADDRESS:
+    if bounty['author'] == zero_address:
         return failure('Bounty not found', 404)
-    else:
-        return success(bounty)
+
+    return success(bounty)
 
 
 @bounties.route('/<uuid:guid>/settle', methods=['POST'])
@@ -145,6 +150,7 @@ def post_bounties_guid_settle(guid):
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
+    account = web3.toChecksumAddress(account)
 
     schema = {
         'type': 'object',
@@ -178,7 +184,7 @@ def post_bounties_guid_settle(guid):
 
     receipt = web3.eth.getTransactionReceipt(tx)
     processed = bounty_registry.events.NewVerdict().processReceipt(receipt)
-    if len(processed) == 0:
+    if not processed:
         return failure(
             'Invalid transaction receipt, no events emitted. Check contract addresses',
             400)
@@ -191,6 +197,7 @@ def post_bounties_guid_assertions(guid):
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
+    account = web3.toChecksumAddress(account)
 
     schema = {
         'type': 'object',
@@ -256,7 +263,7 @@ def post_bounties_guid_assertions(guid):
 
     receipt = web3.eth.getTransactionReceipt(tx)
     processed = bounty_registry.events.NewAssertion().processReceipt(receipt)
-    if len(processed) == 0:
+    if not processed:
         return failure(
             'Invalid transaction receipt, no events emitted. Check contract addresses',
             400)

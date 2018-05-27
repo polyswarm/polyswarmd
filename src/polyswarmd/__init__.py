@@ -33,5 +33,5 @@ def before_request():
 def get_syncing():
     if not web3.eth.syncing:
         return success(False)
-    else:
-        return success(dict(web3.eth.syncing))
+
+    return success(dict(web3.eth.syncing))
