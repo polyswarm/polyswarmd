@@ -20,6 +20,6 @@ setup(name='polyswarmd',
           'polyswarmd': ['config/*', 'truffle/build/**/*'],
       },
       entry_points = {
-          'console_scripts': ['polyswarmd=polyswarmd.polyswarmd:main'],
+          'console_scripts': ['polyswarmd=polyswarmd.__main__:main'],
       },
 )
