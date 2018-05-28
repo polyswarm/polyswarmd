@@ -1,2 +1,2 @@
-include README.rst
-include requirements.txt
+include README.rst requirements.txt
+recursive-include config
