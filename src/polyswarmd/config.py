@@ -34,8 +34,8 @@ def init_config():
 
     with open(config_file, 'r') as f:
         y = yaml.load(f.read())
-        nectar_token_address = y['nectar_token_address']
-        bounty_registry_address = y['bounty_registry_address']
+        nectar_token_address = os.environ.get('NECTAR_TOKEN_ADDRESS', y['nectar_token_address'])
+        bounty_registry_address = os.environ.get('BOUNTY_REGISTRY_ADDRESS', y['bounty_registry_address'])
 
 def set_config(**kwargs):
     global eth_uri, ipfs_uri, network, nectar_token_address, bounty_registry_address
