@@ -5,20 +5,21 @@ def parse_requirements():
         return f.read().splitlines()
 
 setup(name='polyswarmd',
-      version='0.1',
+      version='0.2',
       description='Daemon for interacting with the PolySwarm marketplace',
       author = 'PolySwarm Developers',
       author_email = 'info@polyswarm.io',
       url='https://github.com/polyswarm/polyswarmd',
+      license='MIT',
       install_requires=parse_requirements(),
       packages=['polyswarmd'],
       package_dir={
-          'polyswarmd': '.',
+          'polyswarmd': 'src/polyswarmd',
       },
       package_data={
-          'polyswarmd': ['polyswarmd.cfg', 'polyswarmd.docker.cfg', 'truffle/build/**/*'],
+          'polyswarmd': ['config/*', 'truffle/build/**/*'],
       },
       entry_points = {
-          'console_scripts': ['polyswarmd=polyswarmd.polyswarmd:main'],
+          'console_scripts': ['polyswarmd=polyswarmd.__main__:main'],
       },
 )

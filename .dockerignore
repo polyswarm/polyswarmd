@@ -3,9 +3,15 @@
 venv/
 __pycache__/
 .env
-polyswarmd.dev.cfg
+.pytest_cache
+.tox
 build/
+config/
+!config/polyswarmd.yml
+!config/polyswarmd.docker.yml
 dist/
 deb_dist/
+polyswarmd.spec
+polyswarmd.egg-info/
 truffle/
 !truffle/build/
