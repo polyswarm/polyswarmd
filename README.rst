@@ -93,27 +93,35 @@ Examples
 --------
 
 **Upload an artifact**
+
 `curl -F file=@foo http://localhost:31337/artifacts`
 
 **Get artifact**
+
 `curl http://localhost:31337/artifacts/QmTcKufUeYYdT4YYAZsv25FNdeJ9q2NyCKLW3CeN4H69fw/0`
 
 **Unlock account (likely to change)**
+
 `curl -H 'Content-Type: application/json' -d '{"password": "password"}' http://localhost:31337/accounts/af8302a3786a35abeddf19758067adc9a23597e5/unlock`
 
 **Post bounty**
+
 `curl -H 'Content-Type: application/json' -d '{"amount": "62500000000000000", "uri": "QmYNmQKp6SuaVrpgWRsPTgCQCnpxUYGq76YEKBXuj2N4H6", "duration": 10}' http://localhost:31337/bounties`
 
 **Get bounty**
+
 `curl http://localhost:31337/bounties/5caa7538-3cb6-44ca-9def-ca0c87e6f0fa`
 
 **Post assertion**
+
 `curl -H 'Content-Type: application/json' -d '{"bid": "62500000000000000", "mask": [true], "verdicts": [true], "metadata": "foo"}' http://localhost:31337/bounties/5caa7538-3cb6-44ca-9def-ca0c87e6f0fa/assertions`
 
 **Get assertion**
+
 `curl http://localhost:31337/bounties/5caa7538-3cb6-44ca-9def-ca0c87e6f0fa/assertions/0`
 
 **Settle bounty (arbiter)**
+
 `curl -H 'Content-Type: application/json' -d '{"verdicts": [true]}' http://localhost:31337/bounties/5caa7538-3cb6-44ca-9def-ca0c87e6f0fa/settle`
 
 Common issues and solutions
