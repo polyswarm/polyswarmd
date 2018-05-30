@@ -19,8 +19,6 @@ web3 = dict()
 
 # Create token bindings for each chain
 nectar_token = dict()
-bounty_registry = dict()
-erc20_relay = dict()
 chains = ['home', 'side']
 for chain in chains:
     temp = Web3(HTTPProvider(eth_uri[chain]))
@@ -30,9 +28,9 @@ for chain in chains:
                                 os.path.join('truffle', 'build', 'contracts',
                                             'NectarToken.json'))
 
-    bounty_registry[chain] = bind_contract(web3[chain], bounty_registry_address[chain],
-                                    os.path.join('truffle', 'build', 'contracts',
-                                                'BountyRegistry.json'))
+bounty_registry = bind_contract(web3['side'], bounty_registry_address['side'],
+                                os.path.join('truffle', 'build', 'contracts',
+                                            'BountyRegistry.json'))
 
 
 def check_transaction(web3, tx):
