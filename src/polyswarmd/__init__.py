@@ -13,6 +13,7 @@ from polyswarmd.utils import bool_list_to_int, int_to_bool_list
 from polyswarmd.artifacts import artifacts
 from polyswarmd.balances import balances
 from polyswarmd.bounties import bounties
+#from polyswarmd.relay import relay
 from polyswarmd.websockets import init_websockets
 
 app = Flask('polyswarmd', root_path=whereami(), instance_path=whereami())
@@ -20,6 +21,7 @@ install_error_handlers(app)
 app.register_blueprint(artifacts, url_prefix='/artifacts')
 app.register_blueprint(balances, url_prefix='/balances')
 app.register_blueprint(bounties, url_prefix='/bounties')
+#app.register_blueprint(relay, url_prefix='/relay')
 init_websockets(app)
 
 
@@ -29,9 +31,9 @@ def before_request():
 
 
 # TODO: Keep this?
-@app.route('/syncing', methods=['GET'])
-def get_syncing():
-    if not web3.eth.syncing:
+@app.route('/syncing/<chain>', methods=['GET'])
+def get_syncing(chain):
+    if not web3[chain].eth.syncing:
         return success(False)
 
-    return success(dict(web3.eth.syncing))
+    return success(dict(web3[chain].eth.syncing))

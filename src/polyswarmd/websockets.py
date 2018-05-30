@@ -7,9 +7,12 @@ import gevent
 import gevent.queue
 from hexbytes import HexBytes
 
-from polyswarmd.eth import web3, bounty_registry
+from polyswarmd.eth import web3 as chains, bounty_registry as bounty_chains, chain_id
 from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict
 
+web3 = chains['side']
+bounty_registry = bounty_chains['side']
+chainId = chain_id['side']
 
 # TODO: This needs some tweaking to work for multiple accounts / concurrent
 # requests, mostly dealing with nonce calculation
@@ -18,7 +21,7 @@ class TransactionQueue(object):
         self.inner = gevent.queue.Queue()
         self.lock = gevent.lock.Semaphore()
         self.dict = dict()
-        self.chain_id = int(web3.net.version)
+        self.chain_id = int(chainId)
         self.id_ = 0
         self.pending = 0
 

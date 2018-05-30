@@ -5,31 +5,37 @@ import gevent
 from web3 import Web3, HTTPProvider
 from web3.middleware import geth_poa_middleware
 
-from polyswarmd.config import eth_uri, nectar_token_address, bounty_registry_address, whereami
+from polyswarmd.config import eth_uri, nectar_token_address, bounty_registry_address, whereami, chain_id
 
-web3 = Web3(HTTPProvider(eth_uri))
-web3.middleware_stack.inject(geth_poa_middleware, layer=0)
-
-
-def bind_contract(address, artifact):
+def bind_contract(web3, address, artifact):
     with open(os.path.abspath(os.path.join(whereami(), artifact)), 'r') as f:
         abi = json.load(f)['abi']
 
     return web3.eth.contract(address=web3.toChecksumAddress(address), abi=abi)
 
-
 zero_address = '0x0000000000000000000000000000000000000000'
 
-nectar_token = bind_contract(nectar_token_address,
-                             os.path.join('truffle', 'build', 'contracts',
-                                          'NectarToken.json'))
+web3 = dict()
 
-bounty_registry = bind_contract(bounty_registry_address,
+# Create token bindings for each chain
+nectar_token = dict()
+bounty_registry = dict()
+erc20_relay = dict()
+chains = ['home', 'side']
+for chain in chains:
+    temp = Web3(HTTPProvider(eth_uri[chain]))
+    temp.middleware_stack.inject(geth_poa_middleware, layer=0)
+    web3[chain] = temp
+    nectar_token[chain] = bind_contract(web3[chain], nectar_token_address[chain],
                                 os.path.join('truffle', 'build', 'contracts',
-                                             'BountyRegistry.json'))
+                                            'NectarToken.json'))
+
+    bounty_registry[chain] = bind_contract(web3[chain], bounty_registry_address[chain],
+                                    os.path.join('truffle', 'build', 'contracts',
+                                                'BountyRegistry.json'))
 
 
-def check_transaction(tx):
+def check_transaction(web3, tx):
     receipt = web3.eth.waitForTransactionReceipt(tx)
     return receipt and receipt.status == 1
 
