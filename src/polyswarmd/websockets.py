@@ -7,10 +7,8 @@ import gevent
 import gevent.queue
 from hexbytes import HexBytes
 
-from polyswarmd.eth import web3 as web3_chains, bounty_registry, chain_id as chain_ids
+from polyswarmd.eth import web3 as web3_chains, bounty_registry as bounty_chains, chain_id as chain_ids
 from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict
-
-web3 = web3_chains['side']
 
 # TODO: This needs some tweaking to work for multiple accounts / concurrent
 # requests, mostly dealing with nonce calculation
@@ -59,14 +57,21 @@ class TransactionQueue(object):
         return iter(self.inner)
 
 # We do two of these so we can maintain the nonce. We can't be combining our pending tx count
-side_transaction_queue = TransactionQueue('side')
-home_transaction_queue = TransactionQueue('home')
+transaction_queue = dict()
+transaction_queue['home'] = TransactionQueue('home')
+transaction_queue['side'] = TransactionQueue('side')
 
 def init_websockets(app):
     sockets = Sockets(app)
 
-    @sockets.route('/events')
-    def events(ws):
+    @sockets.route('/events/<chain>')
+    def events(ws, chain):
+        if chain != 'side' and chain != 'home':
+            return failure('Chain must be either home or side', 400)
+
+        web3 = web3_chains[chain]
+        bounty_registry = bounty_chains[chain]
+
         block_filter = web3.eth.filter('latest')
         bounty_filter = bounty_registry.eventFilter('NewBounty')
         assertion_filter = bounty_registry.eventFilter('NewAssertion')
@@ -117,16 +122,17 @@ def init_websockets(app):
     @sockets.route('/transactions')
     def transactions(ws):
         def home_queue_greenlet():
-            for (id_, tx) in home_transaction_queue:
+            for (id_, tx) in transaction_queue['home']:
                 ws.send(json.dumps({'id': id_, 'data': tx}))
 
         def side_queue_greenlet():
-            for (id_, tx) in side_transaction_queue:
+            for (id_, tx) in transaction_queue['side']:
                 ws.send(json.dumps({'id': id_, 'data': tx}))
 
         # If we can handle the pending tx stuff above, we combine this to one
-        home_qgl = gevent.spawn(home_queue_greenlet)
-        side_qgl = gevent.spawn(side_queue_greenlet)
+        qgl = dict()
+        qgl['home'] = gevent.spawn(home_queue_greenlet)
+        qgl['side'] = gevent.spawn(side_queue_greenlet)
 
         schema = {
             'type': 'object',
@@ -169,13 +175,13 @@ def init_websockets(app):
 
                 txhash = web3_chains[chain_label].eth.sendRawTransaction(HexBytes(data))
                 print('GOT TXHASH:', txhash)
-                if chain_label == 'side':
-                    side_transaction_queue.complete(id_, txhash)
-                elif chain_label == 'home':
-                    home_transaction_queue.complete(id_, txhash)
+
+                queue = transaction_queue.get(chain_label)
+                if queue is not None:
+                    queue.complete(id_, txhash)
                 else:
-                    print('Invalid ChainId. Not our sidechain or homechain.')
+                    print('Invalid ChainId ' + chain_id)
 
         finally:
-            home_qgl.kill()
-            side_qgl.kill()
+            qgl['home'].kill()
+            qgl['side'].kill()

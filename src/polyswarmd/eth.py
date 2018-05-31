@@ -18,6 +18,7 @@ zero_address = '0x0000000000000000000000000000000000000000'
 web3 = dict()
 
 # Create token bindings for each chain
+bounty_registry = dict()
 nectar_token = dict()
 chains = ['home', 'side']
 for chain in chains:
@@ -28,9 +29,9 @@ for chain in chains:
                                 os.path.join('truffle', 'build', 'contracts',
                                             'NectarToken.json'))
 
-bounty_registry = bind_contract(web3['side'], bounty_registry_address['side'],
-                                os.path.join('truffle', 'build', 'contracts',
-                                            'BountyRegistry.json'))
+    bounty_registry[chain] = bind_contract(web3[chain], bounty_registry_address[chain],
+                                    os.path.join('truffle', 'build', 'contracts',
+                                                'BountyRegistry.json'))
 
 
 def check_transaction(web3, tx):
