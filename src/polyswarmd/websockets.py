@@ -18,11 +18,10 @@ class TransactionQueue(object):
     def __init__(self, chain):
         self.inner = gevent.queue.Queue()
         self.lock = gevent.lock.Semaphore()
-        self.web3 = web3_chains[chain]
-        self.chain_id = int(chain_ids[chain])
         self.dict = dict()
         self.id_ = 0
         self.pending = 0
+        self.chain = chain
 
     def acquire(self):
         self.lock.acquire()
@@ -39,12 +38,12 @@ class TransactionQueue(object):
     def send_transaction(self, call, account):
         self.acquire()
 
-        nonce = self.web3.eth.getTransactionCount(account) + self.pending
+        nonce = web3_chains[self.chain].eth.getTransactionCount(account) + self.pending
         self.pending += 1
 
         tx = call.buildTransaction({
             'nonce': nonce,
-            'chainId': self.chain_id,
+            'chainId': int(chain_ids[self.chain]),
         })
         result = gevent.event.AsyncResult()
 
@@ -59,10 +58,9 @@ class TransactionQueue(object):
     def __iter__(self):
         return iter(self.inner)
 
-
+# We do two of these so we can maintain the nonce. We can't be combining our pending tx count
 side_transaction_queue = TransactionQueue('side')
 home_transaction_queue = TransactionQueue('home')
-
 
 def init_websockets(app):
     sockets = Sockets(app)
@@ -118,13 +116,17 @@ def init_websockets(app):
 
     @sockets.route('/transactions')
     def transactions(ws):
-        def queue_greenlet():
-            for (id_, chain_id, tx) in side_transaction_queue:
-                ws.send(json.dumps({'id': id_, 'data': tx}))
-            for (id_, chain_id, tx) in home_transaction_queue:
+        def home_queue_greenlet():
+            for (id_, tx) in home_transaction_queue:
                 ws.send(json.dumps({'id': id_, 'data': tx}))
 
-        qgl = gevent.spawn(queue_greenlet)
+        def side_queue_greenlet():
+            for (id_, tx) in side_transaction_queue:
+                ws.send(json.dumps({'id': id_, 'data': tx}))
+
+        # If we can handle the pending tx stuff above, we combine this to one
+        home_qgl = gevent.spawn(home_queue_greenlet)
+        side_qgl = gevent.spawn(side_queue_greenlet)
 
         schema = {
             'type': 'object',
@@ -169,10 +171,11 @@ def init_websockets(app):
                 print('GOT TXHASH:', txhash)
                 if chain_label == 'side':
                     side_transaction_queue.complete(id_, txhash)
-                else if chain_label == 'home':
+                elif chain_label == 'home':
                     home_transaction_queue.complete(id_, txhash)
                 else:
                     print('Invalid ChainId. Not our sidechain or homechain.')
 
         finally:
-            qgl.kill()
+            home_qgl.kill()
+            side_qgl.kill()

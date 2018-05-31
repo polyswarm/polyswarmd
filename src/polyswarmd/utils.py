@@ -59,3 +59,10 @@ def new_verdict_event_to_dict(new_verdict_event):
         'bounty_guid': str(uuid.UUID(int=new_verdict_event.bountyGuid)),
         'verdicts': int_to_bool_list(new_verdict_event.verdicts),
     }
+
+def new_transfer_event_to_dict(new_transfer_event):
+    return {
+        'from': new_transfer_event['from'],
+        'to': new_transfer_event['to'],
+        'value': str(new_transfer_event['value'])
+    }

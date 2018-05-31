@@ -9,6 +9,7 @@ ipfs_uri = ''
 network = ''
 nectar_token_address = dict()
 bounty_registry_address = dict()
+erc20_relay_address = dict()
 chain_id = dict()
 
 def whereami():
@@ -19,7 +20,7 @@ def whereami():
 
 
 def init_config():
-    global eth_uri, ipfs_uri, network, nectar_token_address, bounty_registry_address, chainId
+    global eth_uri, ipfs_uri, network, nectar_token_address, bounty_registry_address, erc20_relay_addres, chainId
 
     load_dotenv(dotenv_path=os.path.join(whereami(), '.env'))
 
@@ -38,11 +39,13 @@ def init_config():
         home = y['homechain']
         nectar_token_address['home'] = os.environ.get('HOME_NECTAR_TOKEN_ADDRESS', home['nectar_token_address'])
         bounty_registry_address['home'] = os.environ.get('HOME_BOUNTY_REGISTRY_ADDRESS', home['bounty_registry_address'])
+        erc20_relay_address['home'] = os.environ.get('HOME_ERC20_RELAY_ADDRESS', home['erc20_relay_address'])
         chain_id['home'] = os.environ.get('HOME_CHAIN_ID', home['chain_id'])
 
         side = y['sidechain']
         nectar_token_address['side'] = os.environ.get('SIDE_NECTAR_TOKEN_ADDRESS', side['nectar_token_address'])
         bounty_registry_address['side'] = os.environ.get('SIDE_BOUNTY_REGISTRY_ADDRESS', side['bounty_registry_address'])
+        erc20_relay_address['side'] = os.environ.get('SIDE_ERC20_RELAY_ADDRESS', side['erc20_relay_address'])
         chain_id['side'] = os.environ.get('SIDE_CHAIN_ID', side['chain_id'])
 
 def set_config(**kwargs):

@@ -13,7 +13,7 @@ from polyswarmd.utils import bool_list_to_int, int_to_bool_list
 from polyswarmd.artifacts import artifacts
 from polyswarmd.balances import balances
 from polyswarmd.bounties import bounties
-#from polyswarmd.relay import relay
+from polyswarmd.relay import relay
 from polyswarmd.websockets import init_websockets
 
 app = Flask('polyswarmd', root_path=whereami(), instance_path=whereami())
@@ -21,7 +21,7 @@ install_error_handlers(app)
 app.register_blueprint(artifacts, url_prefix='/artifacts')
 app.register_blueprint(balances, url_prefix='/balances')
 app.register_blueprint(bounties, url_prefix='/bounties')
-#app.register_blueprint(relay, url_prefix='/relay')
+app.register_blueprint(relay, url_prefix='/relay')
 init_websockets(app)
 
 

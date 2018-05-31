@@ -5,7 +5,7 @@ import gevent
 from web3 import Web3, HTTPProvider
 from web3.middleware import geth_poa_middleware
 
-from polyswarmd.config import eth_uri, nectar_token_address, bounty_registry_address, whereami, chain_id
+from polyswarmd.config import eth_uri, nectar_token_address, bounty_registry_address, erc20_relay_address, whereami, chain_id
 
 def bind_contract(web3, address, artifact):
     with open(os.path.abspath(os.path.join(whereami(), artifact)), 'r') as f:
