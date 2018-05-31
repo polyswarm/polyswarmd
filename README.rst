@@ -1,5 +1,5 @@
-PolySwarm Alpha
-===============
+PolySwarm
+=========
 
 *API under development and may change*
 
