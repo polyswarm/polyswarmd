@@ -15,11 +15,12 @@ ws.onmessage = msg => {
   // Should do verification of parameters / user confirmation?
   console.log(msg.data);
   const {id, data} = JSON.parse(msg.data);
+  const {chainId} = data;
   console.log(data);
   const tx = new EthereumTx(data);
   tx.sign(key);
 
-  console.log({'id': id, 'data': tx.serialize().toString('hex')});
+  console.log({'id': id, 'chainId': chainId, 'data': tx.serialize().toString('hex')});
 
-  ws.send(JSON.stringify({'id': id, 'data': tx.serialize().toString('hex')}));
+  ws.send(JSON.stringify({'id': id, 'chainId': chainId, 'data': tx.serialize().toString('hex')}));
 };

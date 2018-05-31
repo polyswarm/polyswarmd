@@ -7,20 +7,19 @@ import gevent
 import gevent.queue
 from hexbytes import HexBytes
 
-from polyswarmd.eth import web3, bounty_registry
+from polyswarmd.eth import web3 as web3_chains, bounty_registry as bounty_chains, chain_id as chain_ids
 from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict
-
 
 # TODO: This needs some tweaking to work for multiple accounts / concurrent
 # requests, mostly dealing with nonce calculation
 class TransactionQueue(object):
-    def __init__(self):
+    def __init__(self, chain):
         self.inner = gevent.queue.Queue()
         self.lock = gevent.lock.Semaphore()
         self.dict = dict()
-        self.chain_id = int(web3.net.version)
         self.id_ = 0
         self.pending = 0
+        self.chain = chain
 
     def acquire(self):
         self.lock.acquire()
@@ -37,12 +36,12 @@ class TransactionQueue(object):
     def send_transaction(self, call, account):
         self.acquire()
 
-        nonce = web3.eth.getTransactionCount(account) + self.pending
+        nonce = web3_chains[self.chain].eth.getTransactionCount(account) + self.pending
         self.pending += 1
 
         tx = call.buildTransaction({
             'nonce': nonce,
-            'chainId': self.chain_id,
+            'chainId': int(chain_ids[self.chain]),
         })
         result = gevent.event.AsyncResult()
 
@@ -57,15 +56,22 @@ class TransactionQueue(object):
     def __iter__(self):
         return iter(self.inner)
 
-
-transaction_queue = TransactionQueue()
-
+# We do two of these so we can maintain the nonce. We can't be combining our pending tx count
+transaction_queue = dict()
+transaction_queue['home'] = TransactionQueue('home')
+transaction_queue['side'] = TransactionQueue('side')
 
 def init_websockets(app):
     sockets = Sockets(app)
 
-    @sockets.route('/events')
-    def events(ws):
+    @sockets.route('/events/<chain>')
+    def events(ws, chain):
+        if chain != 'side' and chain != 'home':
+            return failure('Chain must be either home or side', 400)
+
+        web3 = web3_chains[chain]
+        bounty_registry = bounty_chains[chain]
+
         block_filter = web3.eth.filter('latest')
         bounty_filter = bounty_registry.eventFilter('NewBounty')
         assertion_filter = bounty_registry.eventFilter('NewAssertion')
@@ -115,11 +121,18 @@ def init_websockets(app):
 
     @sockets.route('/transactions')
     def transactions(ws):
-        def queue_greenlet():
-            for (id_, tx) in transaction_queue:
+        def home_queue_greenlet():
+            for (id_, tx) in transaction_queue['home']:
                 ws.send(json.dumps({'id': id_, 'data': tx}))
 
-        qgl = gevent.spawn(queue_greenlet)
+        def side_queue_greenlet():
+            for (id_, tx) in transaction_queue['side']:
+                ws.send(json.dumps({'id': id_, 'data': tx}))
+
+        # If we can handle the pending tx stuff above, we combine this to one
+        qgl = dict()
+        qgl['home'] = gevent.spawn(home_queue_greenlet)
+        qgl['side'] = gevent.spawn(side_queue_greenlet)
 
         schema = {
             'type': 'object',
@@ -127,12 +140,15 @@ def init_websockets(app):
                 'id': {
                     'type': 'integer',
                 },
+                'chainId': {
+                    'type': 'integer',
+                },
                 'data': {
                     'type': 'string',
                     'maxLength': 4096,
                 },
             },
-            'required': ['id', 'data'],
+            'required': ['id', 'chainId', 'data'],
         }
 
         try:
@@ -149,10 +165,23 @@ def init_websockets(app):
 
                 id_ = body['id']
                 data = body['data']
+                chain_id = body['chainId']
 
-                txhash = web3.eth.sendRawTransaction(HexBytes(data))
+                chain_label = ''
+                for k, v in chain_ids.items():
+                    if int(v) == chain_id:
+                        chain_label = k
+                        break
+
+                txhash = web3_chains[chain_label].eth.sendRawTransaction(HexBytes(data))
                 print('GOT TXHASH:', txhash)
-                transaction_queue.complete(id_, txhash)
+
+                queue = transaction_queue.get(chain_label)
+                if queue is not None:
+                    queue.complete(id_, txhash)
+                else:
+                    print('Invalid ChainId ' + chain_id)
 
         finally:
-            qgl.kill()
+            qgl['home'].kill()
+            qgl['side'].kill()

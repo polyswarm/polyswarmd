@@ -13,3 +13,4 @@ dist/
 deb_dist/
 polyswarmd.spec
 polyswarmd.egg-info/
+.vscode/
