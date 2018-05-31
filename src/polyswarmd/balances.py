@@ -1,4 +1,4 @@
-from flask import Blueprint
+from flask import Blueprint, request
 
 from polyswarmd.eth import web3 as web3_chains, nectar_token as nectar_chains
 from polyswarmd.response import success, failure
@@ -14,7 +14,7 @@ def get_balance_address_eth(address):
     elif chain != 'side' and chain != 'home':
         return failure('Chain must be either home or side', 400)
 
-    web = web3_chains[chain]
+    web3 = web3_chains[chain]
     nectar_token = nectar_chains[chain]
 
     if not web3.isAddress(address):
@@ -32,7 +32,7 @@ def get_balance_address_nct(address):
     elif chain != 'side' and chain != 'home':
         return failure('Chain must be either home or side', 400)
 
-    web = web3_chains[chain]
+    web3 = web3_chains[chain]
     nectar_token = nectar_chains[chain]
 
     if not web3.isAddress(address):
