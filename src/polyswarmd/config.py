@@ -20,7 +20,7 @@ def whereami():
 
 
 def init_config():
-    global eth_uri, ipfs_uri, network, nectar_token_address, bounty_registry_address, erc20_relay_address, chainId
+    global eth_uri, ipfs_uri, network, nectar_token_address, bounty_registry_address, erc20_relay_address, chain_id
 
     load_dotenv(dotenv_path=os.path.join(whereami(), '.env'))
 

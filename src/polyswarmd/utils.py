@@ -16,9 +16,10 @@ def bounty_to_dict(bounty):
         'author': bounty[1],
         'amount': str(bounty[2]),
         'uri': bounty[3],
-        'expiration': bounty[4],
-        'resolved': bounty[5],
-        'verdicts': int_to_bool_list(bounty[6]),
+        'num_artifacts': bounty[4],
+        'expiration': bounty[5],
+        'resolved': bounty[6],
+        'verdicts': int_to_bool_list(bounty[8]),
     }
 
 
