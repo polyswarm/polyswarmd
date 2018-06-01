@@ -7,7 +7,8 @@ import gevent
 import gevent.queue
 from hexbytes import HexBytes
 
-from polyswarmd.eth import web3 as web3_chains, bounty_registry as bounty_chains, chain_id as chain_ids
+from polyswarmd.eth import web3 as web3_chains, bounty_registry as bounty_chains
+from polyswarmd.config import chain_id as chain_ids
 from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict
 
 # TODO: This needs some tweaking to work for multiple accounts / concurrent
@@ -67,7 +68,8 @@ def init_websockets(app):
     @sockets.route('/events/<chain>')
     def events(ws, chain):
         if chain != 'side' and chain != 'home':
-            return failure('Chain must be either home or side', 400)
+            print('Chain must be either home or side')
+            ws.close()
 
         web3 = web3_chains[chain]
         bounty_registry = bounty_chains[chain]
@@ -174,7 +176,6 @@ def init_websockets(app):
                         break
 
                 txhash = web3_chains[chain_label].eth.sendRawTransaction(HexBytes(data))
-                print('GOT TXHASH:', txhash)
 
                 queue = transaction_queue.get(chain_label)
                 if queue is not None:

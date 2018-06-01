@@ -6,7 +6,7 @@ from jsonschema.exceptions import ValidationError
 from flask import Blueprint, request
 
 from polyswarmd import eth
-from polyswarmd.artifacts import is_valid_ipfshash
+from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts
 from polyswarmd.eth import web3 as web3_chains, check_transaction, nectar_token as nectar_chains, bounty_registry as bounty_chains, zero_address
 from polyswarmd.response import success, failure
 from polyswarmd.websockets import transaction_queue as transaction_chains
@@ -15,6 +15,7 @@ from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict
 bounties = Blueprint('bounties', __name__)
 
 # Use the sidechain here, since that is where our contracts will be deployed.
+
 
 @bounties.route('', methods=['POST'])
 def post_bounties():
@@ -66,6 +67,7 @@ def post_bounties():
     guid = uuid.uuid4()
     amount = int(body['amount'])
     artifactURI = body['uri']
+    numArtifacts = len(list_artifacts(artifactURI))
     durationBlocks = body['duration']
 
     if amount < eth.bounty_amount_min():
@@ -73,6 +75,9 @@ def post_bounties():
 
     if not is_valid_ipfshash(artifactURI):
         return failure('Invalid artifact URI (should be IPFS hash)', 400)
+
+    if numArtifacts == 0:
+        return failure('Invalid artifact URI (0 artifacts found)', 400)
 
     approveAmount = amount + eth.bounty_fee()
 
@@ -84,7 +89,8 @@ def post_bounties():
             'Approve transaction failed, verify parameters and try again', 400)
     tx = transaction_queue.send_transaction(
         bounty_registry.functions.postBounty(guid.int, amount, artifactURI,
-                                             durationBlocks), account).get()
+                                             numArtifacts, durationBlocks),
+        account).get()
     if not check_transaction(web3, tx):
         return failure(
             'Post bounty transaction failed, verify parameters and try again',
