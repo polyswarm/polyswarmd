@@ -24,7 +24,6 @@ build-master:
         DOCKER_FULL_PATH: "$CI_REGISTRY_IMAGE/$CI_PROJECT_NAME:latest"
     stage: build
     script:
-        - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
         - docker build -t $DOCKER_FULL_PATH -f docker/Dockerfile .
         - docker push $DOCKER_FULL_PATH
 
@@ -37,6 +36,5 @@ build-non-master:
         DOCKER_FULL_PATH: "$CI_REGISTRY_IMAGE/$CI_PROJECT_NAME:$CI_COMMIT_REF_NAME"
     stage: build
     script:
-        - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
         - docker build -t $DOCKER_FULL_PATH -f docker/Dockerfile .
         - docker push $DOCKER_FULL_PATH
