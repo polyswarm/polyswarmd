@@ -156,6 +156,7 @@ def init_websockets(app):
         try:
             while not ws.closed:
                 msg = ws.receive()
+                print(msg)
                 if not msg:
                     break
 
@@ -176,6 +177,7 @@ def init_websockets(app):
                         break
 
                 txhash = web3_chains[chain_label].eth.sendRawTransaction(HexBytes(data))
+                print('TXHASH: ', txhash)
 
                 queue = transaction_queue.get(chain_label)
                 if queue is not None:

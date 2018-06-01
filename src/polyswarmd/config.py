@@ -25,7 +25,7 @@ def init_config():
     load_dotenv(dotenv_path=os.path.join(whereami(), '.env'))
 
     eth_uri['home'] = os.environ.get('HOME_ETH_URI', 'http://localhost:8545')
-    eth_uri['side'] = os.environ.get('SIDE_ETH_URI', 'http://localhost:8540')
+    eth_uri['side'] = os.environ.get('SIDE_ETH_URI', 'http://localhost:8545')
     ipfs_uri = os.environ.get('IPFS_URI', 'http://localhost:5001')
     network = os.environ.get('POLYSWARMD_NETWORK', None)
 
