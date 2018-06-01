@@ -21,7 +21,7 @@ build-master:
     tags:
         - docker
     variables:
-        DOCKER_IMAGE_TAG: "latest"
+        DOCKER_FULL_PATH: "$CI_REGISTRY_IMAGE/$CI_PROJECT_NAME:latest"
     stage: build
     script:
         - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
