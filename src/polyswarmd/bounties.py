@@ -7,12 +7,29 @@ from flask import Blueprint, request
 
 from polyswarmd import eth
 from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts
+from polyswarmd.bloom import BloomFilter, FILTER_BITS
 from polyswarmd.eth import web3 as web3_chains, check_transaction, nectar_token as nectar_chains, bounty_registry as bounty_chains, zero_address
 from polyswarmd.response import success, failure
 from polyswarmd.websockets import transaction_queue as transaction_chains
 from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict
 
 bounties = Blueprint('bounties', __name__)
+
+
+def calculate_bloom(arts):
+    bf = BloomFilter()
+    for _, h in arts:
+        bf.add(h.encode('utf-8'))
+
+    v = int(bf)
+    ret = []
+    d = (1 << 256) - 1
+    for _ in range(FILTER_BITS // 256):
+        ret.insert(0, v % d)
+        v //= d
+
+    return ret
+
 
 # Use the sidechain here, since that is where our contracts will be deployed.
 
@@ -67,7 +84,6 @@ def post_bounties():
     guid = uuid.uuid4()
     amount = int(body['amount'])
     artifactURI = body['uri']
-    numArtifacts = len(list_artifacts(artifactURI))
     durationBlocks = body['duration']
 
     if amount < eth.bounty_amount_min():
@@ -76,8 +92,13 @@ def post_bounties():
     if not is_valid_ipfshash(artifactURI):
         return failure('Invalid artifact URI (should be IPFS hash)', 400)
 
-    if numArtifacts == 0:
-        return failure('Invalid artifact URI (0 artifacts found)', 400)
+    arts = list_artifacts(artifactURI)
+    if not arts:
+        return failure('Invalid artifact URI (could not retrieve artifacts)',
+                       400)
+
+    numArtifacts = len(arts)
+    bloom = calculate_bloom(arts)
 
     approveAmount = amount + eth.bounty_fee()
 
@@ -89,8 +110,8 @@ def post_bounties():
             'Approve transaction failed, verify parameters and try again', 400)
     tx = transaction_queue.send_transaction(
         bounty_registry.functions.postBounty(guid.int, amount, artifactURI,
-                                             numArtifacts, durationBlocks),
-        account).get()
+                                             numArtifacts, durationBlocks,
+                                             bloom), account).get()
     if not check_transaction(web3, tx):
         return failure(
             'Post bounty transaction failed, verify parameters and try again',
@@ -197,8 +218,8 @@ def get_bounties_guid(guid):
     return success(bounty)
 
 
-@bounties.route('/<uuid:guid>/settle', methods=['POST'])
-def post_bounties_guid_settle(guid):
+@bounties.route('/<uuid:guid>/vote', methods=['POST'])
+def post_bounties_guid_vote(guid):
     chain = request.args.get('chain')
     if not chain:
         chain = 'home'
@@ -224,8 +245,11 @@ def post_bounties_guid_settle(guid):
                     'type': 'boolean',
                 },
             },
+            'valid_bloom': {
+                'type': 'boolean',
+            },
         },
-        'required': ['verdicts'],
+        'required': ['verdicts', 'valid_bloom'],
     }
 
     body = request.get_json()
@@ -235,9 +259,10 @@ def post_bounties_guid_settle(guid):
         return failure('Invalid JSON: ' + e.message, 400)
 
     verdicts = bool_list_to_int(body['verdicts'])
+    valid_bloom = bool(body['valid_bloom'])
 
     tx = transaction_queue.send_transaction(
-        bounty_registry.functions.settleBounty(guid.int, verdicts),
+        bounty_registry.functions.voteOnBounty(guid.int, verdicts, valid_bloom),
         account).get()
     if not check_transaction(web3, tx):
         return failure(
@@ -252,6 +277,34 @@ def post_bounties_guid_settle(guid):
             400)
     new_verdict_event = processed[0]['args']
     return success(new_verdict_event_to_dict(new_verdict_event))
+
+
+@bounties.route('/<uuid:guid>/settle', methods=['POST'])
+def post_bounties_guid_settle(guid):
+    chain = request.args.get('chain')
+    if not chain:
+        chain = 'home'
+    elif chain != 'side' and chain != 'home':
+        return failure('Chain must be either home or side', 400)
+
+    web3 = web3_chains[chain]
+    transaction_queue = transaction_chains[chain]
+    bounty_registry = bounty_chains[chain]
+
+    account = request.args.get('account')
+    if not account or not web3.isAddress(account):
+        return failure('Source account required', 401)
+    account = web3.toChecksumAddress(account)
+
+    tx = transaction_queue.send_transaction(
+        bounty_registry.functions.settleBounty(guid.int), account).get()
+    if not check_transaction(web3, tx):
+        return failure(
+            'Settle bounty transaction failed, verify parameters and try again',
+            400)
+
+    # TODO: raise event in contract?
+    return success()
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['POST'])
