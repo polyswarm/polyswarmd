@@ -2,9 +2,12 @@ homechain:
     nectar_token_address: '0x9e46a38f5daabe8683e10793b06749eef7d733d1'
     bounty_registry_address: '0x6ccf49a92cab2a45553fe0e7662e6800e71a6dcf'
     erc20_relay_address: '0x47ab5979a7b94ad45081cfc5d1f710632b59609a'
+    offer_registry_address: '0x676b8059cb0c9b1621c68576f09326e1f850e056'
     chain_id: '1'
 sidechain:
     nectar_token_address: ''
     bounty_registry_address: ''
     erc20_relay_address: ''
+    offer_registry_address: ''
     chain_id: ''
+

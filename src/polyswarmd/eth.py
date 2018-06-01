@@ -4,7 +4,7 @@ import os
 from web3 import Web3, HTTPProvider
 from web3.middleware import geth_poa_middleware
 
-from polyswarmd.config import eth_uri, nectar_token_address, bounty_registry_address, whereami
+from polyswarmd.config import eth_uri, nectar_token_address, bounty_registry_address, offer_registry_address, whereami
 
 
 def bind_contract(web3_, address, artifact):
@@ -16,11 +16,19 @@ def bind_contract(web3_, address, artifact):
 
 zero_address = '0x0000000000000000000000000000000000000000'
 
+offer_msig_artifact = os.path.join('truffle', 'build', 'contracts',
+                                             'OfferMultiSig.json')
+
 web3 = dict()
 
 # Create token bindings for each chain
 bounty_registry = dict()
 nectar_token = dict()
+
+# exsit only on home
+offer_registry = None
+offer_lib = None
+
 chains = ['home', 'side']
 for chain in chains:
     temp = Web3(HTTPProvider(eth_uri[chain]))
@@ -33,6 +41,18 @@ for chain in chains:
     bounty_registry[chain] = bind_contract(
         web3[chain], bounty_registry_address[chain],
         os.path.join('truffle', 'build', 'contracts', 'BountyRegistry.json'))
+
+    if chain is 'home':
+      offer_registry = bind_contract(
+          web3[chain], offer_registry_address[chain],
+          os.path.join('truffle', 'build', 'contracts', 'OfferRegistry.json'))
+
+      offer_lib_address = offer_registry.functions.offerLib().call()
+
+      offer_lib = bind_contract(
+          web3[chain], offer_lib_address,
+          os.path.join('truffle', 'build', 'contracts', 'OfferLib.json'))
+
 
 
 def check_transaction(web3, tx):

@@ -9,7 +9,7 @@ from hexbytes import HexBytes
 
 from polyswarmd.eth import web3 as web3_chains, bounty_registry as bounty_chains
 from polyswarmd.config import chain_id as chain_ids
-from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict
+from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict, state_to_dict
 
 # TODO: This needs some tweaking to work for multiple accounts / concurrent
 # requests, mostly dealing with nonce calculation
@@ -187,3 +187,66 @@ def init_websockets(app):
         finally:
             qgl['home'].kill()
             qgl['side'].kill()
+
+    # for receive messages about offers that might need to be signed
+    @sockets.route('/messages/<uuid:guid>')
+    def messages(ws, guid):
+        try:
+            while not ws.closed:
+                msg = ws.receive()
+                print(msg)
+                if not msg:
+                    break
+
+                msg = ws.receive()
+
+                schema = {
+                    'type': 'object',
+                    'properties': {
+                        'type': {
+                            'type': 'string',
+                        },
+                        'fromSocketUri': {
+                            'type': 'string',
+                        },
+                        'toSocketUri': {
+                            'type': 'string',
+                        },
+                        'state': {
+                            'type': 'string',
+                        },
+                        'r': {
+                            'type': 'string',
+                        },
+                        'v': {
+                            'type': 'integer',
+                        },
+                        's': {
+                            'type': 'string',
+                        }
+                    },
+                    'required': ['type', 'state'],
+                }
+
+                body = json.loads(msg)
+
+                try:
+                    jsonschema.validate(body, schema)
+                except ValidationError as e:
+                    print('Invalid JSON: ' + e.message)
+
+                state_dict = state_to_dict(body['state'])
+                state_dict['guid'] = guid.int
+
+                ws.send(
+                    json.dumps({
+                        'type':
+                        body['type'],
+                        'raw_state':
+                        body['state'],
+                        'state': 
+                        state_dict
+                    }))
+        except:
+            pass
+        
