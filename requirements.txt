@@ -12,3 +12,4 @@ requests==2.18.4
 requests-mock==1.5.0
 web3==4.2.0
 Werkzeug==0.14.1
+websocket-client==0.48.0

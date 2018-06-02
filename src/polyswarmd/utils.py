@@ -1,4 +1,5 @@
 import uuid
+from polyswarmd.eth import offer_lib, web3 as web3_chains
 
 
 def bool_list_to_int(bs):
@@ -73,4 +74,30 @@ def new_transfer_event_to_dict(new_transfer_event):
         'from': new_transfer_event['from'],
         'to': new_transfer_event['to'],
         'value': str(new_transfer_event['value'])
+    }
+
+def channel_to_dict(channel_data):
+    return {
+        'msig_address': channel_data[0],
+        'ambassador': channel_data[1],
+        'expert': channel_data[2]
+    }
+
+def state_to_dict(state):
+    # gets state of non required state
+    offer_info = offer_lib.function.getOfferState(state)
+    web3 = web3_chains['home']
+
+    return {
+        'isClosed': web3.toInt(offer_lib.functions.getCloseFlag(state)),
+        'nonce': web3.toInt(offer_lib.functions.getSequence(state)),
+        'ambassador': offer_lib.functions.getPartyA(state),
+        'expert': offer_lib.functions.getPartyB(state),
+        'msig_address': offer_lib.functions.getMultiSigAddress(state),
+        'ambassador_balance': web3.toInt(offer_lib.functions.getBalanceA(state)),
+        'expert_balance': web3.toInt(offer_lib.functions.getBalanceB(state)),
+        'token': offer_lib.functions.getTokenAddress(state),
+        'offer_amount': web3.toInt(offer_lib.functions.getCloseFlag(state)),
+        'ipfs_uri': web3.toText(offer_info[3]),
+        'verdicts': offer_info[5]
     }
