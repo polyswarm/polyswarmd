@@ -11,14 +11,13 @@ from polyswarmd.eth import web3 as web3_chains, check_transaction, nectar_token,
 from polyswarmd.response import success, failure
 from polyswarmd.websockets import transaction_queue as transaction_queue_chain
 from polyswarmd.utils import channel_to_dict
-
-web3 = web3_chains['home']
-transaction_queue = transaction_queue_chain['home']
-
+chain = 'home'
 offers = Blueprint('offers', __name__)
 
 @offers.route('', methods=['POST'])
 def create_offer_channel():
+    web3 = web3_chains[chain]
+    transaction_queue = transaction_queue_chain[chain]
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
@@ -99,7 +98,7 @@ def create_offer_channel():
     success_dict['websocketUri'] = offer_msig.functions.websocketUri().call()
     # TODO find a better way than replace
     success_dict['websocketUri'] = web3.toText(success_dict['websocketUri']).replace('\u0000', '')
-    
+
     success_dict['guid'] = uuid.UUID(int=success_dict['guid'])
 
     return success(success_dict)
@@ -107,6 +106,8 @@ def create_offer_channel():
 
 @offers.route('/<uuid:guid>/open', methods=['POST'])
 def open(guid):
+    web3 = web3_chains[chain]
+    transaction_queue = transaction_queue_chain[chain]
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
@@ -182,6 +183,8 @@ def open(guid):
 
 @offers.route('/<uuid:guid>/join', methods=['POST'])
 def join(guid):
+    web3 = web3_chains[chain]
+    transaction_queue = transaction_queue_chain[chain]
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
@@ -250,6 +253,8 @@ def join(guid):
 
 @offers.route('/<uuid:guid>/close', methods=['POST'])
 def close(guid):
+    web3 = web3_chains[chain]
+    transaction_queue = transaction_queue_chain[chain]
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
@@ -320,6 +325,8 @@ def close(guid):
 
 @offers.route('/<uuid:guid>/settle', methods=['POST'])
 def settle(guid):
+    web3 = web3_chains[chain]
+    transaction_queue = transaction_queue_chain[chain]
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
@@ -387,6 +394,8 @@ def settle(guid):
 
 @offers.route('/<uuid:guid>/challenge', methods=['POST'])
 def challange(guid):
+    web3 = web3_chains[chain]
+    transaction_queue = transaction_queue_chain[chain]
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
@@ -457,7 +466,7 @@ def challange(guid):
 
 @offers.route('/<uuid:guid>/sendmsg', methods=['POST'])
 def message_sender(guid):
-
+    web3 = web3_chains[chain]
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
@@ -537,6 +546,7 @@ def get_channel_address(guid):
 
 @offers.route('/<uuid:guid>/settlementPeriod', methods=['GET'])
 def get_settlement_period(guid):
+
     offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
     offer_msig = bind_contract(web3, offer_channel['msig_address'], offer_msig_artifact)
 
@@ -546,9 +556,10 @@ def get_settlement_period(guid):
 
 @offers.route('pending', methods=['GET'])
 def pending():
+    web3 = web3_chains[chain]
     offers_pending = []
     num_of_offers = offer_registry.functions.getNumberOfOffers().call()
-
+    
     for i in range(0, num_of_offers):
         guid = offer_registry.functions.channelsGuids(i).call()
         channel_data = channel_to_dict(offer_registry.guidToChannel(guid).call())
@@ -563,7 +574,7 @@ def pending():
 @offers.route('opened', methods=['GET'])
 def opened(guid):
     offers_opened = []
-
+    web3 = web3_chains[chain]
     num_of_offers = offer_registry.functions.getNumberOfOffers().call()
 
     for i in range(0, num_of_offers):
@@ -580,6 +591,7 @@ def opened(guid):
 @offers.route('closed', methods=['GET'])
 def closed(guid):
     offers_closed = []
+    web3 = web3_chains[chain]
     num_of_offers = offer_registry.functions.getNumberOfOffers().call()
 
     for i in range(0, num_of_offers):
@@ -595,6 +607,7 @@ def closed(guid):
 
 @offers.route('myoffers', methods=['GET'])
 def myoffers(guid):
+    web3 = web3_chains[chain]
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
