@@ -85,19 +85,20 @@ def channel_to_dict(channel_data):
 
 def state_to_dict(state):
     # gets state of non required state
-    offer_info = offer_lib.function.getOfferState(state)
+    offer_info = offer_lib.functions.getOfferState(state).call()
+
     web3 = web3_chains['home']
 
     return {
-        'isClosed': web3.toInt(offer_lib.functions.getCloseFlag(state)),
-        'nonce': web3.toInt(offer_lib.functions.getSequence(state)),
-        'ambassador': offer_lib.functions.getPartyA(state),
-        'expert': offer_lib.functions.getPartyB(state),
-        'msig_address': offer_lib.functions.getMultiSigAddress(state),
-        'ambassador_balance': web3.toInt(offer_lib.functions.getBalanceA(state)),
-        'expert_balance': web3.toInt(offer_lib.functions.getBalanceB(state)),
-        'token': offer_lib.functions.getTokenAddress(state),
-        'offer_amount': web3.toInt(offer_lib.functions.getCloseFlag(state)),
+        'isClosed': offer_lib.functions.getCloseFlag(state).call(),
+        'nonce': offer_lib.functions.getSequence(state).call(),
+        'ambassador': offer_lib.functions.getPartyA(state).call(),
+        'expert': offer_lib.functions.getPartyB(state).call(),
+        'msig_address': offer_lib.functions.getMultiSigAddress(state).call(),
+        'ambassador_balance': offer_lib.functions.getBalanceA(state).call(),
+        'expert_balance': offer_lib.functions.getBalanceB(state).call(),
+        'token': offer_lib.functions.getTokenAddress(state).call(),
+        'offer_amount': offer_lib.functions.getCloseFlag(state).call(),
         'ipfs_uri': web3.toText(offer_info[3]),
         'verdicts': offer_info[5]
     }

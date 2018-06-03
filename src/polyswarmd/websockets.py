@@ -194,11 +194,9 @@ def init_websockets(app):
         try:
             while not ws.closed:
                 msg = ws.receive()
-                print(msg)
+                
                 if not msg:
                     break
-
-                msg = ws.receive()
 
                 schema = {
                     'type': 'object',
