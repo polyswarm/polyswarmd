@@ -11,7 +11,7 @@ from polyswarmd.eth import web3 as web3_chains, check_transaction, nectar_token,
 from polyswarmd.response import success, failure
 from polyswarmd.websockets import transaction_queue as transaction_queue_chain
 from polyswarmd.utils import channel_to_dict
-chain = 'home'
+chain = 'home' # only on home chain
 offers = Blueprint('offers', __name__)
 
 @offers.route('', methods=['POST'])
@@ -84,7 +84,7 @@ def create_offer_channel():
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
 
     tx = transaction_queue.send_transaction(
-        offer_msig.functions.setCommunicationUri(web3.toHex(text = websocket_uri)),
+        offer_msig.functions.setCommunicationUri(web3.toHex(text=websocket_uri)),
         account).get()
 
     if not check_transaction(tx):
@@ -152,9 +152,9 @@ def open(guid):
     s = body['s']
 
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-    approveAmount = offer_lib.functions.getBalanceA(state).call()
+    approve_amount = offer_lib.functions.getBalanceA(state).call()
     tx = transaction_queue.send_transaction(
-        nectar_token['home'].functions.approve(msig_address, approveAmount),
+        nectar_token['home'].functions.approve(msig_address, approve_amount),
         account).get()
     if not check_transaction(tx):
         return failure(
@@ -546,7 +546,7 @@ def get_channel_address(guid):
 
 @offers.route('/<uuid:guid>/settlementPeriod', methods=['GET'])
 def get_settlement_period(guid):
-
+    web3 = web3_chains[chain]
     offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
     offer_msig = bind_contract(web3, offer_channel['msig_address'], offer_msig_artifact)
 
