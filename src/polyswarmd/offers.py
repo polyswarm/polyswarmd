@@ -14,8 +14,9 @@ from polyswarmd.utils import channel_to_dict
 chain = 'home' # only on home chain
 offers = Blueprint('offers', __name__)
 
+
 @offers.route('', methods=['POST'])
-def create_offer_channel():
+def post_create_offer_channel():
     web3 = web3_chains[chain]
     transaction_queue = transaction_queue_chain[chain]
     account = request.args.get('account')
@@ -105,7 +106,7 @@ def create_offer_channel():
 
 
 @offers.route('/<uuid:guid>/open', methods=['POST'])
-def open(guid):
+def post_open(guid):
     web3 = web3_chains[chain]
     transaction_queue = transaction_queue_chain[chain]
     account = request.args.get('account')
@@ -181,8 +182,9 @@ def open(guid):
 
     return success(data)
 
+
 @offers.route('/<uuid:guid>/join', methods=['POST'])
-def join(guid):
+def post_join(guid):
     web3 = web3_chains[chain]
     transaction_queue = transaction_queue_chain[chain]
     account = request.args.get('account')
@@ -252,7 +254,7 @@ def join(guid):
     return success(data)
 
 @offers.route('/<uuid:guid>/close', methods=['POST'])
-def close(guid):
+def post_close(guid):
     web3 = web3_chains[chain]
     transaction_queue = transaction_queue_chain[chain]
     account = request.args.get('account')
@@ -324,7 +326,7 @@ def close(guid):
 
 
 @offers.route('/<uuid:guid>/settle', methods=['POST'])
-def settle(guid):
+def post_settle(guid):
     web3 = web3_chains[chain]
     transaction_queue = transaction_queue_chain[chain]
     account = request.args.get('account')
@@ -393,7 +395,7 @@ def settle(guid):
     return success(data)
 
 @offers.route('/<uuid:guid>/challenge', methods=['POST'])
-def challange(guid):
+def post_challange(guid):
     web3 = web3_chains[chain]
     transaction_queue = transaction_queue_chain[chain]
     account = request.args.get('account')
@@ -465,7 +467,7 @@ def challange(guid):
     return success(data)
 
 @offers.route('/<uuid:guid>/sendmsg', methods=['POST'])
-def message_sender(guid):
+def post_message_sender(guid):
     web3 = web3_chains[chain]
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
@@ -554,8 +556,20 @@ def get_settlement_period(guid):
 
     return success({'settlementPeriodEnd': settlement_period_end})
 
+@offers.route('/<uuid:guid>/websocket', methods=['GET'])
+def get_websocket(guid):
+    web3 = web3_chains[chain]
+    offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
+    msig_address = offer_channel['msig_address']
+    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+    socket_uri = offer_msig.functions.websocketUri().call()
+    # TODO find a better way than replace
+    socket_uri = web3.toText(socket_uri).replace('\u0000', '')
+
+    return success({'websocket': socket_uri})
+
 @offers.route('pending', methods=['GET'])
-def pending():
+def get_pending():
     web3 = web3_chains[chain]
     offers_pending = []
     num_of_offers = offer_registry.functions.getNumberOfOffers().call()
@@ -572,7 +586,7 @@ def pending():
     return success(offers_pending)
 
 @offers.route('opened', methods=['GET'])
-def opened(guid):
+def get_opened(guid):
     offers_opened = []
     web3 = web3_chains[chain]
     num_of_offers = offer_registry.functions.getNumberOfOffers().call()
@@ -589,7 +603,7 @@ def opened(guid):
     return success(offers_opened)
 
 @offers.route('closed', methods=['GET'])
-def closed(guid):
+def get_closed(guid):
     offers_closed = []
     web3 = web3_chains[chain]
     num_of_offers = offer_registry.functions.getNumberOfOffers().call()
@@ -606,7 +620,7 @@ def closed(guid):
     return success(offers_closed)
 
 @offers.route('myoffers', methods=['GET'])
-def myoffers(guid):
+def get_myoffers(guid):
     web3 = web3_chains[chain]
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
