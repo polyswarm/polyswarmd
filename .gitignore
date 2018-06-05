@@ -14,3 +14,6 @@ deb_dist/
 polyswarmd.spec
 polyswarmd.egg-info/
 .vscode/
+truffle/
+polyswarm-relay/
+node_modules/
