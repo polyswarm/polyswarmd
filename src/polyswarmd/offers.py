@@ -65,7 +65,7 @@ def post_create_offer_channel():
         offer_registry.functions.initializeOfferChannel(guid.int, ambassador, expert, settlement_period_length),
         account).get()
 
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'The offer contract deploy transaction failed, verify parameters and try again', 400)
 
@@ -88,7 +88,7 @@ def post_create_offer_channel():
         offer_msig.functions.setCommunicationUri(web3.toHex(text=websocket_uri)),
         account).get()
 
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'Failed to set to set socket url verify parameters and use the setWebsocket/ endpoint to try again', 400)
 
@@ -157,7 +157,7 @@ def post_open(guid):
     tx = transaction_queue.send_transaction(
         nectar_token['home'].functions.approve(msig_address, approve_amount),
         account).get()
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'Approve transaction failed, verify parameters and try again', 400)
 
@@ -165,7 +165,7 @@ def post_open(guid):
         offer_msig.functions.openAgreement(state, v, r, s),
         account).get()
 
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'Failed to open agreement, verify parameters and try again', 400)
 
@@ -236,7 +236,7 @@ def post_join(guid):
         offer_msig.functions.joinAgreement(state, v, r, s),
         account).get()
 
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'Failed to open agreement, verify parameters and try again', 400)
 
@@ -307,7 +307,7 @@ def post_close(guid):
         offer_msig.functions.closeAgreement(state, v, r, s),
         account).get()
 
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'Failed to open agreement, verify parameters and try again', 400)
 
@@ -377,7 +377,7 @@ def post_settle(guid):
         offer_msig.functions.startSettle(state, v, r, s),
         account).get()
 
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'Failed to open agreement, verify parameters and try again', 400)
 
@@ -449,7 +449,7 @@ def post_challange(guid):
         offer_msig.functions.challengeSettle(state, v, r, s),
         account).get()
 
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'Failed to open agreement, verify parameters and try again', 400)
 
