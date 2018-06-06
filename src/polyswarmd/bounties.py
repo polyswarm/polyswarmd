@@ -1,9 +1,11 @@
+import os
 import uuid
 
 import jsonschema
-from jsonschema.exceptions import ValidationError
 
+from ethereum.utils import sha3
 from flask import Blueprint, request
+from jsonschema.exceptions import ValidationError
 
 from polyswarmd import eth
 from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts
@@ -31,7 +33,10 @@ def calculate_bloom(arts):
     return ret
 
 
-# Use the sidechain here, since that is where our contracts will be deployed.
+def calculate_commitment(verdicts):
+    nonce = os.urandom(32)
+    commitment = sha3(int.to_bytes(verdicts ^ int.from_bytes(sha3(nonce))))
+    return int.from_bytes(nonce), commitment
 
 
 @bounties.route('', methods=['POST'])
@@ -341,11 +346,12 @@ def post_bounties_guid_assertions(guid):
                     'type': 'boolean',
                 },
             },
-            'commitment': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 100,
-                'pattern': r'^\d+$',
+            'verdicts': {
+                'type': 'array',
+                'maxItems': 256,
+                'items': {
+                    'type': 'boolean',
+                },
             },
         },
         'required': ['bid', 'mask', 'commitment'],
@@ -359,11 +365,12 @@ def post_bounties_guid_assertions(guid):
 
     bid = int(body['bid'])
     mask = bool_list_to_int(body['mask'])
-    commitment = body['commitment']
+    verdicts = bool_list_to_int(body['commitment'])
 
     if bid < eth.assertion_bid_min():
         return failure('Invalid assertion bid', 400)
 
+    nonce, commitment = calculate_commitment(verdicts)
     approveAmount = bid + eth.assertion_fee()
 
     tx = transaction_queue.send_transaction(
@@ -388,7 +395,11 @@ def post_bounties_guid_assertions(guid):
             'Invalid transaction receipt, no events emitted. Check contract addresses',
             400)
     new_assertion_event = processed[0]['args']
-    return success(new_assertion_event_to_dict(new_assertion_event))
+
+    # Pass generated nonce onto user in response, used for reveal
+    ret = new_assertion_event_to_dict(new_assertion_event)
+    ret['nonce'] = nonce
+    return success(ret)
 
 
 @bounties.route('/<uuid:guid>/assertions/<int:id_>/reveal', methods=['POST'])
@@ -429,7 +440,6 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
                 'type': 'string',
                 'maxLength': 1024,
             },
-
         },
         'required': ['nonce', 'vericts', 'metadata'],
     }
@@ -445,14 +455,16 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
     metadata = body['metadata']
 
     tx = transaction_queue.send_transaction(
-        bounty_registry.functions.revealAssertion(guid.int, id_, nonce, verdicts, metadata), account).get()
+        bounty_registry.functions.revealAssertion(
+            guid.int, id_, nonce, verdicts, metadata), account).get()
     if not check_transaction(web3, tx):
         return failure(
             'Post assertion transaction failed, verify parameters and try again',
             400)
 
     receipt = web3.eth.getTransactionReceipt(tx)
-    processed = bounty_registry.events.RevealedAssertion().processReceipt(receipt)
+    processed = bounty_registry.events.RevealedAssertion().processReceipt(
+        receipt)
     if not processed:
         return failure(
             'Invalid transaction receipt, no events emitted. Check contract addresses',

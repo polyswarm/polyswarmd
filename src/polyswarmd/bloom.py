@@ -1,9 +1,10 @@
 # Based on eth-bloom (https://github.com/ethereum/eth-bloom, used under MIT
 # license) with modifications
 
-import hashlib
 import numbers
 import operator
+
+from ethereum.utils import sha3
 
 FILTER_BITS = 8 * 256
 HASH_FUNCS = 8
@@ -23,7 +24,7 @@ def get_bloom_bits(value):
     # Could decode the ipfs_hash and use it as is, but instead hash the
     # multihash representation to side-step different hash formats going
     # forward. Should rexamine this decision
-    value_hash = hashlib.sha256(value).digest()
+    value_hash = sha3(value).digest()
     for chunk in get_chunks_for_bloom(value_hash):
         bloom_bits = chunk_to_bloom_bits(chunk)
         yield bloom_bits
