@@ -59,7 +59,7 @@ def post_bounties():
             'amount': {
                 'type': 'string',
                 'minLength': 1,
-                'maxLength': 64,
+                'maxLength': 100,
                 'pattern': r'^\d+$',
             },
             'uri': {
@@ -262,8 +262,8 @@ def post_bounties_guid_vote(guid):
     valid_bloom = bool(body['valid_bloom'])
 
     tx = transaction_queue.send_transaction(
-        bounty_registry.functions.voteOnBounty(guid.int, verdicts, valid_bloom),
-        account).get()
+        bounty_registry.functions.voteOnBounty(guid.int, verdicts,
+                                               valid_bloom), account).get()
     if not check_transaction(web3, tx):
         return failure(
             'Settle bounty transaction failed, verify parameters and try again',
@@ -331,7 +331,7 @@ def post_bounties_guid_assertions(guid):
             'bid': {
                 'type': 'string',
                 'minLength': 1,
-                'maxLength': 64,
+                'maxLength': 100,
                 'pattern': r'^\d+$',
             },
             'mask': {
@@ -341,19 +341,14 @@ def post_bounties_guid_assertions(guid):
                     'type': 'boolean',
                 },
             },
-            'verdicts': {
-                'type': 'array',
-                'maxItems': 256,
-                'items': {
-                    'type': 'boolean',
-                },
-            },
-            'metadata': {
+            'commitment': {
                 'type': 'string',
-                'maxLength': 1024,
+                'minLength': 1,
+                'maxLength': 100,
+                'pattern': r'^\d+$',
             },
         },
-        'required': ['bid', 'mask', 'verdicts', 'metadata'],
+        'required': ['bid', 'mask', 'commitment'],
     }
 
     body = request.get_json()
@@ -364,8 +359,7 @@ def post_bounties_guid_assertions(guid):
 
     bid = int(body['bid'])
     mask = bool_list_to_int(body['mask'])
-    verdicts = bool_list_to_int(body['verdicts'])
-    metadata = body['metadata']
+    commitment = body['commitment']
 
     if bid < eth.assertion_bid_min():
         return failure('Invalid assertion bid', 400)
@@ -380,8 +374,8 @@ def post_bounties_guid_assertions(guid):
             'Approve transaction failed, verify parameters and try again', 400)
 
     tx = transaction_queue.send_transaction(
-        bounty_registry.functions.postAssertion(guid.int, bid, mask, verdicts,
-                                                metadata), account).get()
+        bounty_registry.functions.postAssertion(guid.int, bid, mask,
+                                                commitment), account).get()
     if not check_transaction(web3, tx):
         return failure(
             'Post assertion transaction failed, verify parameters and try again',
@@ -395,6 +389,76 @@ def post_bounties_guid_assertions(guid):
             400)
     new_assertion_event = processed[0]['args']
     return success(new_assertion_event_to_dict(new_assertion_event))
+
+
+@bounties.route('/<uuid:guid>/assertions/<int:id_>/reveal', methods=['POST'])
+def post_bounties_guid_assertions_id_reveal(guid, id_):
+    chain = request.args.get('chain')
+    if not chain:
+        chain = 'home'
+    elif chain != 'side' and chain != 'home':
+        return failure('Chain must be either home or side', 400)
+
+    web3 = web3_chains[chain]
+    nectar_token = nectar_chains[chain]
+    transaction_queue = transaction_chains[chain]
+    bounty_registry = bounty_chains[chain]
+
+    account = request.args.get('account')
+    if not account or not web3.isAddress(account):
+        return failure('Source account required', 401)
+    account = web3.toChecksumAddress(account)
+
+    schema = {
+        'type': 'object',
+        'properties': {
+            'nonce': {
+                'type': 'string',
+                'minLength': 1,
+                'maxLength': 100,
+                'pattern': r'^\d+$',
+            },
+            'verdicts': {
+                'type': 'array',
+                'maxItems': 256,
+                'items': {
+                    'type': 'boolean',
+                },
+            },
+            'metadaa': {
+                'type': 'string',
+                'maxLength': 1024,
+            },
+
+        },
+        'required': ['nonce', 'vericts', 'metadata'],
+    }
+
+    body = request.get_json()
+    try:
+        jsonschema.validate(body, schema)
+    except ValidationError as e:
+        return failure('Invalid JSON: ' + e.message, 400)
+
+    nonce = int(body['nonce'])
+    verdicts = bool_list_to_int(body['verdicts'])
+    metadata = body['metadata']
+
+    tx = transaction_queue.send_transaction(
+        bounty_registry.functions.revealAssertion(guid.int, id_, nonce, verdicts, metadata), account).get()
+    if not check_transaction(web3, tx):
+        return failure(
+            'Post assertion transaction failed, verify parameters and try again',
+            400)
+
+    receipt = web3.eth.getTransactionReceipt(tx)
+    processed = bounty_registry.events.RevealedAssertion().processReceipt(receipt)
+    if not processed:
+        return failure(
+            'Invalid transaction receipt, no events emitted. Check contract addresses',
+            400)
+    revealed_assertion_event = processed[0]['args']
+    return success(new_assertion_event_to_dict(revealed_assertion_event))
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['GET'])
