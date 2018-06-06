@@ -43,7 +43,7 @@ class TransactionQueue(object):
         tx = call.buildTransaction({
             'nonce': nonce,
             'chainId': int(chain_ids[self.chain]),
-            'gas': 1500000, # TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to /offers
+            'gas': 2500000, # TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to /offers
         })
         result = gevent.event.AsyncResult()
 
