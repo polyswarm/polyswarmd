@@ -15,7 +15,7 @@ services:
             - POLYSWARMD_NETWORK=docker
         ports:
             - "31337:31337"
-    homechain:
+    geth:
         image: "gitlab.polyswarm.io:3343/polyswarm/eth-networks/priv-testnet"
         ports:
             - "30303:30303"
