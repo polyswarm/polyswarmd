@@ -1,5 +1,6 @@
 import uuid
 
+import json
 import jsonschema
 from jsonschema.exceptions import ValidationError
 
@@ -275,16 +276,16 @@ def post_close(guid):
                 'minLength': 32,
             },
             'r': {
-                'type': 'array',
-                'minLength': 2,
+                'type': 'string',
+                'minLength': 64,
             },
             'v': {
-                'type': 'array',
-                'minimum': 2,
+                'type': 'integer',
+                'minimum': 0,
             },
             's': {
-                'type': 'array',
-                'minLength': 2
+                'type': 'string',
+                'minLength': 64
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -346,16 +347,16 @@ def post_settle(guid):
                 'minLength': 32,
             },
             'r': {
-                'type': 'array',
-                'minLength': 2,
+                'type': 'string',
+                'minLength': 64,
             },
             'v': {
-                'type': 'array',
-                'minimum': 2,
+                'type': 'integer',
+                'minimum': 0,
             },
             's': {
-                'type': 'array',
-                'minLength': 2
+                'type': 'string',
+                'minLength': 64
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -416,16 +417,16 @@ def post_challange(guid):
                 'minLength': 32,
             },
             'r': {
-                'type': 'array',
-                'minLength': 2,
+                'type': 'string',
+                'minLength': 64,
             },
             'v': {
-                'type': 'array',
-                'minimum': 2,
+                'type': 'integer',
+                'minimum': 0,
             },
             's': {
-                'type': 'array',
-                'minLength': 2
+                'type': 'string',
+                'minLength': 64
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -494,19 +495,19 @@ def post_message_sender(guid):
                 'minLength': 32,
             },
             'r': {
-                'type': 'array',
-                'minLength': 2,
+                'type': 'string',
+                'minLength': 64,
             },
             'v': {
-                'type': 'array',
-                'minimum': 2,
+                'type': 'integer',
+                'minimum': 0,
             },
             's': {
-                'type': 'array',
-                'minLength': 2
+                'type': 'string',
+                'minLength': 64
             }
         },
-        'required': ['state', 'from_socket'],
+        'required': ['state', 'fromSocketUri'],
     }
 
     try:
@@ -523,8 +524,8 @@ def post_message_sender(guid):
     socket_uri = web3.toText(socket_uri).replace('\u0000', '')
 
     try:
-        if 'socket_uri' in body:
-            ws = create_connection(body['socket_uri'])
+        if 'toSocketUri' in body:
+            ws = create_connection(body['toSocketUri'])
         else:
             ws = create_connection(socket_uri)
     except:
@@ -534,7 +535,7 @@ def post_message_sender(guid):
 
     body['sender'] = account
 
-    ws.send(body)
+    ws.send(json.dumps(body))
 
     ws.close()
 
