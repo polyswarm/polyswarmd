@@ -81,7 +81,7 @@ def post_create_offer_channel():
 
     success_dict = dict(processed[0]['args'])
 
-    msig_address = success_dict['msig'] 
+    msig_address = success_dict['msig']
 
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
 
@@ -267,7 +267,7 @@ def post_close(guid):
     msig_address = offer_channel['msig_address']
 
     body = request.get_json()
-    
+
     schema = {
         'type': 'object',
         'properties': {
@@ -576,7 +576,7 @@ def get_pending():
     web3 = web3_chains[chain]
     offers_pending = []
     num_of_offers = offer_registry.functions.getNumberOfOffers().call()
-    
+
     for i in range(0, num_of_offers):
         guid = offer_registry.functions.channelsGuids(i).call()
         offer_channel = offer_registry.functions.guidToChannel(guid).call()
