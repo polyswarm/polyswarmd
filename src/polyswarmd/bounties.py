@@ -436,7 +436,7 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
                     'type': 'boolean',
                 },
             },
-            'metadaa': {
+            'metadata': {
                 'type': 'string',
                 'maxLength': 1024,
             },
