@@ -9,4 +9,6 @@ RUN set -x && pip install --no-cache-dir -r requirements.txt
 COPY . .
 RUN set -x && pip install .
 
+COPY config /usr/local/lib/python3.6/site-packages/polyswarmd/config
+
 CMD ["polyswarmd"]
