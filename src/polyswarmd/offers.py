@@ -549,8 +549,9 @@ def get_channel_address(guid):
 @offers.route('/<uuid:guid>/settlementPeriod', methods=['GET'])
 def get_settlement_period(guid):
     web3 = web3_chains[chain]
-    offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
-    offer_msig = bind_contract(web3, offer_channel['msig_address'], offer_msig_artifact)
+    offer_channel = offer_registry.functions.guidToChannel(guid.int).call()
+    channel_data = channel_to_dict(offer_channel)
+    offer_msig = bind_contract(web3, channel_data['msig_address'], offer_msig_artifact)
 
     settlement_period_end = offer_msig.functions.settlementPeriodEnd().call()
 
@@ -559,8 +560,9 @@ def get_settlement_period(guid):
 @offers.route('/<uuid:guid>/websocket', methods=['GET'])
 def get_websocket(guid):
     web3 = web3_chains[chain]
-    offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
-    msig_address = offer_channel['msig_address']
+    offer_channel = offer_registry.functions.guidToChannel(guid.int).call()
+    channel_data = channel_to_dict(offer_channel)
+    msig_address = channel_data['msig_address']
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
     socket_uri = offer_msig.functions.websocketUri().call()
     # TODO find a better way than replace
@@ -576,7 +578,8 @@ def get_pending():
     
     for i in range(0, num_of_offers):
         guid = offer_registry.functions.channelsGuids(i).call()
-        channel_data = channel_to_dict(offer_registry.guidToChannel(guid).call())
+        offer_channel = offer_registry.functions.guidToChannel(guid).call()
+        channel_data = channel_to_dict(offer_channel)
         msig_address = channel_data['msig_address']
         offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
         pending_channel = offer_msig.functions.isPending().call()
@@ -586,14 +589,15 @@ def get_pending():
     return success(offers_pending)
 
 @offers.route('opened', methods=['GET'])
-def get_opened(guid):
+def get_opened():
     offers_opened = []
     web3 = web3_chains[chain]
     num_of_offers = offer_registry.functions.getNumberOfOffers().call()
 
     for i in range(0, num_of_offers):
         guid = offer_registry.functions.channelsGuids(i).call()
-        channel_data = channel_to_dict(offer_registry.guidToChannel(guid).call())
+        offer_channel = offer_registry.functions.guidToChannel(guid).call()
+        channel_data = channel_to_dict(offer_channel)
         msig_address = channel_data['msig_address']
         offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
         opened_channel = offer_msig.functions.isOpen().call()
@@ -603,14 +607,15 @@ def get_opened(guid):
     return success(offers_opened)
 
 @offers.route('closed', methods=['GET'])
-def get_closed(guid):
+def get_closed():
     offers_closed = []
     web3 = web3_chains[chain]
     num_of_offers = offer_registry.functions.getNumberOfOffers().call()
 
     for i in range(0, num_of_offers):
         guid = offer_registry.functions.channelsGuids(i).call()
-        channel_data = channel_to_dict(offer_registry.guidToChannel(guid).call())
+        offer_channel = offer_registry.functions.guidToChannel(guid).call()
+        channel_data = channel_to_dict(offer_channel)
         msig_address = channel_data['msig_address']
         offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
         closed_channel = offer_msig.functions.isClosed().call()
@@ -620,7 +625,7 @@ def get_closed(guid):
     return success(offers_closed)
 
 @offers.route('myoffers', methods=['GET'])
-def get_myoffers(guid):
+def get_myoffers():
     web3 = web3_chains[chain]
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
@@ -632,7 +637,8 @@ def get_myoffers(guid):
 
     for i in range(0, num_of_offers):
         guid = offer_registry.functions.channelsGuids(i).call()
-        channel_data = channel_to_dict(offer_registry.functions.guidToChannel(guid).call())
+        offer_channel = offer_registry.functions.guidToChannel(guid).call()
+        channel_data = channel_to_dict(offer_channel)
         msig_address = channel_data['msig_address']
         offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
         expert = offer_msig.functions.expert().call()
