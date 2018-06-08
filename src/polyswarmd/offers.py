@@ -276,16 +276,16 @@ def post_close(guid):
                 'minLength': 32,
             },
             'r': {
-                'type': 'string',
-                'minLength': 64,
+                'type': 'array',
+                'minLength': 2,
             },
             'v': {
-                'type': 'integer',
-                'minimum': 0,
+                'type': 'array',
+                'minLength': 2,
             },
             's': {
-                'type': 'string',
-                'minLength': 64
+                'type': 'array',
+                'minLength': 2,
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -347,16 +347,16 @@ def post_settle(guid):
                 'minLength': 32,
             },
             'r': {
-                'type': 'string',
-                'minLength': 64,
+                'type': 'array',
+                'minLength': 2,
             },
             'v': {
-                'type': 'integer',
-                'minimum': 0,
+                'type': 'array',
+                'minLength': 2,
             },
             's': {
-                'type': 'string',
-                'minLength': 64
+                'type': 'array',
+                'minLength': 2,
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -417,16 +417,16 @@ def post_challange(guid):
                 'minLength': 32,
             },
             'r': {
-                'type': 'string',
-                'minLength': 64,
+                'type': 'array',
+                'minLength': 2,
             },
             'v': {
-                'type': 'integer',
-                'minimum': 0,
+                'type': 'array',
+                'minLength': 2,
             },
             's': {
-                'type': 'string',
-                'minLength': 64
+                'type': 'array',
+                'minLength': 2,
             }
         },
         'required': ['state', 'r', 'v', 's'],
