@@ -21,7 +21,11 @@ def get_balance_address_eth(address):
         return failure('Invalid address', 400)
 
     address = web3.toChecksumAddress(address)
-    return success(str(web3.eth.getBalance(address)))
+    try:
+        balance = web3.eth.getBalance(address)
+        return success(str(balance))
+    except:
+        return failure("Could not retrieve balance")
 
 
 @balances.route('/<address>/nct', methods=['GET'])
@@ -39,4 +43,8 @@ def get_balance_address_nct(address):
         return failure('Invalid address', 400)
 
     address = web3.toChecksumAddress(address)
-    return success(str(nectar_token.functions.balanceOf(address).call()))
+    try:
+        balance = nectar_token.functions.balanceOf(address).call()
+        return success(str(balance))
+    except:
+        return failure("Could not retrieve balance")

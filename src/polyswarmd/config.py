@@ -2,18 +2,23 @@ import os
 import sys
 import yaml
 
-from dotenv import load_dotenv
-
-eth_uri = dict()
+eth_uri = {}
 ipfs_uri = ''
 network = ''
-nectar_token_address = dict()
-bounty_registry_address = dict()
-erc20_relay_address = dict()
-offer_registry_address = dict()
-chain_id = dict()
+
+nectar_token_address = {}
+bounty_registry_address = {}
+erc20_relay_address = {}
+offer_registry_address = {}
+chain_id = {}
+
+CONFIG_LOCATIONS = ['/etc/polyswarmd']
+
 
 def whereami():
+    """
+    Locate this script in the system, taking into account running from a frozen binary
+    """
     if hasattr(sys, 'frozen') and sys.frozen in ('windows_exe', 'console_exe'):
         return os.path.dirname(os.path.abspath(sys.executable))
 
@@ -21,50 +26,65 @@ def whereami():
 
 
 def init_config():
+    """
+    Read config from yaml file
+    """
     global eth_uri, ipfs_uri, network, nectar_token_address, bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id
 
-    load_dotenv(dotenv_path=os.path.join(whereami(), '.env'))
+    for loc in CONFIG_LOCATIONS:
+        config_file = os.path.join(loc, 'polyswarmd.yml')
+        if os.path.isfile(config_file):
+            break
 
-    eth_uri['home'] = os.environ.get('HOME_ETH_URI', 'http://localhost:8545')
-    eth_uri['side'] = os.environ.get('SIDE_ETH_URI', 'http://localhost:7545')
-    ipfs_uri = os.environ.get('IPFS_URI', 'http://localhost:5001')
-    network = os.environ.get('POLYSWARMD_NETWORK', None)
-
-    config_file = 'polyswarmd.yml' if not network else 'polyswarmd.{}.yml'.format(
-        network)
-    config_file = os.path.abspath(
-        os.path.join(whereami(), 'config', config_file))
+    if not os.path.isfile(config_file):
+        # TODO: What to do here
+        print("MISSING CONFIG")
+        sys.exit(-1)
 
     with open(config_file, 'r') as f:
         y = yaml.load(f.read())
+        ipfs_uri = y['ipfs_uri']
+
         home = y['homechain']
-        nectar_token_address['home'] = os.environ.get('HOME_NECTAR_TOKEN_ADDRESS', home['nectar_token_address'])
-        bounty_registry_address['home'] = os.environ.get('HOME_BOUNTY_REGISTRY_ADDRESS', home['bounty_registry_address'])
-        erc20_relay_address['home'] = os.environ.get('HOME_ERC20_RELAY_ADDRESS', home['erc20_relay_address'])
-        offer_registry_address['home'] = os.environ.get('OFFER_REGISTRY_ADDRESS', home['offer_registry_address']) # only on home chain
-        chain_id['home'] = os.environ.get('HOME_CHAIN_ID', home['chain_id'])
+        eth_uri['home'] = home['eth_uri']
+        nectar_token_address['home'] = home['nectar_token_address']
+        bounty_registry_address['home'] = home['bounty_registry_address']
+        erc20_relay_address['home'] = home['erc20_relay_address']
+        offer_registry_address['home'] = home[
+            'offer_registry_address']  # only on home chain
+        chain_id['home'] = home['chain_id']
 
         side = y['sidechain']
-        nectar_token_address['side'] = os.environ.get('SIDE_NECTAR_TOKEN_ADDRESS', side['nectar_token_address'])
-        bounty_registry_address['side'] = os.environ.get('SIDE_BOUNTY_REGISTRY_ADDRESS', side['bounty_registry_address'])
-        erc20_relay_address['side'] = os.environ.get('SIDE_ERC20_RELAY_ADDRESS', side['erc20_relay_address'])
-        chain_id['side'] = os.environ.get('SIDE_CHAIN_ID', side['chain_id'])
+        eth_uri['side'] = side['eth_uri']
+        nectar_token_address['side'] = side['nectar_token_address']
+        bounty_registry_address['side'] = side['bounty_registry_address']
+        erc20_relay_address['side'] = side['erc20_relay_address']
+        chain_id['side'] = side['chain_id']
+
 
 def set_config(**kwargs):
-    global eth_uri, ipfs_uri, network, nectar_token_address, bounty_registry_address, erc20_relay_address
-    eth_uri = dict()
-    eth_uri['home'] = kwargs.get('eth_uri', 'http://localhost:8545')
-    eth_uri['side'] = kwargs.get('eth_uri', 'http://localhost:7545')
+    """
+    Set up config from arguments for testing purposes
+    """
+    global eth_uri, ipfs_uri, network, nectar_token_address, bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id
+    eth_uri = {
+        'home': kwargs.get('eth_uri', 'http://localhost:8545'),
+        'side': kwargs.get('eth_uri', 'http://localhost:7545'),
+    }
     ipfs_uri = kwargs.get('ipfs_uri', 'http://localhost:5001')
-    network = kwargs.get('network', 'test')
-    nectar_token_address = dict()
-    nectar_token_address['home'] = kwargs.get('nectar_token_address', '')
-    nectar_token_address['side'] = kwargs.get('nectar_token_address', '')
-    erc20_relay_address = dict()
-    erc20_relay_address['home'] = kwargs.get('erc20_relay_address', '')
-    erc20_relay_address['side'] = kwargs.get('erc20_relay_address', '')
-    bounty_registry_address = dict()
-    bounty_registry_address['home'] = kwargs.get('bounty_registry_address', '')
-    bounty_registry_address['side'] = kwargs.get('bounty_registry_address', '')
-    offer_registry_address = dict()
-    offer_registry_address['home'] = kwargs.get('offer_registry_address', '')
+
+    nectar_token_address = {
+        'home': kwargs.get('nectar_token_address', ''),
+        'side': kwargs.get('nectar_token_address', ''),
+    }
+    erc20_relay_address = {
+        'home': kwargs.get('erc20_relay_address', ''),
+        'side': kwargs.get('erc20_relay_address', ''),
+    }
+    bounty_registry_address = {
+        'home': kwargs.get('bounty_registry_address', ''),
+        'side': kwargs.get('bounty_registry_address', ''),
+    }
+    offer_registry_address = {
+        'home': kwargs.get('offer_registry_address', ''),
+    }

@@ -46,8 +46,10 @@ def assertion_to_dict(assertion):
         'author': assertion[0],
         'bid': str(assertion[1]),
         'mask': int_to_bool_list(assertion[2]),
-        'verdicts': int_to_bool_list(assertion[3]),
-        'metadata': assertion[4],
+        'commitment': str(assertion[3]),
+        'nonce': str(assertion[4]),
+        'verdicts': int_to_bool_list(assertion[5]),
+        'metadata': assertion[6],
     }
 
 
@@ -58,8 +60,18 @@ def new_assertion_event_to_dict(new_assertion_event):
         'index': new_assertion_event.index,
         'bid': str(new_assertion_event.bid),
         'mask': int_to_bool_list(new_assertion_event.mask),
-        'verdicts': int_to_bool_list(new_assertion_event.verdicts),
-        'metadata': new_assertion_event.metadata,
+        'commitment': str(new_assertion_event.commitment),
+    }
+
+
+def revealed_assertion_event_to_dict(revealed_assertion_event):
+    return {
+        'bounty_guid': str(uuid.UUID(int=revealed_assertion_event.bountyGuid)),
+        'author': revealed_assertion_event.author,
+        'index': revealed_assertion_event.index,
+        'nonce': str(revealed_assertion_event.bid),
+        'verdicts': int_to_bool_list(revealed_assertion_event.verdicts),
+        'metadata': revealed_assertion_event.metadata,
     }
 
 

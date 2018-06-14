@@ -19,18 +19,17 @@ zero_address = '0x0000000000000000000000000000000000000000'
 offer_msig_artifact = os.path.join('truffle', 'build', 'contracts',
                                              'OfferMultiSig.json')
 
-web3 = dict()
+web3 = {}
 
 # Create token bindings for each chain
-bounty_registry = dict()
-nectar_token = dict()
+bounty_registry = {}
+nectar_token = {}
 
 # exsit only on home
 offer_registry = None
 offer_lib = None
 
-chains = ['home', 'side']
-for chain in chains:
+for chain in ('home', 'side'):
     temp = Web3(HTTPProvider(eth_uri[chain]))
     temp.middleware_stack.inject(geth_poa_middleware, layer=0)
     web3[chain] = temp
