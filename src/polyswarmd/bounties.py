@@ -13,7 +13,8 @@ from polyswarmd.bloom import BloomFilter, FILTER_BITS
 from polyswarmd.eth import web3 as web3_chains, check_transaction, nectar_token as nectar_chains, bounty_registry as bounty_chains, zero_address
 from polyswarmd.response import success, failure
 from polyswarmd.websockets import transaction_queue as transaction_chains
-from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict
+from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, new_bounty_event_to_dict, \
+        new_assertion_event_to_dict, new_verdict_event_to_dict, revealed_assertion_event_to_dict
 
 bounties = Blueprint('bounties', __name__)
 
@@ -34,11 +35,11 @@ def calculate_bloom(arts):
 
 
 def int_to_bytes(i):
-    return bytes.fromhex(hex(i)[2:])[::-1]
+    return bytes.fromhex(hex(i)[2:])
 
 
 def int_from_bytes(b):
-    return int.from_bytes(b, byteorder='little')
+    return int.from_bytes(b, byteorder='big')
 
 
 def calculate_commitment(verdicts):
@@ -449,7 +450,7 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
                 'maxLength': 1024,
             },
         },
-        'required': ['nonce', 'vericts', 'metadata'],
+        'required': ['nonce', 'verdicts', 'metadata'],
     }
 
     body = request.get_json()
@@ -467,7 +468,7 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
             guid.int, id_, nonce, verdicts, metadata), account).get()
     if not check_transaction(web3, tx):
         return failure(
-            'Post assertion transaction failed, verify parameters and try again',
+            'Reveal assertion transaction failed, verify parameters and try again',
             400)
 
     receipt = web3.eth.getTransactionReceipt(tx)
@@ -478,7 +479,7 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
             'Invalid transaction receipt, no events emitted. Check contract addresses',
             400)
     revealed_assertion_event = processed[0]['args']
-    return success(new_assertion_event_to_dict(revealed_assertion_event))
+    return success(revealed_assertion_event_to_dict(revealed_assertion_event))
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['GET'])

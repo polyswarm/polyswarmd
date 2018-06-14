@@ -69,7 +69,7 @@ def revealed_assertion_event_to_dict(revealed_assertion_event):
         'bounty_guid': str(uuid.UUID(int=revealed_assertion_event.bountyGuid)),
         'author': revealed_assertion_event.author,
         'index': revealed_assertion_event.index,
-        'nonce': str(revealed_assertion_event.bid),
+        'nonce': str(revealed_assertion_event.nonce),
         'verdicts': int_to_bool_list(revealed_assertion_event.verdicts),
         'metadata': revealed_assertion_event.metadata,
     }
