@@ -33,10 +33,18 @@ def calculate_bloom(arts):
     return ret
 
 
+def int_to_bytes(i):
+    return bytes.fromhex(hex(i)[2:])[::-1]
+
+
+def int_from_bytes(b):
+    return int.from_bytes(b, byteorder='little')
+
+
 def calculate_commitment(verdicts):
     nonce = os.urandom(32)
-    commitment = sha3(int.to_bytes(verdicts ^ int.from_bytes(sha3(nonce))))
-    return int.from_bytes(nonce), commitment
+    commitment = sha3(int_to_bytes(verdicts ^ int_from_bytes(sha3(nonce))))
+    return int_from_bytes(nonce), int_from_bytes(commitment)
 
 
 @bounties.route('', methods=['POST'])
@@ -354,7 +362,7 @@ def post_bounties_guid_assertions(guid):
                 },
             },
         },
-        'required': ['bid', 'mask', 'commitment'],
+        'required': ['bid', 'mask', 'verdicts'],
     }
 
     body = request.get_json()
@@ -365,7 +373,7 @@ def post_bounties_guid_assertions(guid):
 
     bid = int(body['bid'])
     mask = bool_list_to_int(body['mask'])
-    verdicts = bool_list_to_int(body['commitment'])
+    verdicts = bool_list_to_int(body['verdicts'])
 
     if bid < eth.assertion_bid_min():
         return failure('Invalid assertion bid', 400)
@@ -398,7 +406,7 @@ def post_bounties_guid_assertions(guid):
 
     # Pass generated nonce onto user in response, used for reveal
     ret = new_assertion_event_to_dict(new_assertion_event)
-    ret['nonce'] = nonce
+    ret['nonce'] = str(nonce)
     return success(ret)
 
 
