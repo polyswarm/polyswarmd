@@ -41,13 +41,17 @@ def init_config():
 
     with open(config_file, 'r') as f:
         y = yaml.load(f.read())
+        ipfs_uri = y['ipfs_uri']
+
         home = y['homechain']
+        eth_uri['home'] = home['eth_uri']
         nectar_token_address['home'] = home['nectar_token_address']
         bounty_registry_address['home'] = home['bounty_registry_address']
         erc20_relay_address['home'] = home['erc20_relay_address']
         chain_id['home'] = home['chain_id']
 
         side = y['sidechain']
+        eth_uri['side'] = side['eth_uri']
         nectar_token_address['side'] = side['nectar_token_address']
         bounty_registry_address['side'] = side['bounty_registry_address']
         erc20_relay_address['side'] = side['erc20_relay_address']

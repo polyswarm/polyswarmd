@@ -16,13 +16,12 @@ def bind_contract(web3_, address, artifact):
 
 zero_address = '0x0000000000000000000000000000000000000000'
 
-web3 = dict()
+web3 = {}
 
 # Create token bindings for each chain
-bounty_registry = dict()
-nectar_token = dict()
-chains = ['home', 'side']
-for chain in chains:
+bounty_registry = {}
+nectar_token = {}
+for chain in ('home', 'side'):
     temp = Web3(HTTPProvider(eth_uri[chain]))
     temp.middleware_stack.inject(geth_poa_middleware, layer=0)
     web3[chain] = temp
