@@ -278,14 +278,17 @@ def post_close(guid):
             'r': {
                 'type': 'array',
                 'minLength': 2,
+                'maxLength': 2,
             },
             'v': {
                 'type': 'array',
                 'minLength': 2,
+                'maxLength': 2,
             },
             's': {
                 'type': 'array',
                 'minLength': 2,
+                'maxLength': 2,
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -349,14 +352,17 @@ def post_settle(guid):
             'r': {
                 'type': 'array',
                 'minLength': 2,
+                'maxLength': 2,
             },
             'v': {
                 'type': 'array',
                 'minLength': 2,
+                'maxLength': 2,
             },
             's': {
                 'type': 'array',
                 'minLength': 2,
+                'maxLength': 2,
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -419,14 +425,17 @@ def post_challange(guid):
             'r': {
                 'type': 'array',
                 'minLength': 2,
+                'maxLength': 2,
             },
             'v': {
                 'type': 'array',
                 'minLength': 2,
+                'maxLength': 2,
             },
             's': {
                 'type': 'array',
                 'minLength': 2,
+                'maxLength': 2,
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -482,11 +491,11 @@ def post_message_sender(guid):
     schema = {
         'type': 'object',
         'properties': {
-            'toSocketUri': {
+            'to_socket': {
                 'type': 'string',
                 'minLength': 0,
             },
-            'fromSocketUri': {
+            'from_socket': {
                 'type': 'string',
                 'minLength': 0,
             },
@@ -507,7 +516,7 @@ def post_message_sender(guid):
                 'minLength': 64
             }
         },
-        'required': ['state', 'fromSocketUri'],
+        'required': ['state', 'from_socket'],
     }
 
     try:
@@ -524,8 +533,8 @@ def post_message_sender(guid):
     socket_uri = web3.toText(socket_uri).replace('\u0000', '')
 
     try:
-        if 'toSocketUri' in body:
-            ws = create_connection(body['toSocketUri'])
+        if 'to_socket' in body:
+            ws = create_connection(body['to_socket'])
         else:
             ws = create_connection(socket_uri)
     except:

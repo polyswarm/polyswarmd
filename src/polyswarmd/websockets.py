@@ -205,10 +205,10 @@ def init_websockets(app):
                         'type': {
                             'type': 'string',
                         },
-                        'fromSocketUri': {
+                        'from_socket': {
                             'type': 'string',
                         },
-                        'toSocketUri': {
+                        'to_socket': {
                             'type': 'string',
                         },
                         'state': {
