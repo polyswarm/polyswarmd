@@ -5,7 +5,7 @@ def parse_requirements():
         return f.read().splitlines()
 
 setup(name='polyswarmd',
-      version='0.2',
+      version='0.3',
       description='Daemon for interacting with the PolySwarm marketplace',
       author = 'PolySwarm Developers',
       author_email = 'info@polyswarm.io',
@@ -17,7 +17,7 @@ setup(name='polyswarmd',
           'polyswarmd': 'src/polyswarmd',
       },
       package_data={
-          'polyswarmd': ['config/*', 'truffle/build/**/*'],
+          'polyswarmd': ['truffle/build/**/*'],
       },
       entry_points = {
           'console_scripts': ['polyswarmd=polyswarmd.__main__:main'],
