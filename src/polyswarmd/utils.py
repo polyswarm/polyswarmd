@@ -16,7 +16,7 @@ def uint256_list_to_hex_string(us):
 
 
 def bounty_to_dict(bounty):
-    return {
+    retval = {
         'guid': str(uuid.UUID(int=bounty[0])),
         'author': bounty[1],
         'amount': str(bounty[2]),
@@ -24,11 +24,13 @@ def bounty_to_dict(bounty):
         'num_artifacts': bounty[4],
         'expiration': bounty[5],
         'resolved': bounty[6],
-        'bloom': uint256_list_to_hex_string(bounty[7]),
-        'voters': bounty[8],
-        'verdicts': int_to_bool_list(bounty[9]),
-        'bloom_votes': bounty[10],
     }
+    if len(bounty) > 7:
+        retval['bloom'] = uint256_list_to_hex_string(bounty[7])
+        retval['voters'] = bounty[8]
+        retval['verdicts'] = int_to_bool_list(bounty[9])
+        retval['bloom_votes'] = bounty[10]
+    return retval
 
 
 def new_bounty_event_to_dict(new_bounty_event):

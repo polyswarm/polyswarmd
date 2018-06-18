@@ -1,5 +1,6 @@
 import uuid
 
+import json
 import jsonschema
 from jsonschema.exceptions import ValidationError
 
@@ -65,7 +66,7 @@ def post_create_offer_channel():
         offer_registry.functions.initializeOfferChannel(guid.int, ambassador, expert, settlement_period_length),
         account).get()
 
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'The offer contract deploy transaction failed, verify parameters and try again', 400)
 
@@ -80,7 +81,7 @@ def post_create_offer_channel():
 
     success_dict = dict(processed[0]['args'])
 
-    msig_address = success_dict['msig'] 
+    msig_address = success_dict['msig']
 
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
 
@@ -88,7 +89,7 @@ def post_create_offer_channel():
         offer_msig.functions.setCommunicationUri(web3.toHex(text=websocket_uri)),
         account).get()
 
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'Failed to set to set socket url verify parameters and use the setWebsocket/ endpoint to try again', 400)
 
@@ -157,7 +158,7 @@ def post_open(guid):
     tx = transaction_queue.send_transaction(
         nectar_token['home'].functions.approve(msig_address, approve_amount),
         account).get()
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'Approve transaction failed, verify parameters and try again', 400)
 
@@ -165,7 +166,7 @@ def post_open(guid):
         offer_msig.functions.openAgreement(state, v, r, s),
         account).get()
 
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'Failed to open agreement, verify parameters and try again', 400)
 
@@ -270,7 +271,7 @@ def post_join(guid):
         offer_msig.functions.joinAgreement(state, v, r, s),
         account).get()
 
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'Failed to open agreement, verify parameters and try again', 400)
 
@@ -300,7 +301,7 @@ def post_close(guid):
     msig_address = offer_channel['msig_address']
 
     body = request.get_json()
-    
+
     schema = {
         'type': 'object',
         'properties': {
@@ -311,14 +312,17 @@ def post_close(guid):
             'r': {
                 'type': 'array',
                 'minLength': 2,
+                'maxLength': 2,
             },
             'v': {
                 'type': 'array',
-                'minimum': 2,
+                'minLength': 2,
+                'maxLength': 2,
             },
             's': {
                 'type': 'array',
-                'minLength': 2
+                'minLength': 2,
+                'maxLength': 2,
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -341,7 +345,7 @@ def post_close(guid):
         offer_msig.functions.closeAgreement(state, v, r, s),
         account).get()
 
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'Failed to open agreement, verify parameters and try again', 400)
 
@@ -382,14 +386,17 @@ def post_settle(guid):
             'r': {
                 'type': 'array',
                 'minLength': 2,
+                'maxLength': 2,
             },
             'v': {
                 'type': 'array',
-                'minimum': 2,
+                'minLength': 2,
+                'maxLength': 2,
             },
             's': {
                 'type': 'array',
-                'minLength': 2
+                'minLength': 2,
+                'maxLength': 2,
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -411,7 +418,7 @@ def post_settle(guid):
         offer_msig.functions.startSettle(state, v, r, s),
         account).get()
 
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'Failed to open agreement, verify parameters and try again', 400)
 
@@ -452,14 +459,17 @@ def post_challange(guid):
             'r': {
                 'type': 'array',
                 'minLength': 2,
+                'maxLength': 2,
             },
             'v': {
                 'type': 'array',
-                'minimum': 2,
+                'minLength': 2,
+                'maxLength': 2,
             },
             's': {
                 'type': 'array',
-                'minLength': 2
+                'minLength': 2,
+                'maxLength': 2,
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -483,7 +493,7 @@ def post_challange(guid):
         offer_msig.functions.challengeSettle(state, v, r, s),
         account).get()
 
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'Failed to open agreement, verify parameters and try again', 400)
 
@@ -515,11 +525,11 @@ def post_message_sender(guid):
     schema = {
         'type': 'object',
         'properties': {
-            'toSocketUri': {
+            'to_socket': {
                 'type': 'string',
                 'minLength': 0,
             },
-            'fromSocketUri': {
+            'from_socket': {
                 'type': 'string',
                 'minLength': 0,
             },
@@ -528,16 +538,16 @@ def post_message_sender(guid):
                 'minLength': 32,
             },
             'r': {
-                'type': 'array',
-                'minLength': 2,
+                'type': 'string',
+                'minLength': 64,
             },
             'v': {
-                'type': 'array',
-                'minimum': 2,
+                'type': 'integer',
+                'minimum': 0,
             },
             's': {
-                'type': 'array',
-                'minLength': 2
+                'type': 'string',
+                'minLength': 64
             }
         },
         'required': ['state', 'from_socket'],
@@ -557,8 +567,8 @@ def post_message_sender(guid):
     socket_uri = web3.toText(socket_uri).replace('\u0000', '')
 
     try:
-        if 'socket_uri' in body:
-            ws = create_connection(body['socket_uri'])
+        if 'to_socket' in body:
+            ws = create_connection(body['to_socket'])
         else:
             ws = create_connection(socket_uri)
     except:
@@ -568,7 +578,7 @@ def post_message_sender(guid):
 
     body['sender'] = account
 
-    ws.send(body)
+    ws.send(json.dumps(body))
 
     ws.close()
 
@@ -583,8 +593,9 @@ def get_channel_address(guid):
 @offers.route('/<uuid:guid>/settlementPeriod', methods=['GET'])
 def get_settlement_period(guid):
     web3 = web3_chains[chain]
-    offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
-    offer_msig = bind_contract(web3, offer_channel['msig_address'], offer_msig_artifact)
+    offer_channel = offer_registry.functions.guidToChannel(guid.int).call()
+    channel_data = channel_to_dict(offer_channel)
+    offer_msig = bind_contract(web3, channel_data['msig_address'], offer_msig_artifact)
 
     settlement_period_end = offer_msig.functions.settlementPeriodEnd().call()
 
@@ -593,8 +604,9 @@ def get_settlement_period(guid):
 @offers.route('/<uuid:guid>/websocket', methods=['GET'])
 def get_websocket(guid):
     web3 = web3_chains[chain]
-    offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
-    msig_address = offer_channel['msig_address']
+    offer_channel = offer_registry.functions.guidToChannel(guid.int).call()
+    channel_data = channel_to_dict(offer_channel)
+    msig_address = channel_data['msig_address']
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
     socket_uri = offer_msig.functions.websocketUri().call()
     # TODO find a better way than replace
@@ -607,10 +619,11 @@ def get_pending():
     web3 = web3_chains[chain]
     offers_pending = []
     num_of_offers = offer_registry.functions.getNumberOfOffers().call()
-    
+
     for i in range(0, num_of_offers):
         guid = offer_registry.functions.channelsGuids(i).call()
-        channel_data = channel_to_dict(offer_registry.guidToChannel(guid).call())
+        offer_channel = offer_registry.functions.guidToChannel(guid).call()
+        channel_data = channel_to_dict(offer_channel)
         msig_address = channel_data['msig_address']
         offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
         pending_channel = offer_msig.functions.isPending().call()
@@ -620,14 +633,15 @@ def get_pending():
     return success(offers_pending)
 
 @offers.route('opened', methods=['GET'])
-def get_opened(guid):
+def get_opened():
     offers_opened = []
     web3 = web3_chains[chain]
     num_of_offers = offer_registry.functions.getNumberOfOffers().call()
 
     for i in range(0, num_of_offers):
         guid = offer_registry.functions.channelsGuids(i).call()
-        channel_data = channel_to_dict(offer_registry.guidToChannel(guid).call())
+        offer_channel = offer_registry.functions.guidToChannel(guid).call()
+        channel_data = channel_to_dict(offer_channel)
         msig_address = channel_data['msig_address']
         offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
         opened_channel = offer_msig.functions.isOpen().call()
@@ -637,14 +651,15 @@ def get_opened(guid):
     return success(offers_opened)
 
 @offers.route('closed', methods=['GET'])
-def get_closed(guid):
+def get_closed():
     offers_closed = []
     web3 = web3_chains[chain]
     num_of_offers = offer_registry.functions.getNumberOfOffers().call()
 
     for i in range(0, num_of_offers):
         guid = offer_registry.functions.channelsGuids(i).call()
-        channel_data = channel_to_dict(offer_registry.guidToChannel(guid).call())
+        offer_channel = offer_registry.functions.guidToChannel(guid).call()
+        channel_data = channel_to_dict(offer_channel)
         msig_address = channel_data['msig_address']
         offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
         closed_channel = offer_msig.functions.isClosed().call()
@@ -654,7 +669,7 @@ def get_closed(guid):
     return success(offers_closed)
 
 @offers.route('myoffers', methods=['GET'])
-def get_myoffers(guid):
+def get_myoffers():
     web3 = web3_chains[chain]
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
@@ -666,7 +681,8 @@ def get_myoffers(guid):
 
     for i in range(0, num_of_offers):
         guid = offer_registry.functions.channelsGuids(i).call()
-        channel_data = channel_to_dict(offer_registry.functions.guidToChannel(guid).call())
+        offer_channel = offer_registry.functions.guidToChannel(guid).call()
+        channel_data = channel_to_dict(offer_channel)
         msig_address = channel_data['msig_address']
         offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
         expert = offer_msig.functions.expert().call()
