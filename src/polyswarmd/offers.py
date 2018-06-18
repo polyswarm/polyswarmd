@@ -343,7 +343,7 @@ def post_close(guid):
 
     if not check_transaction(tx):
         return failure(
-            'Failed to open agreement, verify parameters and try again', 400)
+            'Failed to close agreement, verify parameters and try again', 400)
 
     receipt = web3.eth.getTransactionReceipt(tx)
 
@@ -358,6 +358,65 @@ def post_close(guid):
 
     return success(data)
 
+# for closing a challenged state with a timeout
+@offers.route('/<uuid:guid>/closeChallenged', methods=['POST'])
+def post_close_challenged(guid):
+    web3 = web3_chains[chain]
+    transaction_queue = transaction_queue_chain[chain]
+    account = request.args.get('account')
+    if not account or not web3.isAddress(account):
+        return failure('Source account required', 401)
+    account = web3.toChecksumAddress(account)
+
+    offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
+    msig_address = offer_channel['msig_address']
+
+    body = request.get_json()
+    
+    schema = {
+        'type': 'object',
+        'properties': {
+            'state': {
+                'type': 'string',
+                'minLength': 32,
+            },
+            'r': {
+                'type': 'array',
+                'minLength': 2,
+            },
+            'v': {
+                'type': 'array',
+                'minimum': 2,
+            },
+            's': {
+                'type': 'array',
+                'minLength': 2
+            }
+        },
+        'required': ['state', 'r', 'v', 's'],
+    }
+
+    try:
+        jsonschema.validate(body, schema)
+    except ValidationError as e:
+        return failure('Invalid JSON: ' + e.message)
+
+    state = body['state']
+    v = body['v']
+    r = body['r']
+    s = body['s']
+
+    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+
+    tx = transaction_queue.send_transaction(
+        offer_msig.functions.closeAgreementWithTimeout(state, v, r, s),
+        account).get()
+
+    if not check_transaction(tx):
+        return failure(
+            'Failed to close agreement, verify parameters and try again', 400)
+
+    return success()
 
 @offers.route('/<uuid:guid>/settle', methods=['POST'])
 def post_settle(guid):
