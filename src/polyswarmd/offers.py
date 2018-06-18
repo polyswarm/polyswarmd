@@ -182,6 +182,40 @@ def post_open(guid):
 
     return success(data)
 
+@offers.route('/<uuid:guid>/cancel', methods=['POST'])
+def post_cancel(guid):
+    web3 = web3_chains[chain]
+    transaction_queue = transaction_queue_chain[chain]
+    account = request.args.get('account')
+    if not account or not web3.isAddress(account):
+        return failure('Source account required', 401)
+    account = web3.toChecksumAddress(account)
+
+    offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
+    msig_address = offer_channel['msig_address']
+
+    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+
+    tx = transaction_queue.send_transaction(
+        offer_msig.functions.cancel(),
+        account).get()
+
+    if not check_transaction(tx):
+        return failure(
+            'Failed to cancel agreement, make sure this channel has not been joined and try again', 400)
+
+    receipt = web3.eth.getTransactionReceipt(tx)
+
+    processed = offer_msig.events.CanceledAgreement().processReceipt(receipt)
+
+    if not processed:
+        return failure(
+            'Invalid transaction receipt, no events emitted. Check contract addresses',
+            400)
+
+    data = dict(processed[0]['args'])
+
+    return success(data)
 
 @offers.route('/<uuid:guid>/join', methods=['POST'])
 def post_join(guid):
