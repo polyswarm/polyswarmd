@@ -1,6 +1,7 @@
 import os
 import sys
 import yaml
+import time
 
 eth_uri = {}
 ipfs_uri = ''
@@ -13,7 +14,6 @@ offer_registry_address = {}
 chain_id = {}
 
 CONFIG_LOCATIONS = ['/etc/polyswarmd']
-
 
 def whereami():
     """
