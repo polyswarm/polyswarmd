@@ -28,6 +28,24 @@ services:
             - IPFS=http://ipfs:8545
         volumes:
             - "./:/build"
+    tx-singer:
+        image: "gitlab.polyswarm.io:3343/polyswarm/transaction-signer/transaction-signer"
+        depends_on:
+            - polyswarmd
+        environment:
+            - POLYSWARMD_NETWORK=ws://polyswarmd:31337/transactions
+            # - datadir="/home/user/.ethereum/priv_testnet"
+            # - address="34e583cf9c1789c3141538eec77d9f0b8f7e89f2"
+            # - password="password"
+    tx-singer:
+        image: "gitlab.polyswarm.io:3343/polyswarm/transaction-signer/transaction-signer"
+        depends_on:
+            - polyswarmd
+        environment:
+            - POLYSWARMD_NETWORK=ws://polyswarmd:31337/transactions
+            # - datadir="/home/user/.ethereum/priv_testnet"
+            # - address="34e583cf9c1789c3141538eec77d9f0b8f7e89f2"
+            # - password="password"
     geth:
         image: "gitlab.polyswarm.io:3343/polyswarm/eth-networks/priv-testnet"
         logging:
