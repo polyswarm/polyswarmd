@@ -16,7 +16,7 @@ def bind_contract(web3_, address, artifact):
 
 zero_address = '0x0000000000000000000000000000000000000000'
 
-offer_msig_artifact = os.path.join('truffle', 'build', 'contracts',
+offer_msig_artifact = os.path.join('/etc/polyswarmd/', 'contracts',
                                              'OfferMultiSig.json')
 
 web3 = {}
@@ -25,7 +25,7 @@ web3 = {}
 bounty_registry = {}
 nectar_token = {}
 
-# exsit only on home
+# exists only on home
 offer_registry = None
 offer_lib = None
 
@@ -35,22 +35,23 @@ for chain in ('home', 'side'):
     web3[chain] = temp
     nectar_token[chain] = bind_contract(
         web3[chain], nectar_token_address[chain],
-        os.path.join('truffle', 'build', 'contracts', 'NectarToken.json'))
+        os.path.join('/etc/polyswarmd/', 'contracts', 'NectarToken.json'))
 
     bounty_registry[chain] = bind_contract(
         web3[chain], bounty_registry_address[chain],
-        os.path.join('truffle', 'build', 'contracts', 'BountyRegistry.json'))
+        os.path.join('/etc/polyswarmd/', 'contracts', 'BountyRegistry.json'))
 
     if chain is 'home':
+
       offer_registry = bind_contract(
           web3[chain], offer_registry_address[chain],
-          os.path.join('truffle', 'build', 'contracts', 'OfferRegistry.json'))
+          os.path.join('/etc/polyswarmd/', 'contracts', 'OfferRegistry.json'))
 
       offer_lib_address = offer_registry.functions.offerLib().call()
 
       offer_lib = bind_contract(
           web3[chain], offer_lib_address,
-          os.path.join('truffle', 'build', 'contracts', 'OfferLib.json'))
+          os.path.join('/etc/polyswarmd/', 'contracts', 'OfferLib.json'))
 
 
 
