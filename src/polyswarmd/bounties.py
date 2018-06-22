@@ -149,8 +149,11 @@ def post_bounties():
             'Invalid transaction receipt, no events emitted. Check contract addresses',
             400)
     new_bounty_event = processed[0]['args']
+    response = new_bounty_event_to_dict(new_bounty_event)
+    if not is_valid_ipfshash(response['uri']):
+        return failure('Invalid IPFS hash in URI', 400)
 
-    return success(new_bounty_event_to_dict(new_bounty_event))
+    return success(response)
 
 # TODO: Caching layer for this
 @bounties.route('', methods=['GET'])
@@ -167,9 +170,12 @@ def get_bounties():
     ret = []
     for i in range(num_bounties):
         guid = bounty_registry.functions.bountyGuids(i).call()
-        ret.append(
-            bounty_to_dict(
-                bounty_registry.functions.bountiesByGuid(guid).call()))
+        bounty = bounty_to_dict(
+            bounty_registry.functions.bountiesByGuid(guid).call())
+        if not is_valid_ipfshash(bounty['uri']):
+            continue
+
+        ret.append(bounty)
 
     return success(ret)
 
@@ -193,6 +199,9 @@ def get_bounties_active():
         guid = bounty_registry.functions.bountyGuids(i).call()
         bounty = bounty_to_dict(
             bounty_registry.functions.bountiesByGuid(guid).call())
+
+        if not is_valid_ipfshash(bounty['uri']):
+            continue
 
         if bounty['expiration'] > current_block:
             ret.append(bounty)
@@ -220,6 +229,9 @@ def get_bounties_pending():
         bounty = bounty_to_dict(
             bounty_registry.functions.bountiesByGuid(guid).call())
 
+        if not is_valid_ipfshash(bounty['uri']):
+            continue
+
         if bounty['expiration'] <= current_block and not bounty['resolved']:
             ret.append(bounty)
 
@@ -238,6 +250,8 @@ def get_bounties_guid(guid):
 
     bounty = bounty_to_dict(
         bounty_registry.functions.bountiesByGuid(guid.int).call())
+    if not is_valid_ipfshash(bounty['uri']):
+        return failure('Invalid IPFS hash in URI', 400)
     if bounty['author'] == zero_address:
         return failure('Bounty not found', 404)
 
