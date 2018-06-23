@@ -8,10 +8,10 @@ from flask import Blueprint, request
 
 from websocket import create_connection
 
-from polyswarmd.eth import web3 as web3_chains, check_transaction, nectar_token, offer_registry, bind_contract, offer_msig_artifact, offer_lib
+from polyswarmd.eth import web3 as web3_chains, check_transaction, nectar_token, nectar_token_address, offer_registry, bind_contract, offer_msig_artifact, offer_lib
 from polyswarmd.response import success, failure
 from polyswarmd.websockets import transaction_queue as transaction_queue_chain
-from polyswarmd.utils import channel_to_dict
+from polyswarmd.utils import channel_to_dict, dict_to_state
 chain = 'home' # only on home chain
 offers = Blueprint('offers', __name__)
 
@@ -376,7 +376,7 @@ def post_close_challenged(guid):
     msig_address = offer_channel['msig_address']
 
     body = request.get_json()
-    
+
     schema = {
         'type': 'object',
         'properties': {
@@ -493,6 +493,92 @@ def post_settle(guid):
     data = dict(processed[0]['args'])
 
     return success(data)
+
+@offers.route('state', methods=['POST'])
+def create_state():
+
+    body = request.get_json()
+
+    schema = {
+        'type': 'object',
+        'properties': {
+            'close_flag': {
+                'type': 'integer',
+                'minimum': 0,
+                'maximum': 1
+            },
+            'nonce': {
+                'type': 'integer',
+                'minimum': 0,
+            },
+            'ambassador': {
+                'type': 'string',
+                'minLength': 1,
+            },
+            'expert': {
+                'type': 'string',
+                'minLength': 1,
+            },
+            'msig_address': {
+                'type': 'string',
+                'minLength': 1,
+            },
+            'ambassador_balance': {
+                'type': 'integer',
+                'minimum': 0,
+            },
+            'expert_balance': {
+                'type': 'integer',
+                'minimum': 0,
+            },
+            'guid': {
+                'type': 'string',
+                'minLength': 1,
+            },
+            'offer_amount': {
+                'type': 'integer',
+                'minimum': 0,
+            },
+            'artifact_hash': {
+                'type': 'string',
+                'minimum': 0,
+            },
+            'ipfs_hash': {
+                'type': 'string',
+                'minimum': 0,
+            },
+            'engagement_deadline': {
+                'type': 'string',
+                'minimum': 0,
+            },
+            'assertion_deadline': {
+                'type': 'string',
+                'minLength': 1
+            },
+            'current_commitment': {
+                'type': 'string',
+                'minLength': 1
+            },
+            'verdicts': {
+                'type': 'string',
+                'minLength': 1
+            },
+            'meta_data': {
+                'type': 'string',
+                'minLength': 1
+            }
+        },
+        'required': ['close_flag', 'nonce', 'expert', 'msig_address', 'ambassador_balance', 'expert_balance', 'guid', 'offer_amount'],
+    }
+
+    try:
+        jsonschema.validate(body, schema)
+    except ValidationError as e:
+        return failure('Invalid JSON: ' + e.message)
+
+    body['token_address'] = str(nectar_token_address);
+
+    return success({ 'state': dict_to_state(body) })
 
 @offers.route('/<uuid:guid>/challenge', methods=['POST'])
 def post_challange(guid):
