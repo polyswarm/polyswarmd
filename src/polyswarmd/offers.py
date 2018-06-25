@@ -201,7 +201,7 @@ def post_cancel(guid):
         offer_msig.functions.cancel(),
         account).get()
 
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'Failed to cancel agreement, make sure this channel has not been joined and try again', 400)
 
@@ -416,7 +416,7 @@ def post_close_challenged(guid):
         offer_msig.functions.closeAgreementWithTimeout(state, v, r, s),
         account).get()
 
-    if not check_transaction(tx):
+    if not check_transaction(web3, tx):
         return failure(
             'Failed to close agreement, verify parameters and try again', 400)
 
@@ -576,9 +576,9 @@ def create_state():
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message)
 
-    body['token_address'] = str(nectar_token_address);
+    body['token_address'] = str(nectar_token_address[chain])
 
-    return success({ 'state': dict_to_state(body) })
+    return success({'state': dict_to_state(body)})
 
 @offers.route('/<uuid:guid>/challenge', methods=['POST'])
 def post_challange(guid):
