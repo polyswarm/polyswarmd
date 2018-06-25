@@ -576,7 +576,7 @@ def create_state():
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message)
 
-    body['token_address'] = str(nectar_token_address);
+    body['token_address'] = str(nectar_token_address[chain]);
 
     return success({ 'state': dict_to_state(body) })
 
