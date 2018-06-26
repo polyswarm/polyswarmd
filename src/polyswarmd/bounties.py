@@ -55,7 +55,6 @@ def post_bounties():
     if not chain:
         chain = 'home'
     elif chain != 'side' and chain != 'home':
-        print('Invalid JSON: ' + e.message)
         return failure('Chain must be either home or side', 400)
 
     transaction_queue = transaction_chains[chain]
@@ -98,7 +97,6 @@ def post_bounties():
     try:
         jsonschema.validate(body, schema)
     except ValidationError as e:
-        print('Invalid JSON: ' + e.message)
         return failure('Invalid JSON: ' + e.message, 400)
 
     guid = uuid.uuid4()
@@ -107,16 +105,13 @@ def post_bounties():
     durationBlocks = body['duration']
 
     if amount < eth.bounty_amount_min():
-        print('Invalid bounty amount')
         return failure('Invalid bounty amount', 400)
 
     if not is_valid_ipfshash(artifactURI):
-        print('Invalid artifact URI (should be IPFS hash)')
         return failure('Invalid artifact URI (should be IPFS hash)', 400)
 
     arts = list_artifacts(artifactURI)
     if not arts:
-        print('Invalid artifact URI (could not retrieve artifacts)')
         return failure('Invalid artifact URI (could not retrieve artifacts)',
                        400)
 
@@ -134,7 +129,6 @@ def post_bounties():
         nectar_token.functions.approve(bounty_registry.address, approveAmount),
         account, base_nonce).get()
     if not check_transaction(web3, tx):
-        print('Approve transaction failed, verify parameters and try again')
         return failure(
             'Approve transaction failed, verify parameters and try again', 400)
 
@@ -145,20 +139,18 @@ def post_bounties():
                                              numArtifacts, durationBlocks,
                                              bloom), account, base_nonce).get()
     if not check_transaction(web3, tx):
-        print('Post bounty transaction failed, verify parameters and try again')
         return failure(
             'Post bounty transaction failed, verify parameters and try again',
             400)
     receipt = web3.eth.getTransactionReceipt(tx)
     processed = bounty_registry.events.NewBounty().processReceipt(receipt)
     if not processed:
-        print('Invalid transaction receipt, no events emitted. Check contract addresses')
         return failure(
             'Invalid transaction receipt, no events emitted. Check contract addresses',
             400)
     new_bounty_event = processed[0]['args']
-    return success(new_bounty_event_to_dict(new_bounty_event))
 
+    return success(new_bounty_event_to_dict(new_bounty_event))
 
 # TODO: Caching layer for this
 @bounties.route('', methods=['GET'])
@@ -167,7 +159,6 @@ def get_bounties():
     if not chain:
         chain = 'home'
     elif chain != 'side' and chain != 'home':
-        print('Chain must be either home or side')
         return failure('Chain must be either home or side', 400)
 
     bounty_registry = bounty_chains[chain]
