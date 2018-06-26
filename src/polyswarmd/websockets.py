@@ -19,7 +19,6 @@ class TransactionQueue(object):
         self.lock = gevent.lock.Semaphore()
         self.dict = dict()
         self.id_ = 0
-        self.pending = 0
         self.chain = chain
 
     def acquire(self):
@@ -31,14 +30,10 @@ class TransactionQueue(object):
     def complete(self, id_, txhash):
         self.acquire()
         self.dict[id_].set_result(txhash)
-        self.pending -= 1
         self.release()
 
-    def send_transaction(self, call, account):
+    def send_transaction(self, call, account, nonce):
         self.acquire()
-
-        nonce = web3_chains[self.chain].eth.getTransactionCount(account) + self.pending
-        self.pending += 1
 
         tx = call.buildTransaction({
             'nonce': nonce,
@@ -195,7 +190,7 @@ def init_websockets(app):
         try:
             while not ws.closed:
                 msg = ws.receive()
-                
+
                 if not msg:
                     break
 
@@ -243,9 +238,8 @@ def init_websockets(app):
                         body['type'],
                         'raw_state':
                         body['state'],
-                        'state': 
+                        'state':
                         state_dict
                     }))
         except:
             pass
-        

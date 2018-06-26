@@ -85,6 +85,10 @@ def post_bounties():
                 'type': 'integer',
                 'minimum': 1,
             },
+            'base_nonce': {
+                'type': 'integer',
+                'minimum': 0,
+            }
         },
         'required': ['amount', 'uri', 'duration'],
     }
@@ -116,16 +120,24 @@ def post_bounties():
 
     approveAmount = amount + eth.bounty_fee()
 
+    if 'base_nonce' in body:
+        base_nonce = body['base_nonce']
+    else:
+        base_nonce = web3.eth.getTransactionCount(account)
+
     tx = transaction_queue.send_transaction(
         nectar_token.functions.approve(bounty_registry.address, approveAmount),
-        account).get()
+        account, base_nonce).get()
     if not check_transaction(web3, tx):
         return failure(
             'Approve transaction failed, verify parameters and try again', 400)
+
+    base_nonce += 1;
+
     tx = transaction_queue.send_transaction(
         bounty_registry.functions.postBounty(guid.int, amount, artifactURI,
                                              numArtifacts, durationBlocks,
-                                             bloom), account).get()
+                                             bloom), account, base_nonce).get()
     if not check_transaction(web3, tx):
         return failure(
             'Post bounty transaction failed, verify parameters and try again',
@@ -137,8 +149,8 @@ def post_bounties():
             'Invalid transaction receipt, no events emitted. Check contract addresses',
             400)
     new_bounty_event = processed[0]['args']
-    return success(new_bounty_event_to_dict(new_bounty_event))
 
+    return success(new_bounty_event_to_dict(new_bounty_event))
 
 # TODO: Caching layer for this
 @bounties.route('', methods=['GET'])
@@ -262,6 +274,10 @@ def post_bounties_guid_vote(guid):
             'valid_bloom': {
                 'type': 'boolean',
             },
+            'base_nonce': {
+                'type': 'integer',
+                'minimum': 0,
+            }
         },
         'required': ['verdicts', 'valid_bloom'],
     }
@@ -275,9 +291,14 @@ def post_bounties_guid_vote(guid):
     verdicts = bool_list_to_int(body['verdicts'])
     valid_bloom = bool(body['valid_bloom'])
 
+    if 'base_nonce' in body:
+        base_nonce = body['base_nonce']
+    else:
+        base_nonce = web3.eth.getTransactionCount(account)
+
     tx = transaction_queue.send_transaction(
         bounty_registry.functions.voteOnBounty(guid.int, verdicts,
-                                               valid_bloom), account).get()
+                                               valid_bloom), account, base_nonce).get()
     if not check_transaction(web3, tx):
         return failure(
             'Settle bounty transaction failed, verify parameters and try again',
@@ -309,9 +330,13 @@ def post_bounties_guid_settle(guid):
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
+    if 'base_nonce' in body:
+        base_nonce = body['base_nonce']
+    else:
+        base_nonce = web3.eth.getTransactionCount(account)
 
     tx = transaction_queue.send_transaction(
-        bounty_registry.functions.settleBounty(guid.int), account).get()
+        bounty_registry.functions.settleBounty(guid.int), account, base_nonce).get()
     if not check_transaction(web3, tx):
         return failure(
             'Settle bounty transaction failed, verify parameters and try again',
@@ -362,6 +387,10 @@ def post_bounties_guid_assertions(guid):
                     'type': 'boolean',
                 },
             },
+            'base_nonce': {
+                'type': 'integer',
+                'minimum': 0,
+            }
         },
         'required': ['bid', 'mask', 'verdicts'],
     }
@@ -381,17 +410,23 @@ def post_bounties_guid_assertions(guid):
 
     nonce, commitment = calculate_commitment(verdicts)
     approveAmount = bid + eth.assertion_fee()
+    if 'base_nonce' in body:
+        base_nonce = body['base_nonce']
+    else:
+        base_nonce = web3.eth.getTransactionCount(account)
 
     tx = transaction_queue.send_transaction(
         nectar_token.functions.approve(bounty_registry.address, approveAmount),
-        account).get()
+        account, base_nonce).get()
     if not check_transaction(web3, tx):
         return failure(
             'Approve transaction failed, verify parameters and try again', 400)
 
+    base_nonce += 1;
+
     tx = transaction_queue.send_transaction(
         bounty_registry.functions.postAssertion(guid.int, bid, mask,
-                                                commitment), account).get()
+                                                commitment), account, base_nonce).get()
     if not check_transaction(web3, tx):
         return failure(
             'Post assertion transaction failed, verify parameters and try again',
@@ -449,6 +484,10 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
                 'type': 'string',
                 'maxLength': 1024,
             },
+            'base_nonce': {
+                'type': 'integer',
+                'minimum': 0,
+            }
         },
         'required': ['nonce', 'verdicts', 'metadata'],
     }
@@ -463,9 +502,14 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
     verdicts = bool_list_to_int(body['verdicts'])
     metadata = body['metadata']
 
+    if 'base_nonce' in body:
+        base_nonce = body['base_nonce']
+    else:
+        base_nonce = web3.eth.getTransactionCount(account)
+
     tx = transaction_queue.send_transaction(
         bounty_registry.functions.revealAssertion(
-            guid.int, id_, nonce, verdicts, metadata), account).get()
+            guid.int, id_, nonce, verdicts, metadata), account, base_nonce).get()
     if not check_transaction(web3, tx):
         return failure(
             'Reveal assertion transaction failed, verify parameters and try again',
