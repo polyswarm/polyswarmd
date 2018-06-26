@@ -46,6 +46,10 @@ def post_create_offer_channel():
                 'type': 'string',
                 'minLength': 1,
                 'maxLength': 32
+            },
+            'base_nonce': {
+                'type': 'integer',
+                'minimum': 0,
             }
         },
         'required': ['ambassador', 'expert', 'settlementPeriodLength', 'websocketUri'],
@@ -56,6 +60,11 @@ def post_create_offer_channel():
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message)
 
+    if 'base_nonce' in body:
+        base_nonce = body['base_nonce']
+    else:
+        base_nonce = web3.eth.getTransactionCount(account)
+
     guid = uuid.uuid4()
     ambassador = web3.toChecksumAddress(body['ambassador'])
     expert = web3.toChecksumAddress(body['expert'])
@@ -64,7 +73,7 @@ def post_create_offer_channel():
 
     tx = transaction_queue.send_transaction(
         offer_registry.functions.initializeOfferChannel(guid.int, ambassador, expert, settlement_period_length),
-        account).get()
+        account, base_nonce).get()
 
     if not check_transaction(web3, tx):
         return failure(
@@ -85,9 +94,11 @@ def post_create_offer_channel():
 
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
 
+    base_nonce += 1
+
     tx = transaction_queue.send_transaction(
         offer_msig.functions.setCommunicationUri(web3.toHex(text=websocket_uri)),
-        account).get()
+        account, base_nonce).get()
 
     if not check_transaction(web3, tx):
         return failure(
@@ -138,6 +149,10 @@ def post_open(guid):
             's': {
                 'type': 'string',
                 'minLength': 64
+            },
+            'base_nonce': {
+                'type': 'integer',
+                'minimum': 0,
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -153,14 +168,23 @@ def post_open(guid):
     r = body['r']
     s = body['s']
 
+    if 'base_nonce' in body:
+        base_nonce = body['base_nonce']
+    else:
+        base_nonce = web3.eth.getTransactionCount(account)
+
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
     approve_amount = offer_lib.functions.getBalanceA(state).call()
+
     tx = transaction_queue.send_transaction(
         nectar_token['home'].functions.approve(msig_address, approve_amount),
-        account).get()
+        account, base_nonce).get()
+
     if not check_transaction(web3, tx):
         return failure(
             'Approve transaction failed, verify parameters and try again', 400)
+
+    base_nonce += 1
 
     tx = transaction_queue.send_transaction(
         offer_msig.functions.openAgreement(state, v, r, s),
@@ -191,15 +215,31 @@ def post_cancel(guid):
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
+    body = request.get_json()
+
+    schema = {
+        'type': 'object',
+        'properties': {
+            'base_nonce': {
+                'type': 'integer',
+                'minimum': 0,
+            }
+        }
+    }
 
     offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
 
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
 
+    if 'base_nonce' in body:
+        base_nonce = body['base_nonce']
+    else:
+        base_nonce = web3.eth.getTransactionCount(account)
+
     tx = transaction_queue.send_transaction(
         offer_msig.functions.cancel(),
-        account).get()
+        account, base_nonce).get()
 
     if not check_transaction(tx):
         return failure(
@@ -250,6 +290,10 @@ def post_join(guid):
             's': {
                 'type': 'string',
                 'minLength': 64
+            },
+            'base_nonce': {
+                'type': 'integer',
+                'minimum': 0,
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -265,11 +309,16 @@ def post_join(guid):
     r = body['r']
     s = body['s']
 
+    if 'base_nonce' in body:
+        base_nonce = body['base_nonce']
+    else:
+        base_nonce = web3.eth.getTransactionCount(account)
+
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
 
     tx = transaction_queue.send_transaction(
         offer_msig.functions.joinAgreement(state, v, r, s),
-        account).get()
+        account, base_nonce).get()
 
     if not check_transaction(web3, tx):
         return failure(
@@ -323,6 +372,10 @@ def post_close(guid):
                 'type': 'array',
                 'minLength': 2,
                 'maxLength': 2,
+            },
+            'base_nonce': {
+                'type': 'integer',
+                'minimum': 0,
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -338,12 +391,16 @@ def post_close(guid):
     r = body['r']
     s = body['s']
 
+    if 'base_nonce' in body:
+        base_nonce = body['base_nonce']
+    else:
+        base_nonce = web3.eth.getTransactionCount(account)
 
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
 
     tx = transaction_queue.send_transaction(
         offer_msig.functions.closeAgreement(state, v, r, s),
-        account).get()
+        account, base_nonce).get()
 
     if not check_transaction(web3, tx):
         return failure(
@@ -376,7 +433,7 @@ def post_close_challenged(guid):
     msig_address = offer_channel['msig_address']
 
     body = request.get_json()
-    
+
     schema = {
         'type': 'object',
         'properties': {
@@ -395,6 +452,10 @@ def post_close_challenged(guid):
             's': {
                 'type': 'array',
                 'minLength': 2
+            },
+            'base_nonce': {
+                'type': 'integer',
+                'minimum': 0,
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -410,11 +471,16 @@ def post_close_challenged(guid):
     r = body['r']
     s = body['s']
 
+    if 'base_nonce' in body:
+        base_nonce = body['base_nonce']
+    else:
+        base_nonce = web3.eth.getTransactionCount(account)
+
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
 
     tx = transaction_queue.send_transaction(
         offer_msig.functions.closeAgreementWithTimeout(state, v, r, s),
-        account).get()
+        account, base_nonce).get()
 
     if not check_transaction(tx):
         return failure(
@@ -456,6 +522,10 @@ def post_settle(guid):
                 'type': 'array',
                 'minLength': 2,
                 'maxLength': 2,
+            },
+            'base_nonce': {
+                'type': 'integer',
+                'minimum': 0,
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -471,11 +541,16 @@ def post_settle(guid):
     r = body['r']
     s = body['s']
 
+    if 'base_nonce' in body:
+        base_nonce = body['base_nonce']
+    else:
+        base_nonce = web3.eth.getTransactionCount(account)
+
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
 
     tx = transaction_queue.send_transaction(
         offer_msig.functions.startSettle(state, v, r, s),
-        account).get()
+        account, base_nonce).get()
 
     if not check_transaction(web3, tx):
         return failure(
@@ -529,6 +604,10 @@ def post_challange(guid):
                 'type': 'array',
                 'minLength': 2,
                 'maxLength': 2,
+            },
+            'base_nonce': {
+                'type': 'integer',
+                'minimum': 0,
             }
         },
         'required': ['state', 'r', 'v', 's'],
@@ -545,12 +624,16 @@ def post_challange(guid):
     r = body['r']
     s = body['s']
 
+    if 'base_nonce' in body:
+        base_nonce = body['base_nonce']
+    else:
+        base_nonce = web3.eth.getTransactionCount(account)
 
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
 
     tx = transaction_queue.send_transaction(
         offer_msig.functions.challengeSettle(state, v, r, s),
-        account).get()
+        account, base_nonce).get()
 
     if not check_transaction(web3, tx):
         return failure(
