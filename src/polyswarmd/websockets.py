@@ -43,7 +43,7 @@ class TransactionQueue(object):
         result = gevent.event.AsyncResult()
 
         self.dict[self.id_] = result
-        self.inner.put((self.id_, tx))
+        self.inner.put((self.id_, tx, account))
         self.id_ += 1
 
         self.release()
@@ -120,12 +120,12 @@ def init_websockets(app):
     @sockets.route('/transactions')
     def transactions(ws):
         def home_queue_greenlet():
-            for (id_, tx) in transaction_queue['home']:
-                ws.send(json.dumps({'id': id_, 'data': tx}))
+            for (id_, tx, account) in transaction_queue['home']:
+                ws.send(json.dumps({'id': id_, 'data': tx, 'to': account}))
 
         def side_queue_greenlet():
-            for (id_, tx) in transaction_queue['side']:
-                ws.send(json.dumps({'id': id_, 'data': tx}))
+            for (id_, tx, account) in transaction_queue['side']:
+                ws.send(json.dumps({'id': id_, 'data': tx, 'to': account}))
 
         # If we can handle the pending tx stuff above, we combine this to one
         qgl = dict()
