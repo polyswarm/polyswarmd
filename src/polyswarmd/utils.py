@@ -1,4 +1,5 @@
 import uuid
+import operator
 from polyswarmd.eth import offer_lib, web3 as web3_chains
 
 
@@ -83,12 +84,14 @@ def new_verdict_event_to_dict(new_verdict_event):
         'verdicts': int_to_bool_list(new_verdict_event.verdicts),
     }
 
-def new_transfer_event_to_dict(new_transfer_event):
+
+def transfer_event_to_dict(transfer_event):
     return {
-        'from': new_transfer_event['from'],
-        'to': new_transfer_event['to'],
-        'value': str(new_transfer_event['value'])
+        'from': transfer_event['from'],
+        'to': transfer_event['to'],
+        'value': str(transfer_event['value'])
     }
+
 
 def channel_to_dict(channel_data):
     return {
@@ -96,76 +99,6 @@ def channel_to_dict(channel_data):
         'ambassador': channel_data[1],
         'expert': channel_data[2]
     }
-
-def to_padded_hex(val):
-    web3 = web3_chains['home']
-
-    if type(val) == str:
-        if val.startswith('0x'):
-            padded_hex = web3.toHex(hexstr=val)[2:]
-        else:
-            padded_hex = web3.toHex(text=val)[2:]
-    else:
-        padded_hex = web3.toHex(val)[2:]
-
-    l = 64 - len(padded_hex)
-
-    for i in range(0, l):
-        padded_hex = '0' + padded_hex
-
-    return padded_hex
-
-def dict_to_state(state_dict):
-    state_str = '0x'
-
-    # should always be included
-    state_str = state_str + to_padded_hex(state_dict['close_flag'])
-    state_str = state_str + to_padded_hex(state_dict['nonce'])
-    state_str = state_str + to_padded_hex(state_dict['ambassador'])
-    state_str = state_str + to_padded_hex(state_dict['expert'])
-    state_str = state_str + to_padded_hex(state_dict['msig_address'])
-    state_str = state_str + to_padded_hex(state_dict['ambassador_balance'])
-    state_str = state_str + to_padded_hex(state_dict['expert_balance'])
-    state_str = state_str + to_padded_hex(state_dict['token_address'])
-    state_str = state_str + to_padded_hex(state_dict['guid'])
-    state_str = state_str + to_padded_hex(state_dict['offer_amount'])
-
-    if 'artifact_hash' in state_dict:
-        state_str = state_str + to_padded_hex(state_dict['artifact_hash'])
-    else:
-        state_str = state_str + to_padded_hex('')
-
-    if 'ipfs_hash' in state_dict:
-        state_str = state_str + to_padded_hex(state_dict['ipfs_hash'])
-    else:
-        state_str = state_str + to_padded_hex('')
-
-    if 'engagement_deadline' in state_dict:
-        state_str = state_str + to_padded_hex(state_dict['engagement_deadline'])
-    else:
-        state_str = state_str + to_padded_hex('')
-
-    if 'assertion_deadline' in state_dict:
-        state_str = state_str + to_padded_hex(state_dict['assertion_deadline'])
-    else:
-        state_str = state_str + to_padded_hex('')
-
-    if 'current_commitment' in state_dict:
-        state_str = state_str + to_padded_hex(state_dict['current_commitment'])
-    else:
-        state_str = state_str + to_padded_hex('')
-
-    if 'verdicts' in state_dict:
-        state_str = state_str + to_padded_hex(state_dict['verdicts'])
-    else:
-        state_str = state_str + to_padded_hex('')
-
-    if 'meta_data' in state_dict:
-        state_str = state_str + to_padded_hex(state_dict['meta_data'])
-    else:
-        state_str = state_str + to_padded_hex('')
-
-    return state_str
 
 def state_to_dict(state):
     # gets state of non required state

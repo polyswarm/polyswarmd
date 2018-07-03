@@ -1,7 +1,6 @@
 import os
-import uuid
-
 import jsonschema
+import uuid
 
 from ethereum.utils import sha3
 from flask import Blueprint, request
@@ -10,11 +9,9 @@ from jsonschema.exceptions import ValidationError
 from polyswarmd import eth
 from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
-from polyswarmd.eth import web3 as web3_chains, check_transaction, nectar_token as nectar_chains, bounty_registry as bounty_chains, zero_address
+from polyswarmd.eth import web3 as web3_chains, build_transaction, nectar_token as nectar_chains, bounty_registry as bounty_chains, zero_address
 from polyswarmd.response import success, failure
-from polyswarmd.websockets import transaction_queue as transaction_chains
-from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, new_bounty_event_to_dict, \
-        new_assertion_event_to_dict, new_verdict_event_to_dict, revealed_assertion_event_to_dict
+from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict
 
 bounties = Blueprint('bounties', __name__)
 
@@ -51,13 +48,10 @@ def calculate_commitment(verdicts):
 @bounties.route('', methods=['POST'])
 def post_bounties():
     # Must read chain before account to have a valid web3 ref
-    chain = request.args.get('chain')
-    if not chain:
-        chain = 'home'
-    elif chain != 'side' and chain != 'home':
+    chain = request.args.get('chain', 'home')
+    if chain != 'side' and chain != 'home':
         return failure('Chain must be either home or side', 400)
 
-    transaction_queue = transaction_chains[chain]
     web3 = web3_chains[chain]
     nectar_token = nectar_chains[chain]
     bounty_registry = bounty_chains[chain]
@@ -66,6 +60,9 @@ def post_bounties():
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
+
+    base_nonce = int(request.args.get('base_nonce',
+                                  web3.eth.getTransactionCount(account)))
 
     schema = {
         'type': 'object',
@@ -85,10 +82,6 @@ def post_bounties():
                 'type': 'integer',
                 'minimum': 1,
             },
-            'base_nonce': {
-                'type': 'integer',
-                'minimum': 0,
-            }
         },
         'required': ['amount', 'uri', 'duration'],
     }
@@ -120,48 +113,23 @@ def post_bounties():
 
     approveAmount = amount + eth.bounty_fee()
 
-    if 'base_nonce' in body:
-        base_nonce = body['base_nonce']
-    else:
-        base_nonce = web3.eth.getTransactionCount(account)
+    transactions = [
+        build_transaction(
+            nectar_token.functions.approve(bounty_registry.address,
+                                           approveAmount), chain, base_nonce),
+        build_transaction(
+            bounty_registry.functions.postBounty(
+                guid.int, amount, artifactURI, numArtifacts, durationBlocks,
+                bloom), chain, base_nonce + 1),
+    ]
 
-    tx = transaction_queue.send_transaction(
-        nectar_token.functions.approve(bounty_registry.address, approveAmount),
-        account, base_nonce).get()
-    if not check_transaction(web3, tx):
-        return failure(
-            'Approve transaction failed, verify parameters and try again', 400)
-
-    base_nonce += 1;
-
-    tx = transaction_queue.send_transaction(
-        bounty_registry.functions.postBounty(guid.int, amount, artifactURI,
-                                             numArtifacts, durationBlocks,
-                                             bloom), account, base_nonce).get()
-    if not check_transaction(web3, tx):
-        return failure(
-            'Post bounty transaction failed, verify parameters and try again',
-            400)
-    receipt = web3.eth.getTransactionReceipt(tx)
-    processed = bounty_registry.events.NewBounty().processReceipt(receipt)
-    if not processed:
-        return failure(
-            'Invalid transaction receipt, no events emitted. Check contract addresses',
-            400)
-    new_bounty_event = processed[0]['args']
-    response = new_bounty_event_to_dict(new_bounty_event)
-    if not is_valid_ipfshash(response['uri']):
-        return failure('Invalid IPFS hash in URI', 400)
-
-    return success(response)
+    return success({'transactions': transactions})
 
 # TODO: Caching layer for this
 @bounties.route('', methods=['GET'])
 def get_bounties():
-    chain = request.args.get('chain')
-    if not chain:
-        chain = 'home'
-    elif chain != 'side' and chain != 'home':
+    chain = request.args.get('chain', 'home')
+    if chain != 'side' and chain != 'home':
         return failure('Chain must be either home or side', 400)
 
     bounty_registry = bounty_chains[chain]
@@ -183,10 +151,8 @@ def get_bounties():
 # TODO: Caching layer for this
 @bounties.route('/active', methods=['GET'])
 def get_bounties_active():
-    chain = request.args.get('chain')
-    if not chain:
-        chain = 'home'
-    elif chain != 'side' and chain != 'home':
+    chain = request.args.get('chain', 'home')
+    if chain != 'side' and chain != 'home':
         return failure('Chain must be either home or side', 400)
 
     web3 = web3_chains[chain]
@@ -212,10 +178,8 @@ def get_bounties_active():
 # TODO: Caching layer for this
 @bounties.route('/pending', methods=['GET'])
 def get_bounties_pending():
-    chain = request.args.get('chain')
-    if not chain:
-        chain = 'home'
-    elif chain != 'side' and chain != 'home':
+    chain = request.args.get('chain', 'home')
+    if chain != 'side' and chain != 'home':
         return failure('Chain must be either home or side', 400)
 
     web3 = web3_chains[chain]
@@ -240,10 +204,8 @@ def get_bounties_pending():
 
 @bounties.route('/<uuid:guid>', methods=['GET'])
 def get_bounties_guid(guid):
-    chain = request.args.get('chain')
-    if not chain:
-        chain = 'home'
-    elif chain != 'side' and chain != 'home':
+    chain = request.args.get('chain', 'home')
+    if chain != 'side' and chain != 'home':
         return failure('Chain must be either home or side', 400)
 
     bounty_registry = bounty_chains[chain]
@@ -260,20 +222,20 @@ def get_bounties_guid(guid):
 
 @bounties.route('/<uuid:guid>/vote', methods=['POST'])
 def post_bounties_guid_vote(guid):
-    chain = request.args.get('chain')
-    if not chain:
-        chain = 'home'
-    elif chain != 'side' and chain != 'home':
+    chain = request.args.get('chain', 'home')
+    if chain != 'side' and chain != 'home':
         return failure('Chain must be either home or side', 400)
 
     web3 = web3_chains[chain]
-    transaction_queue = transaction_chains[chain]
     bounty_registry = bounty_chains[chain]
 
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
+
+    base_nonce = int(request.args.get('base_nonce',
+                                  web3.eth.getTransactionCount(account)))
 
     schema = {
         'type': 'object',
@@ -288,10 +250,6 @@ def post_bounties_guid_vote(guid):
             'valid_bloom': {
                 'type': 'boolean',
             },
-            'base_nonce': {
-                'type': 'integer',
-                'minimum': 0,
-            }
         },
         'required': ['verdicts', 'valid_bloom'],
     }
@@ -305,78 +263,56 @@ def post_bounties_guid_vote(guid):
     verdicts = bool_list_to_int(body['verdicts'])
     valid_bloom = bool(body['valid_bloom'])
 
-    if 'base_nonce' in body:
-        base_nonce = body['base_nonce']
-    else:
-        base_nonce = web3.eth.getTransactionCount(account)
-
-    tx = transaction_queue.send_transaction(
-        bounty_registry.functions.voteOnBounty(guid.int, verdicts,
-                                               valid_bloom), account, base_nonce).get()
-    if not check_transaction(web3, tx):
-        return failure(
-            'Settle bounty transaction failed, verify parameters and try again',
-            400)
-
-    receipt = web3.eth.getTransactionReceipt(tx)
-    processed = bounty_registry.events.NewVerdict().processReceipt(receipt)
-    if not processed:
-        return failure(
-            'Invalid transaction receipt, no events emitted. Check contract addresses',
-            400)
-    new_verdict_event = processed[0]['args']
-    return success(new_verdict_event_to_dict(new_verdict_event))
+    transactions = [
+        build_transaction(
+            bounty_registry.functions.voteOnBounty(
+                guid.int, verdicts, valid_bloom), chain, base_nonce),
+    ]
+    return success({'transactions': transactions})
 
 
 @bounties.route('/<uuid:guid>/settle', methods=['POST'])
 def post_bounties_guid_settle(guid):
-    chain = request.args.get('chain')
-    if not chain:
-        chain = 'home'
-    elif chain != 'side' and chain != 'home':
+    chain = request.args.get('chain', 'home')
+    if chain != 'side' and chain != 'home':
         return failure('Chain must be either home or side', 400)
 
     web3 = web3_chains[chain]
-    transaction_queue = transaction_chains[chain]
     bounty_registry = bounty_chains[chain]
 
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
-    if 'base_nonce' in body:
-        base_nonce = body['base_nonce']
-    else:
-        base_nonce = web3.eth.getTransactionCount(account)
 
-    tx = transaction_queue.send_transaction(
-        bounty_registry.functions.settleBounty(guid.int), account, base_nonce).get()
-    if not check_transaction(web3, tx):
-        return failure(
-            'Settle bounty transaction failed, verify parameters and try again',
-            400)
+    base_nonce = int(request.args.get('base_nonce',
+                                  web3.eth.getTransactionCount(account)))
 
-    # TODO: raise event in contract?
-    return success()
+    transactions = [
+        build_transaction(
+            bounty_registry.functions.settleBounty(guid.int), chain,
+            base_nonce),
+    ]
+    return success({'transactions': transactions})
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['POST'])
 def post_bounties_guid_assertions(guid):
-    chain = request.args.get('chain')
-    if not chain:
-        chain = 'home'
-    elif chain != 'side' and chain != 'home':
+    chain = request.args.get('chain', 'home')
+    if chain != 'side' and chain != 'home':
         return failure('Chain must be either home or side', 400)
 
     web3 = web3_chains[chain]
     nectar_token = nectar_chains[chain]
-    transaction_queue = transaction_chains[chain]
     bounty_registry = bounty_chains[chain]
 
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
+
+    base_nonce = int(request.args.get('base_nonce',
+                                  web3.eth.getTransactionCount(account)))
 
     schema = {
         'type': 'object',
@@ -401,10 +337,6 @@ def post_bounties_guid_assertions(guid):
                     'type': 'boolean',
                 },
             },
-            'base_nonce': {
-                'type': 'integer',
-                'minimum': 0,
-            }
         },
         'required': ['bid', 'mask', 'verdicts'],
     }
@@ -424,59 +356,33 @@ def post_bounties_guid_assertions(guid):
 
     nonce, commitment = calculate_commitment(verdicts)
     approveAmount = bid + eth.assertion_fee()
-    if 'base_nonce' in body:
-        base_nonce = body['base_nonce']
-    else:
-        base_nonce = web3.eth.getTransactionCount(account)
 
-    tx = transaction_queue.send_transaction(
-        nectar_token.functions.approve(bounty_registry.address, approveAmount),
-        account, base_nonce).get()
-    if not check_transaction(web3, tx):
-        return failure(
-            'Approve transaction failed, verify parameters and try again', 400)
-
-    base_nonce += 1;
-
-    tx = transaction_queue.send_transaction(
-        bounty_registry.functions.postAssertion(guid.int, bid, mask,
-                                                commitment), account, base_nonce).get()
-    if not check_transaction(web3, tx):
-        return failure(
-            'Post assertion transaction failed, verify parameters and try again',
-            400)
-
-    receipt = web3.eth.getTransactionReceipt(tx)
-    processed = bounty_registry.events.NewAssertion().processReceipt(receipt)
-    if not processed:
-        return failure(
-            'Invalid transaction receipt, no events emitted. Check contract addresses',
-            400)
-    new_assertion_event = processed[0]['args']
+    transactions = [
+        build_transaction(nectar_token.functions.approve(bounty_registry.address, approveAmount), chain, base_nonce),
+        build_transaction(bounty_registry.functions.postAssertion(guid.int, bid, mask, commitment), chain, base_nonce + 1),
+    ]
 
     # Pass generated nonce onto user in response, used for reveal
-    ret = new_assertion_event_to_dict(new_assertion_event)
-    ret['nonce'] = str(nonce)
-    return success(ret)
+    return success({'transactions': transactions, 'nonce': str(nonce)})
 
 
 @bounties.route('/<uuid:guid>/assertions/<int:id_>/reveal', methods=['POST'])
 def post_bounties_guid_assertions_id_reveal(guid, id_):
-    chain = request.args.get('chain')
-    if not chain:
-        chain = 'home'
-    elif chain != 'side' and chain != 'home':
+    chain = request.args.get('chain', 'home')
+    if chain != 'side' and chain != 'home':
         return failure('Chain must be either home or side', 400)
 
     web3 = web3_chains[chain]
     nectar_token = nectar_chains[chain]
-    transaction_queue = transaction_chains[chain]
     bounty_registry = bounty_chains[chain]
 
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
+
+    base_nonce = int(request.args.get('base_nonce',
+                                  web3.eth.getTransactionCount(account)))
 
     schema = {
         'type': 'object',
@@ -498,10 +404,6 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
                 'type': 'string',
                 'maxLength': 1024,
             },
-            'base_nonce': {
-                'type': 'integer',
-                'minimum': 0,
-            }
         },
         'required': ['nonce', 'verdicts', 'metadata'],
     }
@@ -516,36 +418,17 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
     verdicts = bool_list_to_int(body['verdicts'])
     metadata = body['metadata']
 
-    if 'base_nonce' in body:
-        base_nonce = body['base_nonce']
-    else:
-        base_nonce = web3.eth.getTransactionCount(account)
+    transactions = [
+        build_transaction(bounty_registry.functions.revealAssertion(guid.int, id_, nonce, verdicts, metadata), chain, base_nonce),
 
-    tx = transaction_queue.send_transaction(
-        bounty_registry.functions.revealAssertion(
-            guid.int, id_, nonce, verdicts, metadata), account, base_nonce).get()
-    if not check_transaction(web3, tx):
-        return failure(
-            'Reveal assertion transaction failed, verify parameters and try again',
-            400)
-
-    receipt = web3.eth.getTransactionReceipt(tx)
-    processed = bounty_registry.events.RevealedAssertion().processReceipt(
-        receipt)
-    if not processed:
-        return failure(
-            'Invalid transaction receipt, no events emitted. Check contract addresses',
-            400)
-    revealed_assertion_event = processed[0]['args']
-    return success(revealed_assertion_event_to_dict(revealed_assertion_event))
+    ]
+    return success({'transactions': transactions})
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['GET'])
 def get_bounties_guid_assertions(guid):
-    chain = request.args.get('chain')
-    if not chain:
-        chain = 'home'
-    elif chain != 'side' and chain != 'home':
+    chain = request.args.get('chain', 'home')
+    if chain != 'side' and chain != 'home':
         return failure('Chain must be either home or side', 400)
 
     bounty_registry = bounty_chains[chain]
@@ -563,10 +446,8 @@ def get_bounties_guid_assertions(guid):
 
 @bounties.route('/<uuid:guid>/assertions/<int:id_>', methods=['GET'])
 def get_bounties_guid_assertions_id(guid, id_):
-    chain = request.args.get('chain')
-    if not chain:
-        chain = 'home'
-    elif chain != 'side' and chain != 'home':
+    chain = request.args.get('chain', 'home')
+    if chain != 'side' and chain != 'home':
         return failure('Chain must be either home or side', 400)
 
     bounty_registry = bounty_chains[chain]

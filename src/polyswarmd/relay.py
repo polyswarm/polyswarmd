@@ -4,10 +4,8 @@ from jsonschema.exceptions import ValidationError
 from flask import Blueprint, request
 
 from polyswarmd.response import success, failure
-from polyswarmd.eth import web3 as web3_chains, check_transaction, nectar_token as nectar_chains
+from polyswarmd.eth import web3 as web3_chains, build_transaction, nectar_token as nectar_chains
 from polyswarmd.config import erc20_relay_address as erc20_chains
-from polyswarmd.websockets import transaction_queue as transaction_chains
-from polyswarmd.utils import new_transfer_event_to_dict
 
 relay = Blueprint('relay', __name__)
 
@@ -29,12 +27,14 @@ def send_funds_from(chain):
     web3 = web3_chains[chain]
     nectar_token = nectar_chains[chain]
     erc20_relay_address = erc20_chains[chain]
-    transaction_queue = transaction_chains[chain]
 
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
+
+    base_nonce = int(
+        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
 
     if not erc20_relay_address or not web3.isAddress(erc20_relay_address):
         return failure('ERC20 Relay misconfigured', 500)
@@ -61,18 +61,10 @@ def send_funds_from(chain):
 
     amount = int(body['amount'])
 
-    tx = transaction_queue.send_transaction(
-        nectar_token.functions.transfer(erc20_relay_address, amount),
-        account).get()
+    transactions = [
+        build_transaction(
+            nectar_token.functions.transfer(erc20_relay_address, amount),
+            chain, base_nonce),
+    ]
 
-    if not check_transaction(web3, tx):
-        return failure(
-            'Approve transaction failed, verify parameters and try again', 400)
-    receipt = web3.eth.getTransactionReceipt(tx)
-    processed = nectar_token.events.Transfer().processReceipt(receipt)
-    if not processed:
-        return failure(
-            'Invalid transaction receipt, no events emitted. Check contract addresses',
-            400)
-    new_transfer_event = processed[0]['args']
-    return success(new_transfer_event_to_dict(new_transfer_event))
+    return success({'transactions': transactions})

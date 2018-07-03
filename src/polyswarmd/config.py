@@ -6,6 +6,7 @@ import time
 eth_uri = {}
 ipfs_uri = ''
 network = ''
+config_location = ''
 
 nectar_token_address = {}
 bounty_registry_address = {}
@@ -13,7 +14,7 @@ erc20_relay_address = {}
 offer_registry_address = {}
 chain_id = {}
 
-CONFIG_LOCATIONS = ['/etc/polyswarmd']
+CONFIG_LOCATIONS = ['/etc/polyswarmd', '~/.config/polyswarmd']
 
 def whereami():
     """
@@ -29,10 +30,12 @@ def init_config():
     """
     Read config from yaml file
     """
-    global eth_uri, ipfs_uri, network, nectar_token_address, bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id
+    global eth_uri, ipfs_uri, network, config_location, nectar_token_address, \
+            bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id
 
-    for loc in CONFIG_LOCATIONS:
-        config_file = os.path.join(loc, 'polyswarmd.yml')
+    for config_location in CONFIG_LOCATIONS:
+        config_location = os.path.expanduser(config_location)
+        config_file = os.path.join(config_location, 'polyswarmd.yml')
         if os.path.isfile(config_file):
             break
 
