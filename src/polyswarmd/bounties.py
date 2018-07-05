@@ -32,7 +32,8 @@ def calculate_bloom(arts):
 
 
 def int_to_bytes(i):
-    return bytes.fromhex(hex(i)[2:])
+    h = hex(i)[2:]
+    return bytes.fromhex('0' * (64 - len(h)) + h)
 
 
 def int_from_bytes(b):
@@ -61,8 +62,8 @@ def post_bounties():
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
 
-    base_nonce = int(request.args.get('base_nonce',
-                                  web3.eth.getTransactionCount(account)))
+    base_nonce = int(
+        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
 
     schema = {
         'type': 'object',
@@ -234,8 +235,8 @@ def post_bounties_guid_vote(guid):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
 
-    base_nonce = int(request.args.get('base_nonce',
-                                  web3.eth.getTransactionCount(account)))
+    base_nonce = int(
+        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
 
     schema = {
         'type': 'object',
@@ -285,8 +286,8 @@ def post_bounties_guid_settle(guid):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
 
-    base_nonce = int(request.args.get('base_nonce',
-                                  web3.eth.getTransactionCount(account)))
+    base_nonce = int(
+        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
 
     transactions = [
         build_transaction(
@@ -311,8 +312,8 @@ def post_bounties_guid_assertions(guid):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
 
-    base_nonce = int(request.args.get('base_nonce',
-                                  web3.eth.getTransactionCount(account)))
+    base_nonce = int(
+        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
 
     schema = {
         'type': 'object',
@@ -358,8 +359,12 @@ def post_bounties_guid_assertions(guid):
     approveAmount = bid + eth.assertion_fee()
 
     transactions = [
-        build_transaction(nectar_token.functions.approve(bounty_registry.address, approveAmount), chain, base_nonce),
-        build_transaction(bounty_registry.functions.postAssertion(guid.int, bid, mask, commitment), chain, base_nonce + 1),
+        build_transaction(
+            nectar_token.functions.approve(bounty_registry.address,
+                                           approveAmount), chain, base_nonce),
+        build_transaction(
+            bounty_registry.functions.postAssertion(
+                guid.int, bid, mask, commitment), chain, base_nonce + 1),
     ]
 
     # Pass generated nonce onto user in response, used for reveal
@@ -381,8 +386,8 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
 
-    base_nonce = int(request.args.get('base_nonce',
-                                  web3.eth.getTransactionCount(account)))
+    base_nonce = int(
+        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
 
     schema = {
         'type': 'object',
@@ -419,8 +424,9 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
     metadata = body['metadata']
 
     transactions = [
-        build_transaction(bounty_registry.functions.revealAssertion(guid.int, id_, nonce, verdicts, metadata), chain, base_nonce),
-
+        build_transaction(
+            bounty_registry.functions.revealAssertion(
+                guid.int, id_, nonce, verdicts, metadata), chain, base_nonce),
     ]
     return success({'transactions': transactions})
 
