@@ -26,7 +26,7 @@ def bind_contract(web3_, address, artifact):
         address=web3_.toChecksumAddress(address), abi=abi)
 
 
-gas_limit = 500000,  # TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to /offers
+gas_limit = 500000 # TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to /offers
 zero_address = '0x0000000000000000000000000000000000000000'
 
 offer_msig_artifact = os.path.join(config_location, 'contracts',

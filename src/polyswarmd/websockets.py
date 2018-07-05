@@ -1,8 +1,12 @@
+import gevent
 import json
-
 import jsonschema
+import sys
+
 from jsonschema.exceptions import ValidationError
+from flask import request
 from flask_sockets import Sockets
+from geventwebsocket import WebSocketError
 
 from polyswarmd.eth import web3 as web3_chains, bounty_registry as bounty_chains
 from polyswarmd.config import chain_id as chain_ids
@@ -11,10 +15,11 @@ from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_di
 def init_websockets(app):
     sockets = Sockets(app)
 
-    @sockets.route('/events/<chain>')
-    def events(ws, chain):
+    @sockets.route('/events')
+    def events(ws):
+        chain = request.args.get('chain', 'home')
         if chain != 'side' and chain != 'home':
-            print('Chain must be either home or side')
+            print('Chain must be either home or side', file=sys.stderr)
             ws.close()
 
         web3 = web3_chains[chain]
@@ -25,8 +30,8 @@ def init_websockets(app):
         assertion_filter = bounty_registry.eventFilter('NewAssertion')
         verdict_filter = bounty_registry.eventFilter('NewVerdict')
 
-        try:
-            while not ws.closed:
+        while not ws.closed:
+            try:
                 for event in block_filter.get_new_entries():
                     ws.send(
                         json.dumps({
@@ -64,8 +69,11 @@ def init_websockets(app):
                         }))
 
                 gevent.sleep(1)
-        except:
-            pass
+            except WebSocketError:
+                break
+            except Exception as e:
+                print('Error in /events:', e, file=sys.stderr)
+                continue
 
     # for receive messages about offers that might need to be signed
     @sockets.route('/messages/<uuid:guid>')
@@ -110,7 +118,7 @@ def init_websockets(app):
                 try:
                     jsonschema.validate(body, schema)
                 except ValidationError as e:
-                    print('Invalid JSON: ' + e.message)
+                    print('Invalid JSON:', e, file=sys.stderr)
 
                 state_dict = state_to_dict(body['state'])
                 state_dict['guid'] = guid.int
