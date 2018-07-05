@@ -167,13 +167,14 @@ def events_from_transaction(txhash, chain):
 
     # TODO: Check for out of gas, other
     # TODO: Report contract errors
-    receipt = web3[chain].eth.getTransactionReceipt(txhash)
+    receipt = web3[chain].eth.waitForTransactionReceipt(txhash)
+    txhash = bytes(txhash).hex()
     if not receipt:
-        return {'errors': {txhash: 'transaction receipt not available'}}
+        return {'errors': ['transaction {0}: receipt not available'.format(txhash)]}
     if receipt.gasUsed == gas_limit:
-        return {'errors': {txhash: 'transaction ran out of gas'}}
+        return {'errors': ['transaction {0}: out of gas'.format(txhash)]}
     if receipt.status != 1:
-        return {'errors': {txhash: 'transaction failed, check parameters'}}
+        return {'errors': ['transaction {0}: transaction failed, check parameters'.format(txhash)]}
 
     ret = {}
 
@@ -214,7 +215,7 @@ def events_from_transaction(txhash, chain):
 
     # Offers
     # TODO: no conversion functions for most of these, do we want those?
-    offer_msig = bind_contract(web3, zero_address, offer_msig_artifact)
+    offer_msig = bind_contract(web3['home'], zero_address, offer_msig_artifact)
 
     processed = offer_registry.events.InitializedChannel().processReceipt(
         receipt)
