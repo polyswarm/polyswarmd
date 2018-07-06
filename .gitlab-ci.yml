@@ -8,7 +8,8 @@ test:
         - docker
     stage: test
     script:
-        - docker build -t $DOCKER_FULL_PATH -f docker/Dockerfile .
+        - echo ${CI_PROJECT_PATH}
+        - docker build -t ${CI_PROJECT_PATH} -f docker/Dockerfile .
         
 deploy-master:
     only: 
