@@ -5,11 +5,8 @@ services:
 
 before_script:
   - apk --no-cache add curl
-  
-after_script:
-    
 
-test:
+build-docker:
     tags:
         - docker
     stage: test
