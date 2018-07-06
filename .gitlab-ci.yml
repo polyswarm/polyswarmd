@@ -3,26 +3,18 @@ image: docker:stable
 services:
   - docker:dind
 
-build-master:
+test:
+    tags:
+        - docker
+    stage: test
+    script:
+        - docker build -t $DOCKER_FULL_PATH -f docker/Dockerfile .
+        
+deploy-master:
     only: 
         - master
     tags:
         - docker
-    variables:
-        DOCKER_FULL_PATH: index.docker.io/polyswarm/polyswarmd
-    stage: build
+    stage: deploy
     script:
-        - docker login -u "$CI_CUSTOM_DOCKER_HUB_USERNAME" -p "$CI_CUSTOM_DOCKER_HUB_PASSWORD" $CI_SWARM_DOCKER_HUB_REGISTRY 
-        - docker build -t $DOCKER_FULL_PATH -f docker/Dockerfile .
-        #- docker push $DOCKER_FULL_PATH
-
-build-non-master:
-    except: 
-        - master
-    tags:
-        - docker
-    variables:
-        DOCKER_FULL_PATH: "$CI_REGISTRY_IMAGE/$CI_PROJECT_NAME:$CI_COMMIT_REF_NAME"
-    stage: build
-    script:
-        - docker build -t $DOCKER_FULL_PATH -f docker/Dockerfile .
+        - curl --request POST --form "token=$CI_JOB_TOKEN" --form ref=master https://gitlab.polyswarm.io/api/v4/projects/${CI_CUSTOM_PROJECT_ID_META}/trigger/pipeline
