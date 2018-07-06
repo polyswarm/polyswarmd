@@ -14,7 +14,7 @@ build-master:
     script:
         - docker login -u "$CI_CUSTOM_DOCKER_HUB_USERNAME" -p "$CI_CUSTOM_DOCKER_HUB_PASSWORD" $CI_SWARM_DOCKER_HUB_REGISTRY 
         - docker build -t $DOCKER_FULL_PATH -f docker/Dockerfile .
-        - docker push $DOCKER_FULL_PATH
+        #- docker push $DOCKER_FULL_PATH
 
 build-non-master:
     except: 
