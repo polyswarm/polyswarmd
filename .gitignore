@@ -17,3 +17,5 @@ polyswarmd.egg-info/
 truffle/
 polyswarm-relay/
 node_modules/
+docker/contracts
+docker/polyswarmd.yml

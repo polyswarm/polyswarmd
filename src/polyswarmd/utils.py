@@ -1,5 +1,5 @@
 import uuid
-from polyswarmd.eth import offer_lib, web3 as web3_chains
+from polyswarmd.eth import offer_lib, web3 as web3_chains, zero_address
 
 
 def bool_list_to_int(bs):
@@ -23,7 +23,8 @@ def bounty_to_dict(bounty):
         'uri': bounty[3],
         'num_artifacts': bounty[4],
         'expiration': bounty[5],
-        'resolved': bounty[6],
+        'assigned_arbiter': bounty[6],
+        'resolved': bounty[6] != zero_address,
     }
     if len(bounty) > 7:
         retval['bloom'] = uint256_list_to_hex_string(bounty[7])
@@ -83,12 +84,14 @@ def new_verdict_event_to_dict(new_verdict_event):
         'verdicts': int_to_bool_list(new_verdict_event.verdicts),
     }
 
-def new_transfer_event_to_dict(new_transfer_event):
+
+def transfer_event_to_dict(transfer_event):
     return {
-        'from': new_transfer_event['from'],
-        'to': new_transfer_event['to'],
-        'value': str(new_transfer_event['value'])
+        'from': transfer_event['from'],
+        'to': transfer_event['to'],
+        'value': str(transfer_event['value'])
     }
+
 
 def channel_to_dict(channel_data):
     return {
@@ -96,6 +99,28 @@ def channel_to_dict(channel_data):
         'ambassador': channel_data[1],
         'expert': channel_data[2]
     }
+
+
+def state_to_dict(state):
+    # gets state of non required state
+    offer_info = offer_lib.functions.getOfferState(state).call()
+
+    web3 = web3_chains['home']
+
+    return {
+        'isClosed': offer_lib.functions.getCloseFlag(state).call(),
+        'nonce': offer_lib.functions.getSequence(state).call(),
+        'ambassador': offer_lib.functions.getPartyA(state).call(),
+        'expert': offer_lib.functions.getPartyB(state).call(),
+        'msig_address': offer_lib.functions.getMultiSigAddress(state).call(),
+        'ambassador_balance': offer_lib.functions.getBalanceA(state).call(),
+        'expert_balance': offer_lib.functions.getBalanceB(state).call(),
+        'token': offer_lib.functions.getTokenAddress(state).call(),
+        'offer_amount': offer_lib.functions.getCloseFlag(state).call(),
+        'ipfs_uri': web3.toText(offer_info[3]),
+        'verdicts': offer_info[5]
+    }
+
 
 def to_padded_hex(val):
     web3 = web3_chains['home']
@@ -114,6 +139,7 @@ def to_padded_hex(val):
         padded_hex = '0' + padded_hex
 
     return padded_hex
+
 
 def dict_to_state(state_dict):
     state_str = '0x'
@@ -141,7 +167,8 @@ def dict_to_state(state_dict):
         state_str = state_str + to_padded_hex('')
 
     if 'engagement_deadline' in state_dict:
-        state_str = state_str + to_padded_hex(state_dict['engagement_deadline'])
+        state_str = state_str + to_padded_hex(
+            state_dict['engagement_deadline'])
     else:
         state_str = state_str + to_padded_hex('')
 
@@ -166,23 +193,3 @@ def dict_to_state(state_dict):
         state_str = state_str + to_padded_hex('')
 
     return state_str
-
-def state_to_dict(state):
-    # gets state of non required state
-    offer_info = offer_lib.functions.getOfferState(state).call()
-
-    web3 = web3_chains['home']
-
-    return {
-        'isClosed': offer_lib.functions.getCloseFlag(state).call(),
-        'nonce': offer_lib.functions.getSequence(state).call(),
-        'ambassador': offer_lib.functions.getPartyA(state).call(),
-        'expert': offer_lib.functions.getPartyB(state).call(),
-        'msig_address': offer_lib.functions.getMultiSigAddress(state).call(),
-        'ambassador_balance': offer_lib.functions.getBalanceA(state).call(),
-        'expert_balance': offer_lib.functions.getBalanceB(state).call(),
-        'token': offer_lib.functions.getTokenAddress(state).call(),
-        'offer_amount': offer_lib.functions.getCloseFlag(state).call(),
-        'ipfs_uri': web3.toText(offer_info[3]),
-        'verdicts': offer_info[5]
-    }

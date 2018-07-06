@@ -8,22 +8,26 @@ from flask import Blueprint, request
 
 from websocket import create_connection
 
-from polyswarmd.eth import web3 as web3_chains, check_transaction, nectar_token, nectar_token_address, offer_registry, bind_contract, offer_msig_artifact, offer_lib
+from polyswarmd.eth import web3 as web3_chains, build_transaction, \
+        nectar_token, offer_registry, bind_contract, offer_msig_artifact, offer_lib
 from polyswarmd.response import success, failure
-from polyswarmd.websockets import transaction_queue as transaction_queue_chain
-from polyswarmd.utils import channel_to_dict, dict_to_state
-chain = 'home' # only on home chain
+from polyswarmd.utils import channel_to_dict
+
+chain = 'home'  # only on home chain
 offers = Blueprint('offers', __name__)
 
 
 @offers.route('', methods=['POST'])
 def post_create_offer_channel():
     web3 = web3_chains[chain]
-    transaction_queue = transaction_queue_chain[chain]
+
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
+
+    base_nonce = int(
+        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
 
     body = request.get_json()
 
@@ -42,92 +46,93 @@ def post_create_offer_channel():
                 'type': 'integer',
                 'minimum': 0,
             },
-            'websocketUri': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 32
-            },
-            'base_nonce': {
-                'type': 'integer',
-                'minimum': 0,
-            }
         },
-        'required': ['ambassador', 'expert', 'settlementPeriodLength', 'websocketUri'],
+        'required': ['ambassador', 'expert', 'settlementPeriodLength'],
     }
 
     try:
         jsonschema.validate(body, schema)
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message)
-
-    if 'base_nonce' in body:
-        base_nonce = body['base_nonce']
-    else:
-        base_nonce = web3.eth.getTransactionCount(account)
 
     guid = uuid.uuid4()
     ambassador = web3.toChecksumAddress(body['ambassador'])
     expert = web3.toChecksumAddress(body['expert'])
     settlement_period_length = body['settlementPeriodLength']
-    websocket_uri = body['websocketUri']
 
-    tx = transaction_queue.send_transaction(
-        offer_registry.functions.initializeOfferChannel(guid.int, ambassador, expert, settlement_period_length),
-        account, base_nonce).get()
+    transactions = [
+        build_transaction(
+            offer_registry.functions.initializeOfferChannel(
+                guid.int, ambassador, expert, settlement_period_length), chain,
+            base_nonce),
+    ]
 
-    if not check_transaction(web3, tx):
-        return failure(
-            'The offer contract deploy transaction failed, verify parameters and try again', 400)
+    return success({'transactions': transactions})
 
-    receipt = web3.eth.getTransactionReceipt(tx)
 
-    processed = offer_registry.events.InitializedChannel().processReceipt(receipt)
-
-    if not processed:
-        return failure(
-            'Invalid transaction receipt, no events emitted. Check contract addresses',
-            400)
-
-    success_dict = dict(processed[0]['args'])
-
-    msig_address = success_dict['msig']
-
+@offers.route('/<uuid:guid>/uri', methods=['POST'])
+def post_uri(guid):
+    web3 = web3_chains[chain]
+    offer_channel = channel_to_dict(
+        offer_registry.functions.guidToChannel(guid.int).call())
+    msig_address = offer_channel['msig_address']
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
 
-    base_nonce += 1
+    account = request.args.get('account')
+    if not account or not web3.isAddress(account):
+        return failure('Source account required', 401)
+    account = web3.toChecksumAddress(account)
 
-    tx = transaction_queue.send_transaction(
-        offer_msig.functions.setCommunicationUri(web3.toHex(text=websocket_uri)),
-        account, base_nonce).get()
+    base_nonce = int(
+        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
 
-    if not check_transaction(web3, tx):
-        return failure(
-            'Failed to set to set socket url verify parameters and use the setWebsocket/ endpoint to try again', 400)
+    body = request.get_json()
 
-    receipt = web3.eth.getTransactionReceipt(tx)
+    schema = {
+        'type': 'object',
+        'properties': {
+            'websocketUri': {
+                'type': 'string',
+                'minLength': 1,
+                'maxLength': 32
+            }
+        },
+        'required': ['websocketUri'],
+    }
 
-    processed = offer_msig.events.CommunicationsSet().processReceipt(receipt)
+    try:
+        jsonschema.validate(body, schema)
+    except ValidationError as e:
+        return failure('Invalid JSON: ' + e.message)
 
-    success_dict['websocketUri'] = offer_msig.functions.websocketUri().call()
-    # TODO find a better way than replace
-    success_dict['websocketUri'] = web3.toText(success_dict['websocketUri']).replace('\u0000', '')
+    websocket_uri = body['websocketUri']
 
-    success_dict['guid'] = uuid.UUID(int=success_dict['guid'])
+    transactions = [
+        build_transaction(
+            offer_msig.functions.setCommunicationUri(
+                web3.toHex(text=websocket_uri)),
+            chain,
+            base_nonce),
+    ]
 
-    return success(success_dict)
+    return success({'transactions': transactions})
 
 
 @offers.route('/<uuid:guid>/open', methods=['POST'])
 def post_open(guid):
     web3 = web3_chains[chain]
-    transaction_queue = transaction_queue_chain[chain]
+    offer_channel = channel_to_dict(
+        offer_registry.functions.guidToChannel(guid.int).call())
+    msig_address = offer_channel['msig_address']
+    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
 
-    offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
-    msig_address = offer_channel['msig_address']
+    base_nonce = int(
+        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
 
     body = request.get_json()
 
@@ -150,10 +155,6 @@ def post_open(guid):
                 'type': 'string',
                 'minLength': 64
             },
-            'base_nonce': {
-                'type': 'integer',
-                'minimum': 0,
-            }
         },
         'required': ['state', 'r', 'v', 's'],
     }
@@ -168,107 +169,58 @@ def post_open(guid):
     r = body['r']
     s = body['s']
 
-    if 'base_nonce' in body:
-        base_nonce = body['base_nonce']
-    else:
-        base_nonce = web3.eth.getTransactionCount(account)
-
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
     approve_amount = offer_lib.functions.getBalanceA(state).call()
 
-    tx = transaction_queue.send_transaction(
-        nectar_token['home'].functions.approve(msig_address, approve_amount),
-        account, base_nonce).get()
+    transactions = [
+        build_transaction(
+            nectar_token['home'].functions.approve(
+                msig_address, approve_amount), chain, base_nonce),
+        build_transaction(
+            offer_msig.functions.openAgreement(state, v, r, s), chain,
+            base_nonce + 1),
+    ]
 
-    if not check_transaction(web3, tx):
-        return failure(
-            'Approve transaction failed, verify parameters and try again', 400)
+    return success({'transactions': transactions})
 
-    base_nonce += 1
-
-    tx = transaction_queue.send_transaction(
-        offer_msig.functions.openAgreement(state, v, r, s),
-        account).get()
-
-    if not check_transaction(web3, tx):
-        return failure(
-            'Failed to open agreement, verify parameters and try again', 400)
-
-    receipt = web3.eth.getTransactionReceipt(tx)
-
-    processed = offer_msig.events.OpenedAgreement().processReceipt(receipt)
-
-    if not processed:
-        return failure(
-            'Invalid transaction receipt, no events emitted. Check contract addresses',
-            400)
-
-    data = dict(processed[0]['args'])
-
-    return success(data)
 
 @offers.route('/<uuid:guid>/cancel', methods=['POST'])
 def post_cancel(guid):
     web3 = web3_chains[chain]
-    transaction_queue = transaction_queue_chain[chain]
+    offer_channel = channel_to_dict(
+        offer_registry.functions.guidToChannel(guid.int).call())
+    msig_address = offer_channel['msig_address']
+    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
-    body = request.get_json()
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'base_nonce': {
-                'type': 'integer',
-                'minimum': 0,
-            }
-        }
-    }
+    base_nonce = int(
+        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
 
-    offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
-    msig_address = offer_channel['msig_address']
+    transactions = [
+        build_transaction(offer_msig.functions.cancel(), chain, base_nonce),
+    ]
 
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+    return success({'transactions': transactions})
 
-    if 'base_nonce' in body:
-        base_nonce = body['base_nonce']
-    else:
-        base_nonce = web3.eth.getTransactionCount(account)
-
-    tx = transaction_queue.send_transaction(
-        offer_msig.functions.cancel(),
-        account, base_nonce).get()
-
-    if not check_transaction(web3, tx):
-        return failure(
-            'Failed to cancel agreement, make sure this channel has not been joined and try again', 400)
-
-    receipt = web3.eth.getTransactionReceipt(tx)
-
-    processed = offer_msig.events.CanceledAgreement().processReceipt(receipt)
-
-    if not processed:
-        return failure(
-            'Invalid transaction receipt, no events emitted. Check contract addresses',
-            400)
-
-    data = dict(processed[0]['args'])
-
-    return success(data)
 
 @offers.route('/<uuid:guid>/join', methods=['POST'])
 def post_join(guid):
     web3 = web3_chains[chain]
-    transaction_queue = transaction_queue_chain[chain]
+    offer_channel = channel_to_dict(
+        offer_registry.functions.guidToChannel(guid.int).call())
+    msig_address = offer_channel['msig_address']
+    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
 
-    offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
-    msig_address = offer_channel['msig_address']
+    base_nonce = int(
+        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
 
     body = request.get_json()
 
@@ -291,10 +243,6 @@ def post_join(guid):
                 'type': 'string',
                 'minLength': 64
             },
-            'base_nonce': {
-                'type': 'integer',
-                'minimum': 0,
-            }
         },
         'required': ['state', 'r', 'v', 's'],
     }
@@ -309,45 +257,30 @@ def post_join(guid):
     r = body['r']
     s = body['s']
 
-    if 'base_nonce' in body:
-        base_nonce = body['base_nonce']
-    else:
-        base_nonce = web3.eth.getTransactionCount(account)
+    transactions = [
+        build_transaction(
+            offer_msig.functions.joinAgreement(state, v, r, s), chain,
+            base_nonce),
+    ]
 
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+    return success({'transactions': transactions})
 
-    tx = transaction_queue.send_transaction(
-        offer_msig.functions.joinAgreement(state, v, r, s),
-        account, base_nonce).get()
-
-    if not check_transaction(web3, tx):
-        return failure(
-            'Failed to open agreement, verify parameters and try again', 400)
-
-    receipt = web3.eth.getTransactionReceipt(tx)
-
-    processed = offer_msig.events.JoinedAgreement().processReceipt(receipt)
-
-    if not processed:
-        return failure(
-            'Invalid transaction receipt, no events emitted. Check contract addresses',
-            400)
-
-    data = dict(processed[0]['args'])
-
-    return success(data)
 
 @offers.route('/<uuid:guid>/close', methods=['POST'])
 def post_close(guid):
     web3 = web3_chains[chain]
-    transaction_queue = transaction_queue_chain[chain]
+    offer_channel = channel_to_dict(
+        offer_registry.functions.guidToChannel(guid.int).call())
+    msig_address = offer_channel['msig_address']
+    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
 
-    offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
-    msig_address = offer_channel['msig_address']
+    base_nonce = int(
+        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
 
     body = request.get_json()
 
@@ -373,10 +306,6 @@ def post_close(guid):
                 'minLength': 2,
                 'maxLength': 2,
             },
-            'base_nonce': {
-                'type': 'integer',
-                'minimum': 0,
-            }
         },
         'required': ['state', 'r', 'v', 's'],
     }
@@ -391,46 +320,31 @@ def post_close(guid):
     r = body['r']
     s = body['s']
 
-    if 'base_nonce' in body:
-        base_nonce = body['base_nonce']
-    else:
-        base_nonce = web3.eth.getTransactionCount(account)
+    transactions = [
+        build_transaction(
+            offer_msig.functions.closeAgreement(state, v, r, s), chain,
+            base_nonce),
+    ]
 
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+    return success({'transactions': transactions})
 
-    tx = transaction_queue.send_transaction(
-        offer_msig.functions.closeAgreement(state, v, r, s),
-        account, base_nonce).get()
-
-    if not check_transaction(web3, tx):
-        return failure(
-            'Failed to close agreement, verify parameters and try again', 400)
-
-    receipt = web3.eth.getTransactionReceipt(tx)
-
-    processed = offer_msig.events.ClosedAgreement().processReceipt(receipt)
-
-    if not processed:
-        return failure(
-            'Invalid transaction receipt, no events emitted. Check contract addresses',
-            400)
-
-    data = dict(processed[0]['args'])
-
-    return success(data)
 
 # for closing a challenged state with a timeout
 @offers.route('/<uuid:guid>/closeChallenged', methods=['POST'])
 def post_close_challenged(guid):
     web3 = web3_chains[chain]
-    transaction_queue = transaction_queue_chain[chain]
+    offer_channel = channel_to_dict(
+        offer_registry.functions.guidToChannel(guid.int).call())
+    msig_address = offer_channel['msig_address']
+    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
 
-    offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
-    msig_address = offer_channel['msig_address']
+    base_nonce = int(
+        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
 
     body = request.get_json()
 
@@ -453,10 +367,6 @@ def post_close_challenged(guid):
                 'type': 'array',
                 'minLength': 2
             },
-            'base_nonce': {
-                'type': 'integer',
-                'minimum': 0,
-            }
         },
         'required': ['state', 'r', 'v', 's'],
     }
@@ -471,33 +381,30 @@ def post_close_challenged(guid):
     r = body['r']
     s = body['s']
 
-    if 'base_nonce' in body:
-        base_nonce = body['base_nonce']
-    else:
-        base_nonce = web3.eth.getTransactionCount(account)
+    transactions = [
+        build_transaction(
+            offer_msig.functions.closeAgreementWithTimeout(state, v, r, s),
+            chain, base_nonce),
+    ]
 
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+    return success({'transactions': transactions})
 
-    tx = transaction_queue.send_transaction(
-        offer_msig.functions.closeAgreementWithTimeout(state, v, r, s),
-        account, base_nonce).get()
-
-    if not check_transaction(web3, tx):
-        return failure(
-            'Failed to close agreement, verify parameters and try again', 400)
-
-    return success()
 
 @offers.route('/<uuid:guid>/settle', methods=['POST'])
 def post_settle(guid):
     web3 = web3_chains[chain]
-    transaction_queue = transaction_queue_chain[chain]
+    offer_channel = channel_to_dict(
+        offer_registry.functions.guidToChannel(guid.int).call())
+    msig_address = offer_channel['msig_address']
+    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
-    offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
-    msig_address = offer_channel['msig_address']
+
+    base_nonce = int(
+        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
 
     body = request.get_json()
 
@@ -523,10 +430,6 @@ def post_settle(guid):
                 'minLength': 2,
                 'maxLength': 2,
             },
-            'base_nonce': {
-                'type': 'integer',
-                'minimum': 0,
-            }
         },
         'required': ['state', 'r', 'v', 's'],
     }
@@ -541,33 +444,14 @@ def post_settle(guid):
     r = body['r']
     s = body['s']
 
-    if 'base_nonce' in body:
-        base_nonce = body['base_nonce']
-    else:
-        base_nonce = web3.eth.getTransactionCount(account)
+    transactions = [
+        build_transaction(
+            offer_msig.functions.startSettle(state, v, r, s), chain,
+            base_nonce),
+    ]
 
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+    return success({'transactions': transactions})
 
-    tx = transaction_queue.send_transaction(
-        offer_msig.functions.startSettle(state, v, r, s),
-        account, base_nonce).get()
-
-    if not check_transaction(web3, tx):
-        return failure(
-            'Failed to open agreement, verify parameters and try again', 400)
-
-    receipt = web3.eth.getTransactionReceipt(tx)
-
-    processed = offer_msig.events.StartedSettle().processReceipt(receipt)
-
-    if not processed:
-        return failure(
-            'Invalid transaction receipt, no events emitted. Check contract addresses',
-            400)
-
-    data = dict(processed[0]['args'])
-
-    return success(data)
 
 @offers.route('state', methods=['POST'])
 def create_state():
@@ -575,7 +459,8 @@ def create_state():
     body = request.get_json()
 
     schema = {
-        'type': 'object',
+        'type':
+        'object',
         'properties': {
             'close_flag': {
                 'type': 'integer',
@@ -643,7 +528,10 @@ def create_state():
                 'minLength': 1
             }
         },
-        'required': ['close_flag', 'nonce', 'expert', 'msig_address', 'ambassador_balance', 'expert_balance', 'guid', 'offer_amount'],
+        'required': [
+            'close_flag', 'nonce', 'expert', 'msig_address',
+            'ambassador_balance', 'expert_balance', 'guid', 'offer_amount'
+        ],
     }
 
     try:
@@ -655,17 +543,22 @@ def create_state():
 
     return success({'state': dict_to_state(body)})
 
+
 @offers.route('/<uuid:guid>/challenge', methods=['POST'])
 def post_challange(guid):
     web3 = web3_chains[chain]
-    transaction_queue = transaction_queue_chain[chain]
+    offer_channel = channel_to_dict(
+        offer_registry.functions.guidToChannel(guid.int).call())
+    msig_address = offer_channel['msig_address']
+    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
 
-    offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
-    msig_address = offer_channel['msig_address']
+    base_nonce = int(
+        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
 
     body = request.get_json()
 
@@ -691,14 +584,9 @@ def post_challange(guid):
                 'minLength': 2,
                 'maxLength': 2,
             },
-            'base_nonce': {
-                'type': 'integer',
-                'minimum': 0,
-            }
         },
         'required': ['state', 'r', 'v', 's'],
     }
-
 
     try:
         jsonschema.validate(body, schema)
@@ -710,42 +598,30 @@ def post_challange(guid):
     r = body['r']
     s = body['s']
 
-    if 'base_nonce' in body:
-        base_nonce = body['base_nonce']
-    else:
-        base_nonce = web3.eth.getTransactionCount(account)
+    transactions = [
+        build_transaction(
+            offer_msig.functions.challengeSettle(state, v, r, s), chain,
+            base_nonce),
+    ]
 
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+    return success({'transactions': transactions})
 
-    tx = transaction_queue.send_transaction(
-        offer_msig.functions.challengeSettle(state, v, r, s),
-        account, base_nonce).get()
-
-    if not check_transaction(web3, tx):
-        return failure(
-            'Failed to open agreement, verify parameters and try again', 400)
-
-    receipt = web3.eth.getTransactionReceipt(tx)
-
-    processed = offer_msig.events.SettleStateChallenged().processReceipt(receipt)
-
-    if not processed:
-        return failure(
-            'Invalid transaction receipt, no events emitted. Check contract addresses',
-            400)
-
-    data = dict(processed[0]['args'])
-
-    return success(data)
 
 @offers.route('/<uuid:guid>/sendmsg', methods=['POST'])
 def post_message_sender(guid):
     web3 = web3_chains[chain]
+    offer_channel = channel_to_dict(
+        offer_registry.functions.guidToChannel(guid.int).call())
+    msig_address = offer_channel['msig_address']
+    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+    socket_uri = offer_msig.functions.websocketUri().call()
+    # TODO find a better way than replace
+    socket_uri = web3.toText(socket_uri).replace('\u0000', '')
+
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
     account = web3.toChecksumAddress(account)
-
 
     body = request.get_json()
 
@@ -786,14 +662,6 @@ def post_message_sender(guid):
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message)
 
-
-    offer_channel = channel_to_dict(offer_registry.functions.guidToChannel(guid.int).call())
-    msig_address = offer_channel['msig_address']
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-    socket_uri = offer_msig.functions.websocketUri().call()
-    # TODO find a better way than replace
-    socket_uri = web3.toText(socket_uri).replace('\u0000', '')
-
     try:
         if 'to_socket' in body:
             ws = create_connection(body['to_socket'])
@@ -812,22 +680,26 @@ def post_message_sender(guid):
 
     return success({'sent': True})
 
+
 @offers.route('/<uuid:guid>', methods=['GET'])
 def get_channel_address(guid):
     offer_channel = offer_registry.functions.guidToChannel(guid.int).call()
 
     return success({'offer_channel': channel_to_dict(offer_channel)})
 
+
 @offers.route('/<uuid:guid>/settlementPeriod', methods=['GET'])
 def get_settlement_period(guid):
     web3 = web3_chains[chain]
     offer_channel = offer_registry.functions.guidToChannel(guid.int).call()
     channel_data = channel_to_dict(offer_channel)
-    offer_msig = bind_contract(web3, channel_data['msig_address'], offer_msig_artifact)
+    offer_msig = bind_contract(web3, channel_data['msig_address'],
+                               offer_msig_artifact)
 
     settlement_period_end = offer_msig.functions.settlementPeriodEnd().call()
 
     return success({'settlementPeriodEnd': settlement_period_end})
+
 
 @offers.route('/<uuid:guid>/websocket', methods=['GET'])
 def get_websocket(guid):
@@ -841,6 +713,7 @@ def get_websocket(guid):
     socket_uri = web3.toText(socket_uri).replace('\u0000', '')
 
     return success({'websocket': socket_uri})
+
 
 @offers.route('pending', methods=['GET'])
 def get_pending():
@@ -860,6 +733,7 @@ def get_pending():
 
     return success(offers_pending)
 
+
 @offers.route('opened', methods=['GET'])
 def get_opened():
     offers_opened = []
@@ -878,6 +752,7 @@ def get_opened():
 
     return success(offers_opened)
 
+
 @offers.route('closed', methods=['GET'])
 def get_closed():
     offers_closed = []
@@ -895,6 +770,7 @@ def get_closed():
             offers_closed.append({'guid': guid, 'address': msig_address})
 
     return success(offers_closed)
+
 
 @offers.route('myoffers', methods=['GET'])
 def get_myoffers():
