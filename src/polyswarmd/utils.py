@@ -1,6 +1,6 @@
 import uuid
 import operator
-from polyswarmd.eth import offer_lib, web3 as web3_chains
+from polyswarmd.eth import offer_lib, web3 as web3_chains, zero_address
 
 
 def bool_list_to_int(bs):
@@ -24,7 +24,8 @@ def bounty_to_dict(bounty):
         'uri': bounty[3],
         'num_artifacts': bounty[4],
         'expiration': bounty[5],
-        'resolved': bounty[6],
+        'assigned_arbiter': bounty[6],
+        'resolved': bounty[6] != zero_address,
     }
     if len(bounty) > 7:
         retval['bloom'] = uint256_list_to_hex_string(bounty[7])
