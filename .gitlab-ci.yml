@@ -11,8 +11,8 @@ test:
         - docker
     stage: test
     script: 
-	- curl google.com
-	- docker build -t ${CI_PROJECT_PATH} -f docker/Dockerfile .
+        - curl google.com
+        - docker build -t ${CI_PROJECT_PATH} -f docker/Dockerfile .
         
 deploy-master:
     only: 
