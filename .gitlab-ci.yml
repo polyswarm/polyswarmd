@@ -3,6 +3,9 @@ image: docker:stable
 services:
   - docker:dind
 
+before_script:
+  - apk --no-cache add curl
+
 test:
     tags:
         - docker
