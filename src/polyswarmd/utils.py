@@ -121,6 +121,13 @@ def state_to_dict(state):
         'verdicts': offer_info[5]
     }
 
+def new_init_channel_event_to_dict(new_init_event):
+    return {
+        'guid': str(uuid.UUID(int=new_init_event.guid)),
+        'ambassador': new_init_event.ambassador,
+        'expert': new_init_event.expert,
+        'multi_signature': new_init_event.msig,
+    }
 
 def to_padded_hex(val):
     web3 = web3_chains['home']
