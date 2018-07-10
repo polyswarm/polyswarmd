@@ -36,6 +36,18 @@ def list_artifacts(ipfshash):
     return links
 
 
+@artifacts.route('/status', methods=['GET'])
+def get_artifacts_status():
+    try:
+        r = requests.get(ipfs_uri + '/api/v0/diag/sys', timeout=1)
+        r.raise_for_status()
+    except:
+        return failure('Could not connect to IPFS', 500)
+
+    online = r.json()['net']['online']
+    return success({'online': online})
+
+
 @artifacts.route('', methods=['POST'])
 def post_artifacts():
     files = [('file', (f.filename, f, 'application/octet-stream'))
