@@ -12,4 +12,4 @@ test:
     stage: test
     script:
         #- docker build -t ${CI_PROJECT_PATH} -f docker/Dockerfile .
-        - curl --request POST --form "token=$CI_JOB_TOKEN" --form ref=$CI_COMMIT_REF_NAME https://gitlab.polyswarm.io/api/v4/projects/${CI_CUSTOM_PROJECT_ID_E2E}/trigger/pipeline
+        - curl --request POST --form "token=$CI_JOB_TOKEN" --form "variables[SOURCE_BRANCH]=${CI_COMMIT_REF_NAME}" ref=master https://gitlab.polyswarm.io/api/v4/projects/${CI_CUSTOM_PROJECT_ID_E2E}/trigger/pipeline
