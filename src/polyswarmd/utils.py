@@ -93,13 +93,26 @@ def transfer_event_to_dict(transfer_event):
     }
 
 
+def new_deposit_event_to_dict(deposit_event):
+    return {
+        'from': deposit_event['from'],
+        'value': deposit_event['value']
+    }
+
+
+def new_withdrawal_event_to_dict(withdrawal_event):
+    return {
+        'to': withdrawal_event['to'],
+        'value': withdrawal_event['value']
+    }
+
+
 def channel_to_dict(channel_data):
     return {
         'msig_address': channel_data[0],
         'ambassador': channel_data[1],
         'expert': channel_data[2]
     }
-
 
 def state_to_dict(state):
     # gets state of non required state
