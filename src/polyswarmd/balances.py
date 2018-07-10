@@ -15,7 +15,6 @@ def get_balance_address_eth(address):
         return failure('Chain must be either home or side', 400)
 
     web3 = web3_chains[chain]
-    nectar_token = nectar_chains[chain]
 
     if not web3.isAddress(address):
         return failure('Invalid address', 400)

@@ -221,7 +221,7 @@ def events_from_transaction(txhash, chain):
     processed = arbiter_staking[
         chain].events.NewWithdrawal().processReceipt(receipt)
     if processed:
-        withdrawal = new_withdrawl_event_to_dict(processed[0]['args'])
+        withdrawal = new_withdrawal_event_to_dict(processed[0]['args'])
         ret['withdrawals'] = ret.get('withdrawals', []) + [withdrawal]
 
     processed = arbiter_staking[

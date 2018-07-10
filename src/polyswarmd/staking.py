@@ -1,7 +1,6 @@
 import jsonschema
-
-from flask import Blueprint, request
 from jsonschema.exceptions import ValidationError
+from flask import Blueprint, request
 
 from polyswarmd import eth
 from polyswarmd.eth import web3 as web3_chains, build_transaction, nectar_token as nectar_chains, arbiter_staking as arbiter_chains
@@ -73,7 +72,6 @@ def post_arbiter_staking_withdrawal():
         return failure('Chain must be either home or side', 400)
 
     web3 = web3_chains[chain]
-    nectar_token = nectar_chains[chain]
     arbiter_staking = arbiter_chains[chain]
 
     account = request.args.get('account')
