@@ -8,9 +8,9 @@ from flask import request
 from flask_sockets import Sockets
 from geventwebsocket import WebSocketError
 
-from polyswarmd.eth import web3 as web3_chains, bounty_registry as bounty_chains
+from polyswarmd.eth import web3 as web3_chains, bounty_registry as bounty_chains, offer_registry
 from polyswarmd.config import chain_id as chain_ids
-from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict, state_to_dict
+from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict, state_to_dict, new_init_channel_event_to_dict
 
 def init_websockets(app):
     sockets = Sockets(app)
@@ -29,6 +29,8 @@ def init_websockets(app):
         bounty_filter = bounty_registry.eventFilter('NewBounty')
         assertion_filter = bounty_registry.eventFilter('NewAssertion')
         verdict_filter = bounty_registry.eventFilter('NewVerdict')
+
+        init_filter = offer_registry.eventFilter('InitializedChannel')
 
         while not ws.closed:
             try:
@@ -66,6 +68,15 @@ def init_websockets(app):
                             'verdict',
                             'data':
                             new_verdict_event_to_dict(event.args),
+                        }))
+
+                for event in init_filter.get_new_entries():
+                    ws.send(
+                        json.dumps({
+                            'event':
+                            'initialized_channel',
+                            'data':
+                            new_init_channel_event_to_dict(event.args),
                         }))
 
                 gevent.sleep(1)

@@ -26,7 +26,7 @@ def bind_contract(web3_, address, artifact):
         address=web3_.toChecksumAddress(address), abi=abi)
 
 
-gas_limit = 500000 # TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to /offers
+gas_limit = 5000000 # TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to settle bounty
 zero_address = '0x0000000000000000000000000000000000000000'
 
 offer_msig_artifact = os.path.join(config_location, 'contracts',
@@ -37,6 +37,7 @@ web3 = {}
 # Create token bindings for each chain
 bounty_registry = {}
 nectar_token = {}
+arbiter_staking = {}
 
 # exists only on home
 offer_registry = None
@@ -53,6 +54,9 @@ for chain in ('home', 'side'):
     bounty_registry[chain] = bind_contract(
         web3[chain], bounty_registry_address[chain],
         os.path.join(config_location, 'contracts', 'BountyRegistry.json'))
+    arbiter_staking[chain] = bind_contract(
+        web3[chain], bounty_registry[chain].functions.staking().call(),
+        os.path.join(config_location, 'contracts', 'ArbiterStaking.json'))
 
     if chain is 'home':
         offer_registry = bind_contract(
@@ -64,7 +68,7 @@ for chain in ('home', 'side'):
         offer_lib = bind_contract(web3[chain], offer_lib_address,
                                   os.path.join(config_location, 'contracts',
                                                'OfferLib.json'))
- 
+
 @misc.route('/syncing', methods=['GET'])
 def get_syncing():
     # Must read chain before account to have a valid web3 ref
@@ -163,7 +167,7 @@ def build_transaction(call, chain, nonce):
 def events_from_transaction(txhash, chain):
     from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, \
             new_verdict_event_to_dict, revealed_assertion_event_to_dict, \
-            transfer_event_to_dict
+            transfer_event_to_dict, new_withdrawal_event_to_dict, new_deposit_event_to_dict
 
     # TODO: Check for out of gas, other
     # TODO: Report contract errors
@@ -212,6 +216,19 @@ def events_from_transaction(txhash, chain):
     if processed:
         reveal = revealed_assertion_event_to_dict(processed[0]['args'])
         ret['reveals'] = ret.get('reveals', []) + [reveal]
+
+    # Arbiter
+    processed = arbiter_staking[
+        chain].events.NewWithdrawal().processReceipt(receipt)
+    if processed:
+        withdrawal = new_withdrawal_event_to_dict(processed[0]['args'])
+        ret['withdrawals'] = ret.get('withdrawals', []) + [withdrawal]
+
+    processed = arbiter_staking[
+        chain].events.NewDeposit().processReceipt(receipt)
+    if processed:
+        deposit = new_deposit_event_to_dict(processed[0]['args'])
+        ret['deposits'] = ret.get('deposits', []) + [deposit]
 
     # Offers
     # TODO: no conversion functions for most of these, do we want those?
@@ -270,3 +287,7 @@ def bounty_amount_min():
 
 def assertion_bid_min():
     return 62500000000000000
+
+
+def staking_total_max():
+    return 1000000000 * 10 ** 18

@@ -126,6 +126,7 @@ def post_bounties():
 
     return success({'transactions': transactions})
 
+
 # TODO: Caching layer for this
 @bounties.route('', methods=['GET'])
 def get_bounties():

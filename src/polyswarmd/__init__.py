@@ -15,6 +15,7 @@ from polyswarmd.balances import balances
 from polyswarmd.bounties import bounties
 from polyswarmd.relay import relay
 from polyswarmd.offers import offers
+from polyswarmd.staking import staking
 from polyswarmd.websockets import init_websockets
 
 app = Flask('polyswarmd', root_path=whereami(), instance_path=whereami())
@@ -25,6 +26,7 @@ app.register_blueprint(balances, url_prefix='/balances')
 app.register_blueprint(bounties, url_prefix='/bounties')
 app.register_blueprint(relay, url_prefix='/relay')
 app.register_blueprint(offers, url_prefix='/offers')
+app.register_blueprint(staking, url_prefix='/staking')
 init_websockets(app)
 
 
