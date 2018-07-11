@@ -2,6 +2,7 @@ import gevent
 import json
 import jsonschema
 import sys
+import time
 
 from jsonschema.exceptions import ValidationError
 from flask import request
@@ -12,8 +13,10 @@ from polyswarmd.eth import web3 as web3_chains, bounty_registry as bounty_chains
 from polyswarmd.config import chain_id as chain_ids
 from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict, state_to_dict, new_init_channel_event_to_dict
 
+
 def init_websockets(app):
     sockets = Sockets(app)
+    start_time = time.time()
 
     @sockets.route('/events')
     def events(ws):
@@ -31,6 +34,14 @@ def init_websockets(app):
         verdict_filter = bounty_registry.eventFilter('NewVerdict')
 
         init_filter = offer_registry.eventFilter('InitializedChannel')
+
+        ws.send(
+            json.dumps({
+                'event': 'connected',
+                'data': {
+                    'start_time': str(start_time),
+                }
+            }))
 
         while not ws.closed:
             try:
@@ -136,12 +147,9 @@ def init_websockets(app):
 
                 ws.send(
                     json.dumps({
-                        'type':
-                        body['type'],
-                        'raw_state':
-                        body['state'],
-                        'state':
-                        state_dict
+                        'type': body['type'],
+                        'raw_state': body['state'],
+                        'state': state_dict
                     }))
         except:
             pass
