@@ -18,7 +18,10 @@ kick-e2e:
         - docker
     stage: deploy
     script:
-       - curl
+      - echo "CI_PROJECT_NAME is ${CI_PROJECT_NAME}"
+      - echo "CI_PROJECT_NAMESPACE is ${CI_PROJECT_NAMESPACE}"
+      - echo "CI_PROJECT_URL is ${CI_PROJECT_URL}"
+      - curl
         --request POST
         --form "token=$CI_JOB_TOKEN"
         --form "variables[SOURCE_BRANCH]=${CI_COMMIT_REF_NAME}"
