@@ -18,10 +18,10 @@ kick-e2e:
         - docker
     stage: deploy
     script:
-       - curl \
-        --request POST \
-        --form "token=$CI_JOB_TOKEN" \
-        --form "variables[SOURCE_BRANCH]=${CI_COMMIT_REF_NAME}" \
-        --form ref=refactor \
+       - curl
+        --request POST
+        --form "token=$CI_JOB_TOKEN"
+        --form "variables[SOURCE_BRANCH]=${CI_COMMIT_REF_NAME}"
+        --form ref=refactor
         https://gitlab.polyswarm.io/api/v4/projects/${CI_CUSTOM_PROJECT_ID_E2E}/trigger/pipeline > /dev/null
 
