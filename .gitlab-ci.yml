@@ -14,8 +14,6 @@ before_script:
 #        - docker build -t ${CI_PROJECT_PATH} -f docker/Dockerfile .
 #
 kick-e2e:
-    only: 
-        - master
     tags:
         - docker
     stage: deploy
