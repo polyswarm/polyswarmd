@@ -4,31 +4,40 @@ services:
   - docker:dind
 
 before_script:
-  - apk --no-cache add curl
-
-#build-docker:
-#    tags:
-#        - docker
-#    stage: test
-#    script:
-#        - docker build -t ${CI_PROJECT_PATH} -f docker/Dockerfile .
+  - apk --no-cache add curl jq
 
 kick-e2e:
     tags:
         - docker
     stage: deploy
     script:
-      - if [
-        `curl
-        -s
-        -o /dev/null
-        -w "%{http_code}"
+      - set -e
+
+      # kick e2e
+      - >-
+        E2E_PIPELINE_ID=`curl
+        --silent
         --request POST
         --form "token=$CI_JOB_TOKEN"
         --form "variables[SOURCE_PROJECT]=$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME"
         --form "variables[SOURCE_BRANCH]=$CI_COMMIT_REF_NAME"
         --form ref=master
-        https://gitlab.polyswarm.io/api/v4/projects/${CI_CUSTOM_PROJECT_ID_E2E}/trigger/pipeline`
-        != "201" ]; then
-        exit 1;
+        "https://gitlab.polyswarm.io/api/v4/projects/${CI_CUSTOM_PROJECT_ID_E2E}/trigger/pipeline" | jq -r ".id"`
+
+      # poll for it to finish
+      - >-
+        while [ -z $PIPELINE_STATUS ] || [ $PIPELINE_STATUS = "pending" ] || [ $PIPELINE_STATUS = "running" ]; do
+          PIPELINE_STATUS=`curl \
+            --silent \
+            --header "PRIVATE-TOKEN: $CI_CUSTOM_CI_PAT" \
+            "https://gitlab.polyswarm.io/api/v4/projects/${CI_CUSTOM_PROJECT_ID_E2E}/pipelines/$E2E_PIPELINE_ID" | jq -r ".status"`
+          echo "waiting for e2e pipeline ...";
+          sleep 5;
+        done
+
+      # check for success
+      - >-
+        if [ $PIPELINE_STATUS != "success" ]; then
+          echo "failure further down the pipeline"
+          exit 1
         fi
