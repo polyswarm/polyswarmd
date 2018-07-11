@@ -18,13 +18,11 @@ kick-e2e:
         - docker
     stage: deploy
     script:
-      - echo "CI_PROJECT_NAME is $CI_PROJECT_NAME"
-      - echo "CI_PROJECT_NAMESPACE is $CI_PROJECT_NAMESPACE"
-      - echo "CI_PROJECT_URL is $CI_PROJECT_URL"
       - curl
         --request POST
         --form "token=$CI_JOB_TOKEN"
         --form "variables[SOURCE_BRANCH]=$CI_COMMIT_REF_NAME"
+        --form "variables[SOURCE_PROJECT]=$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME"
         --form ref=refactor
         https://gitlab.polyswarm.io/api/v4/projects/${CI_CUSTOM_PROJECT_ID_E2E}/trigger/pipeline > /dev/null
 
