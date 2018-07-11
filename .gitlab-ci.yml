@@ -6,18 +6,23 @@ services:
 before_script:
   - apk --no-cache add curl
 
-build-docker:
-    tags:
-        - docker
-    stage: test
-    script: 
-        - docker build -t ${CI_PROJECT_PATH} -f docker/Dockerfile .
-        
+#build-docker:
+#    tags:
+#        - docker
+#    stage: test
+#    script:
+#        - docker build -t ${CI_PROJECT_PATH} -f docker/Dockerfile .
+
 kick-e2e:
-    only: 
-        - master
     tags:
         - docker
     stage: deploy
     script:
-       - curl --request POST --form "token=$CI_JOB_TOKEN" --form ref=master https://gitlab.polyswarm.io/api/v4/projects/${CI_CUSTOM_PROJECT_ID_META}/trigger/pipeline
+      - curl
+        --request POST
+        --form "token=$CI_JOB_TOKEN"
+        --form "variables[SOURCE_PROJECT]=$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME"
+        --form "variables[SOURCE_BRANCH]=$CI_COMMIT_REF_NAME"
+        --form ref=master
+        https://gitlab.polyswarm.io/api/v4/projects/${CI_CUSTOM_PROJECT_ID_E2E}/trigger/pipeline 2> /dev/null
+
