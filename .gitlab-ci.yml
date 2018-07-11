@@ -12,7 +12,7 @@ before_script:
 #    stage: test
 #    script:
 #        - docker build -t ${CI_PROJECT_PATH} -f docker/Dockerfile .
-#
+
 kick-e2e:
     tags:
         - docker
