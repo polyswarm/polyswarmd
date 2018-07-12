@@ -18,7 +18,8 @@ kick-e2e:
         - docker
     stage: deploy
     script:
-      - if [ `curl
+      - if [
+        `curl
         -s
         -o /dev/null
         -w "%{http_code}"
@@ -26,5 +27,8 @@ kick-e2e:
         --form "token=$CI_JOB_TOKEN"
         --form "variables[SOURCE_PROJECT]=$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME"
         --form "variables[SOURCE_BRANCH]=$CI_COMMIT_REF_NAME"
-        --form ref=master
-        https://gitlab.polyswarm.io/api/v4/projects/${CI_CUSTOM_PROJECT_ID_E2E}/trigger/pipeline` != "201" ]; then exit 1; fi
+        --form ref=FAILME
+        https://gitlab.polyswarm.io/api/v4/projects/${CI_CUSTOM_PROJECT_ID_E2E}/trigger/pipeline`
+        != "201" ]; then
+        exit 1;
+        fi
