@@ -84,6 +84,10 @@ def new_verdict_event_to_dict(new_verdict_event):
         'verdicts': int_to_bool_list(new_verdict_event.verdicts),
     }
 
+def new_quorum_event_to_dict(new_quorum_event):
+    return {
+        'quorum_block': new_quorum_event.block
+    }
 
 def transfer_event_to_dict(transfer_event):
     return {
