@@ -25,12 +25,14 @@ def bounty_to_dict(bounty):
         'expiration': bounty[5],
         'assigned_arbiter': bounty[6],
         'resolved': bounty[6] != zero_address,
+        'quorum_reached': bounty[7],
+        'quorum_reached_block': bounty[8],
     }
-    if len(bounty) > 7:
-        retval['bloom'] = uint256_list_to_hex_string(bounty[7])
-        retval['voters'] = bounty[8]
-        retval['verdicts'] = int_to_bool_list(bounty[9])
-        retval['bloom_votes'] = bounty[10]
+    if len(bounty) > 9:
+        retval['bloom'] = uint256_list_to_hex_string(bounty[9])
+        retval['voters'] = bounty[10]
+        retval['verdicts'] = int_to_bool_list(bounty[11])
+        retval['bloom_votes'] = bounty[12]
     return retval
 
 
