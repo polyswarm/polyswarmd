@@ -164,7 +164,6 @@ def build_transaction(call, chain, nonce):
     }
     if free:
         options["gasPrice"] = 0
-    print(options)
     return call.buildTransaction(options)
 
 
