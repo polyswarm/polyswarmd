@@ -12,7 +12,7 @@ from web3 import Web3, HTTPProvider
 from web3.middleware import geth_poa_middleware
 
 from polyswarmd.artifacts import is_valid_ipfshash
-from polyswarmd.config import config_location, chain_id, eth_uri, nectar_token_address, bounty_registry_address, offer_registry_address, whereami
+from polyswarmd.config import config_location, chain_id, eth_uri, nectar_token_address, bounty_registry_address, offer_registry_address, whereami, free
 from polyswarmd.response import success, failure
 
 misc = Blueprint('misc', __name__)
@@ -157,11 +157,14 @@ def post_transactions():
 
 
 def build_transaction(call, chain, nonce):
-    return call.buildTransaction({
+    options = {
         'nonce': nonce,
         'chainId': int(chain_id[chain]),
         'gas': gas_limit,
-    })
+    }
+    if free:
+        options["gasPrice"] = 0
+    return call.buildTransaction(options)
 
 
 def events_from_transaction(txhash, chain):
