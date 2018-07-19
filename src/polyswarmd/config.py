@@ -1,7 +1,7 @@
 import os
 import sys
-import yaml
 import time
+import yaml
 
 eth_uri = {}
 ipfs_uri = ''
