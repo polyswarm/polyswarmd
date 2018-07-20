@@ -178,7 +178,7 @@ def get_bounties_active():
 
 
 # TODO: Caching layer for this
-# Gets bounties that are ready to be voted on
+# Gets bounties that have been revealed and have not been voted on
 @bounties.route('/pending', methods=['GET'])
 def get_bounties_pending():
     chain = request.args.get('chain', 'home')
