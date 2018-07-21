@@ -178,6 +178,7 @@ def get_bounties_active():
 
 
 # TODO: Caching layer for this
+# Gets bounties that have been revealed and have not been voted on
 @bounties.route('/pending', methods=['GET'])
 def get_bounties_pending():
     chain = request.args.get('chain', 'home')
@@ -189,6 +190,8 @@ def get_bounties_pending():
 
     current_block = web3.eth.blockNumber
     num_bounties = bounty_registry.functions.getNumberOfBounties().call()
+    assertion_reveal_window = bounty_registry.functions.ASSERTION_REVEAL_WINDOW().call()
+
     ret = []
     for i in range(num_bounties):
         guid = bounty_registry.functions.bountyGuids(i).call()
@@ -197,8 +200,7 @@ def get_bounties_pending():
 
         if not is_valid_ipfshash(bounty['uri']):
             continue
-
-        if bounty['expiration'] <= current_block and not bounty['resolved']:
+        if bounty['expiration'] + int(assertion_reveal_window) <= current_block and not bounty['resolved']:
             ret.append(bounty)
 
     return success(ret)
