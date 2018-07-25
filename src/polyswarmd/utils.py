@@ -27,12 +27,13 @@ def bounty_to_dict(bounty):
         'resolved': bounty[6] != zero_address,
         'quorum_reached': bounty[7],
         'quorum_reached_block': bounty[8],
+        'quorum_mask': bounty[9],
     }
-    if len(bounty) > 9:
-        retval['bloom'] = uint256_list_to_hex_string(bounty[9])
-        retval['voters'] = bounty[10]
-        retval['verdicts'] = int_to_bool_list(bounty[11])
-        retval['bloom_votes'] = bounty[12]
+    if len(bounty) > 10:
+        retval['bloom'] = uint256_list_to_hex_string(bounty[10])
+        retval['voters'] = bounty[11]
+        retval['verdicts'] = int_to_bool_list(bounty[12])
+        retval['bloom_votes'] = bounty[13]
     return retval
 
 
@@ -84,6 +85,12 @@ def new_verdict_event_to_dict(new_verdict_event):
     return {
         'bounty_guid': str(uuid.UUID(int=new_verdict_event.bountyGuid)),
         'verdicts': int_to_bool_list(new_verdict_event.verdicts),
+    }
+
+def settled_bounty_event_to_dict(new_settled_event):
+    return {
+        'settled_block': new_settled_event.block,
+        'settler': new_settled_event.settler
     }
 
 def new_quorum_event_to_dict(new_quorum_event):
