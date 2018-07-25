@@ -40,9 +40,10 @@ def int_from_bytes(b):
     return int.from_bytes(b, byteorder='big')
 
 
-def calculate_commitment(verdicts):
+def calculate_commitment(account, verdicts):
     nonce = os.urandom(32)
-    commitment = sha3(int_to_bytes(verdicts ^ int_from_bytes(sha3(nonce))))
+    account = int(account, 16)
+    commitment = sha3(int_to_bytes(verdicts ^ int_from_bytes(sha3(nonce)) ^ account))
     return int_from_bytes(nonce), int_from_bytes(commitment)
 
 
@@ -358,7 +359,7 @@ def post_bounties_guid_assertions(guid):
     if bid < eth.assertion_bid_min():
         return failure('Invalid assertion bid', 400)
 
-    nonce, commitment = calculate_commitment(verdicts)
+    nonce, commitment = calculate_commitment(account, verdicts)
     approveAmount = bid + eth.assertion_fee()
 
     transactions = [
