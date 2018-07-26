@@ -85,6 +85,7 @@ def new_verdict_event_to_dict(new_verdict_event):
     return {
         'bounty_guid': str(uuid.UUID(int=new_verdict_event.bountyGuid)),
         'verdicts': int_to_bool_list(new_verdict_event.verdicts),
+        'voter': new_verdict_event.voter
     }
 
 def settled_bounty_event_to_dict(new_settled_event):
