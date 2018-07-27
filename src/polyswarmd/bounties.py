@@ -192,16 +192,20 @@ def get_bounties_pending():
     current_block = web3.eth.blockNumber
     num_bounties = bounty_registry.functions.getNumberOfBounties().call()
     assertion_reveal_window = bounty_registry.functions.ASSERTION_REVEAL_WINDOW().call()
+    assertion_vote_window = bounty_registry.functions.arbiterVoteWindow().call()
 
     ret = []
     for i in range(num_bounties):
         guid = bounty_registry.functions.bountyGuids(i).call()
+        bounty_round = bounty_registry.functions.getCurrentRound(guid)
         bounty = bounty_to_dict(
             bounty_registry.functions.bountiesByGuid(guid).call())
 
+        bounty_end_diff = current_block - bounty['expiration'] + int(assertion_reveal_window) + int(assertion_vote_window)
+
         if not is_valid_ipfshash(bounty['uri']):
             continue
-        if bounty['expiration'] + int(assertion_reveal_window) <= current_block and not bounty['resolved']:
+        if bounty_round == '3' and bounty_end_diff <= 256 and not bounty['resolved']:
             ret.append(bounty)
 
     return success(ret)
