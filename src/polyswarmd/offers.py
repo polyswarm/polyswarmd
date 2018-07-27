@@ -11,7 +11,7 @@ from websocket import create_connection
 from polyswarmd.eth import web3 as web3_chains, build_transaction, \
         nectar_token, offer_registry, bind_contract, offer_msig_artifact, offer_lib
 from polyswarmd.response import success, failure
-from polyswarmd.utils import channel_to_dict
+from polyswarmd.utils import channel_to_dict, validate_ws_url
 
 chain = 'home'  # only on home chain
 offers = Blueprint('offers', __name__)
@@ -618,6 +618,11 @@ def post_message_sender(guid):
     # TODO find a better way than replace
     socket_uri = web3.toText(socket_uri).replace('\u0000', '')
 
+    if not validate_ws_url(socket_uri):
+        return failure(
+            'Contract does not have a valid websocket uri',
+            400)
+
     account = request.args.get('account')
     if not account or not web3.isAddress(account):
         return failure('Source account required', 401)
@@ -712,6 +717,11 @@ def get_websocket(guid):
     # TODO find a better way than replace
     socket_uri = web3.toText(socket_uri).replace('\u0000', '')
 
+    if not validate_ws_url(socket_uri):
+        return failure(
+            'Contract does not have a valid websocket uri',
+            400)
+        
     return success({'websocket': socket_uri})
 
 
