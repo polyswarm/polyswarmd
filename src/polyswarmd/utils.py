@@ -1,3 +1,4 @@
+import re
 import uuid
 from polyswarmd.eth import offer_lib, web3 as web3_chains, zero_address
 
@@ -226,3 +227,14 @@ def dict_to_state(state_dict):
         state_str = state_str + to_padded_hex('')
 
     return state_str
+
+def validate_ws_url(uri):
+    regex = re.compile(
+            r'^(?:ws)s?://' # http:// or https://
+            r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|' #domain...
+            r'localhost|' #localhost...
+            r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})' # ...or ip
+            r'(?::\d+)?' # optional port
+            r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+
+    return re.match(regex, uri) is not None
