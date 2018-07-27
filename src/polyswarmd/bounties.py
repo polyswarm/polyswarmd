@@ -99,7 +99,7 @@ def post_bounties():
     artifactURI = body['uri']
     durationBlocks = body['duration']
 
-    if amount < eth.bounty_amount_min():
+    if amount < eth.bounty_amount_min(chain):
         return failure('Invalid bounty amount', 400)
 
     if not is_valid_ipfshash(artifactURI):
@@ -113,7 +113,7 @@ def post_bounties():
     numArtifacts = len(arts)
     bloom = calculate_bloom(arts)
 
-    approveAmount = amount + eth.bounty_fee()
+    approveAmount = amount + eth.bounty_fee(chain)
 
     transactions = [
         build_transaction(
@@ -383,11 +383,11 @@ def post_bounties_guid_assertions(guid):
     mask = bool_list_to_int(body['mask'])
     verdicts = bool_list_to_int(body['verdicts'])
 
-    if bid < eth.assertion_bid_min():
+    if bid < eth.assertion_bid_min(chain):
         return failure('Invalid assertion bid', 400)
 
     nonce, commitment = calculate_commitment(account, verdicts)
-    approveAmount = bid + eth.assertion_fee()
+    approveAmount = bid + eth.assertion_fee(chain)
 
     transactions = [
         build_transaction(

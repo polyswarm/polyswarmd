@@ -276,21 +276,25 @@ def events_from_transaction(txhash, chain):
 
     return ret
 
-def bounty_fee():
-    return 62500000000000000
+def bounty_fee(chain):
+    return bounty_registry[chain].functions.BOUNTY_FEE().call()
 
 
-def assertion_fee():
-    return 62500000000000000
+def assertion_fee(chain):
+    return bounty_registry[chain].functions.ASSERTION_FEE().call()
 
 
-def bounty_amount_min():
-    return 62500000000000000
+def bounty_amount_min(chain):
+    return bounty_registry[chain].functions.BOUNTY_AMOUNT_MINIMUM().call()
 
 
-def assertion_bid_min():
-    return 62500000000000000
+def assertion_bid_min(chain):
+    return bounty_registry[chain].functions.ASSERTION_BID_MINIMUM().call()
 
 
-def staking_total_max():
-    return 1000000000 * 10 ** 18
+def staking_total_max(chain):
+    return arbiter_staking[chain].functions.MAXIMUM_STAKE().call()
+
+
+def staking_total_min(chain):
+    return arbiter_staking[chain].functions.MINIMUM_STAKE().call()
