@@ -24,7 +24,6 @@ def bounty_to_dict(bounty):
         'num_artifacts': bounty[4],
         'expiration': bounty[5],
         'assigned_arbiter': bounty[6],
-        'resolved': bounty[6] != zero_address,
         'quorum_reached': bounty[7],
         'quorum_reached_block': bounty[8],
         'quorum_mask': bounty[9],
