@@ -191,21 +191,48 @@ def get_bounties_pending():
 
     current_block = web3.eth.blockNumber
     num_bounties = bounty_registry.functions.getNumberOfBounties().call()
-    assertion_reveal_window = bounty_registry.functions.ASSERTION_REVEAL_WINDOW().call()
 
     ret = []
     for i in range(num_bounties):
         guid = bounty_registry.functions.bountyGuids(i).call()
+        bounty_round = bounty_registry.functions.getCurrentRound(guid).call()
         bounty = bounty_to_dict(
             bounty_registry.functions.bountiesByGuid(guid).call())
 
         if not is_valid_ipfshash(bounty['uri']):
             continue
-        if bounty['expiration'] + int(assertion_reveal_window) <= current_block and not bounty['resolved']:
+        if bounty_round == 2:
             ret.append(bounty)
 
     return success(ret)
 
+# TODO: Caching layer for this
+# Gets bounties that have been revealed and have not been voted on
+@bounties.route('/window/reveal', methods=['GET'])
+def get_bounty_reveal_window():
+    chain = request.args.get('chain', 'home')
+    if chain != 'side' and chain != 'home':
+        return failure('Chain must be either home or side', 400)
+
+    web3 = web3_chains[chain]
+    bounty_registry = bounty_chains[chain]
+
+    assertion_reveal_window = bounty_registry.functions.ASSERTION_REVEAL_WINDOW().call()
+
+    return success({ 'blocks': assertion_reveal_window })
+
+@bounties.route('/window/vote', methods=['GET'])
+def get_bounty_vote_window():
+    chain = request.args.get('chain', 'home')
+    if chain != 'side' and chain != 'home':
+        return failure('Chain must be either home or side', 400)
+
+    web3 = web3_chains[chain]
+    bounty_registry = bounty_chains[chain]
+
+    assertion_vote_window = bounty_registry.functions.arbiterVoteWindow().call()
+
+    return success({ 'blocks': assertion_vote_window })
 
 @bounties.route('/<uuid:guid>', methods=['GET'])
 def get_bounties_guid(guid):
