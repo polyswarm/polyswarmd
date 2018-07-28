@@ -11,7 +11,7 @@ from geventwebsocket import WebSocketError
 
 from polyswarmd.eth import web3 as web3_chains, bounty_registry as bounty_chains, offer_registry
 from polyswarmd.config import chain_id as chain_ids
-from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict, state_to_dict, new_init_channel_event_to_dict, new_quorum_event_to_dict, settled_bounty_event_to_dict
+from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict, state_to_dict, new_init_channel_event_to_dict, new_quorum_event_to_dict, settled_bounty_event_to_dict, revealed_assertion_event_to_dict
 
 
 def init_websockets(app):
