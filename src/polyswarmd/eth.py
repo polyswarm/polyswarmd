@@ -162,7 +162,7 @@ def build_transaction(call, chain, nonce):
         'chainId': int(chain_id[chain]),
         'gas': gas_limit,
     }
-    if free:
+    if free[chain]:
         options["gasPrice"] = 0
     return call.buildTransaction(options)
 

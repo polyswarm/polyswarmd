@@ -13,7 +13,7 @@ bounty_registry_address = {}
 erc20_relay_address = {}
 offer_registry_address = {}
 chain_id = {}
-free = False
+free = {}
 
 CONFIG_LOCATIONS = ['/etc/polyswarmd', '~/.config/polyswarmd']
 
@@ -48,8 +48,7 @@ def init_config():
     with open(config_file, 'r') as f:
         y = yaml.load(f.read())
         ipfs_uri = y['ipfs_uri']
-        if 'free' in y:
-            free = y['free']
+
 
         home = y['homechain']
         eth_uri['home'] = home['eth_uri']
@@ -59,6 +58,7 @@ def init_config():
         offer_registry_address['home'] = home[
             'offer_registry_address']  # only on home chain
         chain_id['home'] = home['chain_id']
+        free["home"] = home['free'] if 'free' in home else False
 
         side = y['sidechain']
         eth_uri['side'] = side['eth_uri']
@@ -66,6 +66,7 @@ def init_config():
         bounty_registry_address['side'] = side['bounty_registry_address']
         erc20_relay_address['side'] = side['erc20_relay_address']
         chain_id['side'] = side['chain_id']
+        free["side"] = side['free'] if 'free' in side else False
 
 
 def set_config(**kwargs):
