@@ -1,0 +1,21 @@
+FROM python:3.5-jessie
+LABEL maintainer="PolySwarm Developers <info@polyswarm.io>"
+
+WORKDIR /usr/src/app
+COPY requirements.txt ./
+
+# Required for pycrypto
+RUN set -x && \
+    apt-get update && apt-get install -y \
+        libgmp-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN set -x && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install pyinstaller
+
+COPY . .
+RUN patch -d /usr/local/lib/python3.5/site-packages -p1 < docker/release/site-packages.patch
+RUN pyinstaller src/polyswarmd/__main__.py -n polyswarmd -y --clean
+
+CMD ["./dist/polyswarmd/polyswarmd"]
