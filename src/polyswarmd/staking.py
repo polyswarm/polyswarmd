@@ -51,7 +51,7 @@ def post_arbiter_staking_deposit():
 
     total = arbiter_staking.functions.balanceOf(account).call()
 
-    if amount + total >= eth.staking_total_max():
+    if amount + total >= eth.staking_total_max(chain):
         return failure('Total stake above allowable maximum.', 400)
 
     transactions = [

@@ -11,7 +11,7 @@ from geventwebsocket import WebSocketError
 
 from polyswarmd.eth import web3 as web3_chains, bounty_registry as bounty_chains, offer_registry
 from polyswarmd.config import chain_id as chain_ids
-from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict, state_to_dict, new_init_channel_event_to_dict, new_quorum_event_to_dict, settled_bounty_event_to_dict
+from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict, state_to_dict, new_init_channel_event_to_dict, new_quorum_event_to_dict, settled_bounty_event_to_dict, revealed_assertion_event_to_dict
 
 
 def init_websockets(app):
@@ -34,6 +34,7 @@ def init_websockets(app):
         verdict_filter = bounty_registry.eventFilter('NewVerdict')
         quorum_filiter = bounty_registry.eventFilter('QuorumReached')
         settled_filter = bounty_registry.eventFilter('BountySettled')
+        reveal_filter = bounty_registry.eventFilter('RevealedAssertion')
 
         init_filter = offer_registry.eventFilter('InitializedChannel')
 
@@ -110,6 +111,14 @@ def init_websockets(app):
                             new_init_channel_event_to_dict(event.args),
                         }))
 
+                for event in reveal_filter.get_new_entries():
+                    ws.send(
+                        json.dumps({
+                            'event':
+                            'reveal',
+                            'data':
+                            revealed_assertion_event_to_dict(event.args),
+                        }))
 
                 gevent.sleep(1)
             except WebSocketError:

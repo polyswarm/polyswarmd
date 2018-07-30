@@ -19,6 +19,8 @@ from polyswarmd.staking import staking
 from polyswarmd.websockets import init_websockets
 
 app = Flask('polyswarmd', root_path=whereami(), instance_path=whereami())
+# 100MB limit
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
 install_error_handlers(app)
 app.register_blueprint(misc, url_prefix='/')
 app.register_blueprint(artifacts, url_prefix='/artifacts')
