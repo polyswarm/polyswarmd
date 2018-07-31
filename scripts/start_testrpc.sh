@@ -15,7 +15,7 @@ start_testrpc() {
     --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501209,1000000000000000000000000"
   )
 
-  node_modules/.bin/ganache-cli --gasLimit 0xfffffffffff ${accounts[@]}
+  ganache-cli --gasLimit 0xfffffffffff ${accounts[@]}
 }
 
 start_testrpc

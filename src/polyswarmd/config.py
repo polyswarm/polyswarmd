@@ -15,7 +15,7 @@ offer_registry_address = {}
 chain_id = {}
 free = {}
 
-CONFIG_LOCATIONS = ['/etc/polyswarmd', '~/.config/polyswarmd']
+CONFIG_LOCATIONS = ['/etc/polyswarmd', '~/.config/polyswarmd', './config']
 
 def whereami():
     """
