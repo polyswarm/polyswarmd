@@ -1,6 +1,0 @@
-[submodule "truffle"]
-	path = truffle
-	url = https://github.com/polyswarm/polyswarm-contracts.git
-[submodule "polyswarm-relay"]
-	path = polyswarm-relay
-	url = https://github.com/polyswarm/relay.git

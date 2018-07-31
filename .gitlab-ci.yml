@@ -1,5 +1,11 @@
 image: docker:stable
 
+stages:
+  - build
+  - test
+  - deploy
+  - release
+
 services:
   - docker:dind
 
@@ -8,7 +14,10 @@ before_script:
 
 kick-e2e:
     tags:
-        - docker
+      - docker
+    # FIXME in place while e2e chokes on tags
+    except:
+      - tags
     stage: deploy
     script:
       - set -e
@@ -41,3 +50,18 @@ kick-e2e:
           echo "failure further down the pipeline"
           exit 1
         fi
+
+release:
+    tags:
+      - docker
+    stage: release
+    only:
+      - tags
+    script:
+      - docker build --build-arg "POLYSWARMD_VERSION=$CI_COMMIT_TAG" --build-arg "CONTRACTS_VERSION=$CI_COMMIT_TAG" -t polyswarm/polyswarmd-release-builder -f docker/Dockerfile.release .
+      - IMG_ID=$(docker create polyswarm/polyswarmd-release-builder)
+      - docker cp "$IMG_ID:/tmp/polyswarmd-$CI_COMMIT_TAG.tar.gz" .
+    artifacts:
+      name: "$CI_COMMIT_TAG"
+      paths:
+        - "polyswarmd-$CI_COMMIT_TAG.tar.gz"
