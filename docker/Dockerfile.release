@@ -51,8 +51,8 @@ RUN set -x && \
 # Build ELF
 RUN patch -d /usr/local/lib/python3.5/dist-packages -p1 < docker/release/site-packages.patch && \
     pyinstaller src/polyswarmd/__main__.py -n polyswarmd -y --clean && \
-    mkdir -p dist/polyswarmd/config && \
-    cp contracts/build/contracts/*.json dist/polyswarmd/config && \
+    mkdir -p dist/polyswarmd/config/contracts && \
+    cp contracts/build/contracts/*.json dist/polyswarmd/config/contracts && \
     cp docker/release/polyswarmd.yml dist/polyswarmd/config
 
 # Build tar

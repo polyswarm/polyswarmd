@@ -35,7 +35,7 @@ def init_config():
             bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id, free
 
     for config_location in CONFIG_LOCATIONS:
-        config_location = os.path.expanduser(config_location)
+        config_location = os.path.abspath(os.path.expanduser(config_location))
         config_file = os.path.join(config_location, 'polyswarmd.yml')
         if os.path.isfile(config_file):
             break

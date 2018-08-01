@@ -1,0 +1,16 @@
+ipfs_uri: http://localhost:5001
+homechain:
+  chain_id: 1
+  eth_uri: http://localhost:8545
+  nectar_token_address: "0x9e46a38f5daabe8683e10793b06749eef7d733d1"
+  bounty_registry_address: "0xb9314ac8f04d61cb155598b50c49470b5196d892"
+  offer_registry_address: "0xa9b722839defca2652db9e4fd8b8e281ef0b5de4"
+  erc20_relay_address: "0xff2bad6415467e952484456d7d23e0fd1e9816ce"
+sidechain:
+  free: Yes
+  chain_id: 31337
+  eth_uri: http://localhost:7545
+  nectar_token_address: "0x6bc19695033ea13326ee7a4ca23fe2a4acf07764"
+  bounty_registry_address: "0x93043aa63981e70d181049a5f0e605a86f2f4446"
+  offer_registry_address: "0x74a6c8a715bbd0082523294d1a3cbc146ffbeb15"
+  erc20_relay_address: "0x2e34c500aba2fb2d530fd2017c3b761423090629"
