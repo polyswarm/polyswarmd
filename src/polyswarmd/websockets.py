@@ -128,7 +128,7 @@ def init_websockets(app):
                 logging.error('Error in /events: %s', e)
                 continue
 
-    # for receive messages about offers that might need to be signed
+    # for receiving messages about offers that might need to be signed
     @sockets.route('/messages/<uuid:guid>')
     def messages(ws, guid):
         try:

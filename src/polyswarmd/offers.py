@@ -11,7 +11,7 @@ from websocket import create_connection
 from polyswarmd.eth import web3 as web3_chains, build_transaction, \
         nectar_token, offer_registry, bind_contract, offer_msig_artifact, offer_lib
 from polyswarmd.response import success, failure
-from polyswarmd.utils import channel_to_dict, validate_ws_url
+from polyswarmd.utils import channel_to_dict, validate_ws_url, dict_to_state
 
 chain = 'home'  # only on home chain
 offers = Blueprint('offers', __name__)
@@ -421,10 +421,11 @@ def post_settle(guid):
     return success({'transactions': transactions})
 
 
-@offers.route('state', methods=['POST'])
+@offers.route('/state', methods=['POST'])
 def create_state():
 
     body = request.get_json()
+
 
     schema = {
         'type':
@@ -507,7 +508,7 @@ def create_state():
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message)
 
-    body['token_address'] = str(nectar_token_address[chain])
+    body['token_address'] = str(nectar_token[chain].address)
 
     return success({'state': dict_to_state(body)})
 
