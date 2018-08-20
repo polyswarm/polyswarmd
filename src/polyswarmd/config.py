@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 import time
@@ -5,7 +6,7 @@ import yaml
 
 eth_uri = {}
 ipfs_uri = ''
-network = ''
+db_uri = ''
 config_location = ''
 
 nectar_token_address = {}
@@ -31,7 +32,7 @@ def init_config():
     """
     Read config from yaml file
     """
-    global eth_uri, ipfs_uri, network, config_location, nectar_token_address, \
+    global eth_uri, ipfs_uri, db_uri, config_location, nectar_token_address, \
             bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id, free
 
     for config_location in CONFIG_LOCATIONS:
@@ -41,13 +42,13 @@ def init_config():
             break
 
     if not os.path.isfile(config_file):
-        # TODO: What to do here
-        print("MISSING CONFIG")
+        logging.error("MISSING CONFIG")
         sys.exit(-1)
 
     with open(config_file, 'r') as f:
         y = yaml.load(f.read())
         ipfs_uri = y['ipfs_uri']
+        db_uri = y['db_uri']
 
 
         home = y['homechain']
@@ -73,12 +74,13 @@ def set_config(**kwargs):
     """
     Set up config from arguments for testing purposes
     """
-    global eth_uri, ipfs_uri, network, nectar_token_address, bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id, free
+    global eth_uri, ipfs_uri, db_uri, nectar_token_address, bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id, free
     eth_uri = {
         'home': kwargs.get('eth_uri', 'http://localhost:8545'),
         'side': kwargs.get('eth_uri', 'http://localhost:7545'),
     }
     ipfs_uri = kwargs.get('ipfs_uri', 'http://localhost:5001')
+    db_uri = kwargs.get('db_uri', 'sqlite:///tmp/polyswarmd.sqlite')
     free = kwargs.get('free', False)
 
     nectar_token_address = {

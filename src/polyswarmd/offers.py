@@ -4,7 +4,7 @@ import json
 import jsonschema
 from jsonschema.exceptions import ValidationError
 
-from flask import Blueprint, request
+from flask import Blueprint, g, request
 
 from websocket import create_connection
 
@@ -20,11 +20,7 @@ offers = Blueprint('offers', __name__)
 @offers.route('', methods=['POST'])
 def post_create_offer_channel():
     web3 = web3_chains[chain]
-
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
-    account = web3.toChecksumAddress(account)
+    account = web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
         request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
@@ -77,11 +73,7 @@ def post_uri(guid):
         offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
-    account = web3.toChecksumAddress(account)
+    account = web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
         request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
@@ -125,11 +117,7 @@ def post_open(guid):
         offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
-    account = web3.toChecksumAddress(account)
+    account = web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
         request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
@@ -190,11 +178,7 @@ def post_cancel(guid):
         offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
-    account = web3.toChecksumAddress(account)
+    account = web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
         request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
@@ -213,11 +197,7 @@ def post_join(guid):
         offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
-    account = web3.toChecksumAddress(account)
+    account = web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
         request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
@@ -273,11 +253,7 @@ def post_close(guid):
         offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
-    account = web3.toChecksumAddress(account)
+    account = web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
         request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
@@ -337,11 +313,7 @@ def post_close_challenged(guid):
         offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
-    account = web3.toChecksumAddress(account)
+    account = web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
         request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
@@ -397,11 +369,7 @@ def post_settle(guid):
         offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
-    account = web3.toChecksumAddress(account)
+    account = web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
         request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
@@ -551,11 +519,7 @@ def post_challange(guid):
         offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
-    account = web3.toChecksumAddress(account)
+    account = web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
         request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
@@ -623,10 +587,7 @@ def post_message_sender(guid):
             'Contract does not have a valid websocket uri',
             400)
 
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
-    account = web3.toChecksumAddress(account)
+    account = web3.toChecksumAddress(g.eth_address)
 
     body = request.get_json()
 
@@ -785,12 +746,9 @@ def get_closed():
 @offers.route('myoffers', methods=['GET'])
 def get_myoffers():
     web3 = web3_chains[chain]
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
+    account = web3.toChecksumAddress(g.eth_address)
 
     my_offers = []
-
     num_of_offers = offer_registry.functions.getNumberOfOffers().call()
 
     for i in range(0, num_of_offers):
@@ -801,7 +759,7 @@ def get_myoffers():
         offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
         expert = offer_msig.functions.expert().call()
         ambassador = offer_msig.functions.ambassador().call()
-        if account is expert or account is ambassador:
+        if account == expert or account == ambassador:
             my_offers.append({'guid': guid, 'address': msig_address})
 
     return success(my_offers)

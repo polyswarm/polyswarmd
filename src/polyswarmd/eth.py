@@ -5,7 +5,7 @@ import rlp
 
 from collections import defaultdict
 from ethereum.transactions import Transaction
-from flask import Blueprint, request
+from flask import Blueprint, g, request
 from hexbytes import HexBytes
 from jsonschema.exceptions import ValidationError
 from web3 import Web3, HTTPProvider
@@ -26,7 +26,7 @@ def bind_contract(web3_, address, artifact):
         address=web3_.toChecksumAddress(address), abi=abi)
 
 
-gas_limit = 5000000 # TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to settle bounty
+gas_limit = 5000000  # TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to settle bounty
 zero_address = '0x0000000000000000000000000000000000000000'
 
 offer_msig_artifact = os.path.join(config_location, 'contracts',
@@ -58,16 +58,17 @@ for chain in ('home', 'side'):
         web3[chain], bounty_registry[chain].functions.staking().call(),
         os.path.join(config_location, 'contracts', 'ArbiterStaking.json'))
 
-    if chain is 'home':
+    if chain == 'home':
         offer_registry = bind_contract(
             web3[chain], offer_registry_address[chain],
             os.path.join(config_location, 'contracts', 'OfferRegistry.json'))
 
         offer_lib_address = offer_registry.functions.offerLib().call()
 
-        offer_lib = bind_contract(web3[chain], offer_lib_address,
-                                  os.path.join(config_location, 'contracts',
-                                               'OfferLib.json'))
+        offer_lib = bind_contract(
+            web3[chain], offer_lib_address,
+            os.path.join(config_location, 'contracts', 'OfferLib.json'))
+
 
 @misc.route('/syncing', methods=['GET'])
 def get_syncing():
@@ -96,11 +97,7 @@ def get_nonce():
         return failure('Chain must be either home or side', 400)
 
     w3 = web3[chain]
-
-    account = request.args.get('account')
-    if not account or not w3.isAddress(account):
-        return failure('Source account required', 401)
-    account = w3.toChecksumAddress(account)
+    account = w3.toChecksumAddress(g.eth_address)
 
     return success(w3.eth.getTransactionCount(account))
 
@@ -177,21 +174,27 @@ def events_from_transaction(txhash, chain):
     receipt = web3[chain].eth.waitForTransactionReceipt(txhash)
     txhash = bytes(txhash).hex()
     if not receipt:
-        return {'errors': ['transaction {0}: receipt not available'.format(txhash)]}
+        return {
+            'errors':
+            ['transaction {0}: receipt not available'.format(txhash)]
+        }
     if receipt.gasUsed == gas_limit:
         return {'errors': ['transaction {0}: out of gas'.format(txhash)]}
     if receipt.status != 1:
-        return {'errors': ['transaction {0}: transaction failed, check parameters'.format(txhash)]}
+        return {
+            'errors': [
+                'transaction {0}: transaction failed, check parameters'.format(
+                    txhash)
+            ]
+        }
 
     ret = {}
 
     # Transfers
-    processed = nectar_token[
-        chain].events.Transfer().processReceipt(receipt)
+    processed = nectar_token[chain].events.Transfer().processReceipt(receipt)
     if processed:
         transfer = transfer_event_to_dict(processed[0]['args'])
         ret['transfers'] = ret.get('transfers', []) + [transfer]
-
 
     # Bounties
     processed = bounty_registry[chain].events.NewBounty().processReceipt(
@@ -221,14 +224,14 @@ def events_from_transaction(txhash, chain):
         ret['reveals'] = ret.get('reveals', []) + [reveal]
 
     # Arbiter
-    processed = arbiter_staking[
-        chain].events.NewWithdrawal().processReceipt(receipt)
+    processed = arbiter_staking[chain].events.NewWithdrawal().processReceipt(
+        receipt)
     if processed:
         withdrawal = new_withdrawal_event_to_dict(processed[0]['args'])
         ret['withdrawals'] = ret.get('withdrawals', []) + [withdrawal]
 
-    processed = arbiter_staking[
-        chain].events.NewDeposit().processReceipt(receipt)
+    processed = arbiter_staking[chain].events.NewDeposit().processReceipt(
+        receipt)
     if processed:
         deposit = new_deposit_event_to_dict(processed[0]['args'])
         ret['deposits'] = ret.get('deposits', []) + [deposit]
@@ -241,7 +244,8 @@ def events_from_transaction(txhash, chain):
         receipt)
     if processed:
         initialized = dict(processed[0]['args'])
-        ret['offers_initialized'] = ret.get('offers_initialized', []) + [initialized]
+        ret['offers_initialized'] = ret.get('offers_initialized',
+                                            []) + [initialized]
 
     processed = offer_msig.events.OpenedAgreement().processReceipt(receipt)
     if processed:
@@ -272,9 +276,11 @@ def events_from_transaction(txhash, chain):
         receipt)
     if processed:
         challenged = dict(processed[0]['args'])
-        ret['offers_challenged'] = ret.get('offers_challenged', []) + [challenged]
+        ret['offers_challenged'] = ret.get('offers_challenged',
+                                           []) + [challenged]
 
     return ret
+
 
 def bounty_fee(chain):
     return bounty_registry[chain].functions.BOUNTY_FEE().call()

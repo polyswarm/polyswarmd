@@ -1,6 +1,7 @@
 import gevent
 import json
 import jsonschema
+import logging
 import sys
 import time
 
@@ -22,7 +23,7 @@ def init_websockets(app):
     def events(ws):
         chain = request.args.get('chain', 'home')
         if chain != 'side' and chain != 'home':
-            print('Chain must be either home or side', file=sys.stderr)
+            logging.error('Chain must be either home or side')
             ws.close()
 
         web3 = web3_chains[chain]
@@ -124,7 +125,7 @@ def init_websockets(app):
             except WebSocketError:
                 break
             except Exception as e:
-                print('Error in /events:', e, file=sys.stderr)
+                logging.error('Error in /events: %s', e)
                 continue
 
     # for receive messages about offers that might need to be signed
@@ -170,7 +171,7 @@ def init_websockets(app):
                 try:
                     jsonschema.validate(body, schema)
                 except ValidationError as e:
-                    print('Invalid JSON:', e, file=sys.stderr)
+                    logging.error('Invalid JSON: %s', e)
 
                 state_dict = state_to_dict(body['state'])
                 state_dict['guid'] = guid.int
