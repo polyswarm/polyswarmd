@@ -47,7 +47,11 @@ def before_request():
     g.eth_address = None
 
     # Ignore prefix if present
-    api_key = request.headers.get('Authorization').split()[-1]
+    try:
+        api_key = request.headers.get('Authorization').split()[-1]
+    except:
+        return failure('API key required', 401)
+
     if api_key:
         api_key_obj = lookup_api_key(api_key)
         if api_key_obj:
