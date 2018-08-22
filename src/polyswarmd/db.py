@@ -32,7 +32,7 @@ class User(Base):
 class EthAddress(Base):
     __tablename__ = 'eth_addresses'
     id = Column(Integer, primary_key=True)
-    eth_address = Column(String, index=True, unique=True)
+    eth_address = Column(String, index=True)
 
     user_id = Column(Integer, ForeignKey('users.id'))
 

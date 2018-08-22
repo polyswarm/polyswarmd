@@ -1,5 +1,6 @@
 import json
 import jsonschema
+import logging
 import os
 import rlp
 
@@ -110,6 +111,7 @@ def post_transactions():
         return failure('Chain must be either home or side', 400)
 
     w3 = web3[chain]
+    account = w3.toChecksumAddress(g.eth_address)
 
     schema = {
         'type': 'object',
@@ -138,6 +140,13 @@ def post_transactions():
         try:
             tx = rlp.decode(bytes.fromhex(raw_tx), Transaction)
         except:
+            continue
+
+        sender = w3.toChecksumAddress(tx.sender.hex())
+        if sender != account:
+            logging.warning(
+                'Got invalid transaction sender, expected %s got %s', account,
+                sender)
             continue
 
         # TODO: Additional validation (addresses, methods, etc)
