@@ -27,7 +27,11 @@ def bind_contract(web3_, address, artifact):
         address=web3_.toChecksumAddress(address), abi=abi)
 
 
+<<<<<<< HEAD
 gas_limit = 5000000  # TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to settle bounty
+=======
+gas_limit = 7000000 # TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to settle bounty
+>>>>>>> fix messages
 zero_address = '0x0000000000000000000000000000000000000000'
 
 offer_msig_artifact = os.path.join(config_location, 'contracts',
@@ -159,6 +163,9 @@ def post_transactions():
         for k, v in events.items():
             ret[k].extend(v)
 
+    
+    print(ret)
+    print(txhashes)
     return success(ret)
 
 
