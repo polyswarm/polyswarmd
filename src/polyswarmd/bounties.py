@@ -233,6 +233,7 @@ def post_bounties_guid_settle(guid):
             bounty_registry.functions.settleBounty(guid.int), chain,
             base_nonce),
     ]
+
     return success({'transactions': transactions})
 
 

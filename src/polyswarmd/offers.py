@@ -11,7 +11,7 @@ from websocket import create_connection
 from polyswarmd.eth import web3 as web3_chains, build_transaction, \
         nectar_token, offer_registry, bind_contract, offer_msig_artifact, offer_lib
 from polyswarmd.response import success, failure
-from polyswarmd.utils import channel_to_dict, validate_ws_url, dict_to_state
+from polyswarmd.utils import channel_to_dict, validate_ws_url, dict_to_state, to_padded_hex
 
 chain = 'home'  # only on home chain
 offers = Blueprint('offers', __name__)
@@ -164,7 +164,7 @@ def post_open(guid):
             nectar_token['home'].functions.approve(
                 msig_address, approve_amount), chain, base_nonce),
         build_transaction(
-            offer_msig.functions.openAgreement(state, v, r, s), chain,
+            offer_msig.functions.openAgreement(to_padded_hex(state), v, to_padded_hex(r), to_padded_hex(s)), chain,
             base_nonce + 1),
     ]
 
@@ -575,18 +575,24 @@ def post_challange(guid):
 @offers.route('/<uuid:guid>/sendmsg', methods=['POST'])
 def post_message_sender(guid):
     web3 = web3_chains[chain]
+    print(guid.int)
+    print()
     offer_channel = channel_to_dict(
         offer_registry.functions.guidToChannel(guid.int).call())
+
     msig_address = offer_channel['msig_address']
+    print(msig_address)
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+    print(offer_msig)
     socket_uri = offer_msig.functions.websocketUri().call()
     # TODO find a better way than replace
     socket_uri = web3.toText(socket_uri).replace('\u0000', '')
 
-    if not validate_ws_url(socket_uri):
-        return failure(
-            'Contract does not have a valid websocket uri',
-            400)
+    print(socket_uri)
+    # if not validate_ws_url(socket_uri):
+    #     return failure(
+    #         'Contract does not have a valid websocket uri',
+    #         400)
 
     account = web3.toChecksumAddress(g.eth_address)
 
@@ -631,12 +637,13 @@ def post_message_sender(guid):
 
     try:
         if 'to_socket' in body:
+            print(body['to_socket'])
             ws = create_connection(body['to_socket'])
         else:
             ws = create_connection(socket_uri)
     except:
         return failure(
-            'Could not connect to socket. Check the addresses or wait for party to be online',
+            'Could not connect to socket. Check the addresses or wait for party to be online ' + body['to_socket'],
             400)
 
     body['sender'] = account

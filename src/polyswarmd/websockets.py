@@ -131,8 +131,18 @@ def init_websockets(app):
     # for receiving messages about offers that might need to be signed
     @sockets.route('/messages/<uuid:guid>')
     def messages(ws, guid):
-        try:
-            while not ws.closed:
+
+        ws.send(
+            json.dumps({
+                'event': 'connected',
+                'data': {
+                    'start_time': str(start_time),
+                }
+            }))
+
+        while not ws.closed:
+            try:
+                print('in here yo')
                 msg = ws.receive()
 
                 if not msg:
@@ -178,9 +188,22 @@ def init_websockets(app):
 
                 ws.send(
                     json.dumps({
-                        'type': body['type'],
-                        'raw_state': body['state'],
-                        'state': state_dict
+                        'event': 'connected',
+                        'data': {
+                            'start_time': str(start_time),
+                        }
                     }))
-        except:
-            pass
+        
+                # ws.send(
+                #     json.dumps({
+                #         'type': body['type'],
+                #         'raw_state': body['state'],
+                #         'state': state_dict
+                #     }))
+
+                # gevent.sleep(1)
+            except WebSocketError:
+                break
+            except Exception as e:
+                print('Error in /messages:', e, file=sys.stderr)
+                continue
