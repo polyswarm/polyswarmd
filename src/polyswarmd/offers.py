@@ -158,7 +158,7 @@ def post_open(guid):
     s = body['s']
 
     approve_amount = offer_lib.functions.getBalanceA(state).call()
-
+    print((to_padded_hex(state)))
     transactions = [
         build_transaction(
             nectar_token['home'].functions.approve(
@@ -575,20 +575,15 @@ def post_challange(guid):
 @offers.route('/<uuid:guid>/sendmsg', methods=['POST'])
 def post_message_sender(guid):
     web3 = web3_chains[chain]
-    print(guid.int)
-    print()
     offer_channel = channel_to_dict(
         offer_registry.functions.guidToChannel(guid.int).call())
 
     msig_address = offer_channel['msig_address']
-    print(msig_address)
     offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-    print(offer_msig)
     socket_uri = offer_msig.functions.websocketUri().call()
     # TODO find a better way than replace
     socket_uri = web3.toText(socket_uri).replace('\u0000', '')
 
-    print(socket_uri)
     # if not validate_ws_url(socket_uri):
     #     return failure(
     #         'Contract does not have a valid websocket uri',
