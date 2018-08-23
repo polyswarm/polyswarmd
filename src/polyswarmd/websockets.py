@@ -18,6 +18,7 @@ from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_di
 def init_websockets(app):
     sockets = Sockets(app)
     start_time = time.time()
+    message_sockets = dict()
 
     @sockets.route('/events')
     def events(ws):
@@ -140,6 +141,16 @@ def init_websockets(app):
                 }
             }))
 
+        if guid not in message_sockets:
+            message_sockets[guid] = [ws]
+        else:
+            message_sockets[guid].append(ws)
+
+        print(ws)
+        print(dir(ws))
+        print(ws.origin)
+        print(ws.path)
+
         while not ws.closed:
             try:
                 print('in here yo')
@@ -186,20 +197,15 @@ def init_websockets(app):
                 state_dict = state_to_dict(body['state'])
                 state_dict['guid'] = guid.int
 
-                ws.send(
-                    json.dumps({
-                        'event': 'connected',
-                        'data': {
-                            'start_time': str(start_time),
-                        }
-                    }))
-        
-                # ws.send(
-                #     json.dumps({
-                #         'type': body['type'],
-                #         'raw_state': body['state'],
-                #         'state': state_dict
-                #     }))
+                for message_websocket in message_sockets[guid]:
+                    print('working.................')
+                    if not message_websocket.closed:
+                        message_websocket.send(
+                            json.dumps({
+                                'type': body['type'],
+                                'raw_state': body['state'],
+                                'state': state_dict
+                            }))
 
                 # gevent.sleep(1)
             except WebSocketError:
