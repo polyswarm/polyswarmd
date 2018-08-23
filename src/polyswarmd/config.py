@@ -7,6 +7,7 @@ import yaml
 eth_uri = {}
 ipfs_uri = ''
 db_uri = ''
+require_api_key = False
 config_location = ''
 
 nectar_token_address = {}
@@ -17,6 +18,7 @@ chain_id = {}
 free = {}
 
 CONFIG_LOCATIONS = ['/etc/polyswarmd', '~/.config/polyswarmd', './config']
+
 
 def whereami():
     """
@@ -32,7 +34,7 @@ def init_config():
     """
     Read config from yaml file
     """
-    global eth_uri, ipfs_uri, db_uri, config_location, nectar_token_address, \
+    global eth_uri, ipfs_uri, db_uri, require_api_key, config_location, nectar_token_address, \
             bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id, free
 
     for config_location in CONFIG_LOCATIONS:
@@ -49,7 +51,7 @@ def init_config():
         y = yaml.load(f.read())
         ipfs_uri = y['ipfs_uri']
         db_uri = y['db_uri']
-
+        require_api_key = y['require_api_key']
 
         home = y['homechain']
         eth_uri['home'] = home['eth_uri']
@@ -59,7 +61,7 @@ def init_config():
         offer_registry_address['home'] = home[
             'offer_registry_address']  # only on home chain
         chain_id['home'] = home['chain_id']
-        free["home"] = home['free'] if 'free' in home else False
+        free["home"] = home.get('free', False)
 
         side = y['sidechain']
         eth_uri['side'] = side['eth_uri']
@@ -67,14 +69,15 @@ def init_config():
         bounty_registry_address['side'] = side['bounty_registry_address']
         erc20_relay_address['side'] = side['erc20_relay_address']
         chain_id['side'] = side['chain_id']
-        free["side"] = side['free'] if 'free' in side else False
+        free["home"] = side.get('free', False)
 
 
 def set_config(**kwargs):
     """
     Set up config from arguments for testing purposes
     """
-    global eth_uri, ipfs_uri, db_uri, nectar_token_address, bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id, free
+    global eth_uri, ipfs_uri, db_uri, require_api_key, nectar_token_address, \
+            bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id, free
     eth_uri = {
         'home': kwargs.get('eth_uri', 'http://localhost:8545'),
         'side': kwargs.get('eth_uri', 'http://localhost:7545'),
