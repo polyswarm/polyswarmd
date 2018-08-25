@@ -133,27 +133,13 @@ def init_websockets(app):
     @sockets.route('/messages/<uuid:guid>')
     def messages(ws, guid):
 
-        ws.send(
-            json.dumps({
-                'event': 'connected',
-                'data': {
-                    'start_time': str(start_time),
-                }
-            }))
-
         if guid not in message_sockets:
             message_sockets[guid] = [ws]
         else:
             message_sockets[guid].append(ws)
 
-        print(ws)
-        print(dir(ws))
-        print(ws.origin)
-        print(ws.path)
-
         while not ws.closed:
             try:
-                print('in here yo')
                 msg = ws.receive()
 
                 if not msg:
@@ -198,7 +184,6 @@ def init_websockets(app):
                 state_dict['guid'] = guid.int
 
                 for message_websocket in message_sockets[guid]:
-                    print('working.................')
                     if not message_websocket.closed:
                         message_websocket.send(
                             json.dumps({
