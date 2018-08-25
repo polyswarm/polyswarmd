@@ -158,7 +158,7 @@ def post_open(guid):
     s = body['s']
 
     approve_amount = offer_lib.functions.getBalanceA(state).call()
-    print((to_padded_hex(state)))
+
     transactions = [
         build_transaction(
             nectar_token['home'].functions.approve(
@@ -426,7 +426,6 @@ def create_state():
 
     body = request.get_json()
 
-
     schema = {
         'type':
         'object',
@@ -484,9 +483,9 @@ def create_state():
                 'type': 'string',
                 'minLength': 1
             },
-            'current_commitment': {
+            'commitment': {
                 'type': 'string',
-                'minLength': 1
+                'minimum': 0
             },
             'verdicts': {
                 'type': 'string',
@@ -632,7 +631,6 @@ def post_message_sender(guid):
 
     try:
         if 'to_socket' in body:
-            print(body['to_socket'])
             ws = create_connection(body['to_socket'])
         else:
             ws = create_connection(socket_uri)
