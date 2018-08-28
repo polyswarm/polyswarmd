@@ -65,4 +65,3 @@ release:
       name: "$CI_COMMIT_TAG"
       paths:
         - "polyswarmd-$CI_COMMIT_TAG.tar.gz"
-
