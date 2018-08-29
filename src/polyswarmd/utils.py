@@ -131,9 +131,7 @@ def channel_to_dict(channel_data):
 def state_to_dict(state):
     # gets state of non required state
     offer_info = offer_lib.functions.getOfferState(state).call()
-
     web3 = web3_chains['home']
-
     return {
         'isClosed': offer_lib.functions.getCloseFlag(state).call(),
         'nonce': offer_lib.functions.getSequence(state).call(),
@@ -155,6 +153,26 @@ def new_init_channel_event_to_dict(new_init_event):
         'ambassador': new_init_event.ambassador,
         'expert': new_init_event.expert,
         'multi_signature': new_init_event.msig,
+    }
+
+def new_settle_challenged_event(new_event):
+    return {
+        'challenger': new_event.challenger,
+        'nonce': new_event.sequence,
+        'settle_period_end': new_event.settlementPeriodEnd,
+    }
+
+def new_settle_started_event(new_event):
+    return {
+        'initiator': new_event.initiator,
+        'nonce': new_event.sequence,
+        'settle_period_end': new_event.settlementPeriodEnd,
+    }
+
+def new_cancel_agreement_event_to_dict(new_event):
+    return {
+        'expert': new_event._expert,
+        'ambassador': new_event._ambassador,
     }
 
 def to_padded_hex(val):
