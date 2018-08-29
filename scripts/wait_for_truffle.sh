@@ -17,7 +17,7 @@ while getopts ":p" opt; do
 
       ;;
 
-    \? )
+    w )
       until [ -e /etc/polyswarmd/.ready ] ; do
           >&2 echo "The migration is incomplete - sleeping..."
           sleep 1
