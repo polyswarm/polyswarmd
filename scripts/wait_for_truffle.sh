@@ -4,7 +4,7 @@ set -e
 
 
 
-while getopts ":p" opt; do
+while getopts ":pw" opt; do
   case ${opt} in
     p ) # process option a
       mkdir -p /etc/polyswarmd
