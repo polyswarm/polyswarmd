@@ -11,7 +11,7 @@ from websocket import create_connection
 from polyswarmd.eth import web3 as web3_chains, build_transaction, \
         nectar_token, offer_registry, bind_contract, offer_msig_artifact, offer_lib
 from polyswarmd.response import success, failure
-from polyswarmd.utils import channel_to_dict, validate_ws_url, dict_to_state, to_padded_hex
+from polyswarmd.utils import channel_to_dict, validate_ws_url, dict_to_state, to_padded_hex, bool_list_to_int
 
 chain = 'home'  # only on home chain
 offers = Blueprint('offers', __name__)
@@ -483,13 +483,19 @@ def create_state():
                 'type': 'string',
                 'minLength': 1
             },
-            'commitment': {
-                'type': 'string',
-                'minimum': 0
+            'mask': {
+                'type': 'array',
+                'maxItems': 256,
+                'items': {
+                    'type': 'boolean',
+                },
             },
             'verdicts': {
-                'type': 'string',
-                'minLength': 1
+                'type': 'array',
+                'maxItems': 256,
+                'items': {
+                    'type': 'boolean',
+                },
             },
             'meta_data': {
                 'type': 'string',
@@ -509,6 +515,12 @@ def create_state():
 
     body['token_address'] = str(nectar_token[chain].address)
 
+    if 'verdicts' in body and not 'mask' in body or 'mask' in body and not 'verdicts' in body:
+        return failure('Invalid JSON: Both `verdicts` and `mask` properties must be sent')
+    elif 'verdicts' in body and 'mask' in body:
+        body['verdicts'] = bool_list_to_int(body['verdicts'])
+        body['mask'] = bool_list_to_int(body['mask'])
+        
     return success({'state': dict_to_state(body)})
 
 

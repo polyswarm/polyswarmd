@@ -160,6 +160,9 @@ def init_websockets(app):
                         'state': {
                             'type': 'string',
                         },
+                        'artifact': {
+                            'type': 'string',
+                        },
                         'r': {
                             'type': 'string',
                         },
@@ -182,17 +185,30 @@ def init_websockets(app):
 
                 state_dict = state_to_dict(body['state'])
                 state_dict['guid'] = guid.int
+                ret = {
+                    'type': body['type'],
+                    'raw_state': body['state'],
+                    'state': state_dict
+                }
+
+                if 'r' in body:
+                    ret['r'] = body['r']
+
+                if 'v' in body:
+                    ret['v'] = body['v']
+
+                if 's' in body:
+                    ret['s'] = body['s']
+
+                if 'artifact' in body:
+                    ret['artifact'] = body['artifact']
 
                 for message_websocket in message_sockets[guid]:
                     if not message_websocket.closed:
                         message_websocket.send(
-                            json.dumps({
-                                'type': body['type'],
-                                'raw_state': body['state'],
-                                'state': state_dict
-                            }))
+                            json.dumps(ret))
 
-                # gevent.sleep(1)
+                gevent.sleep(1)
             except WebSocketError:
                 break
             except Exception as e:

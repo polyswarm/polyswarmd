@@ -143,9 +143,10 @@ def state_to_dict(state):
         'ambassador_balance': offer_lib.functions.getBalanceA(state).call(),
         'expert_balance': offer_lib.functions.getBalanceB(state).call(),
         'token': offer_lib.functions.getTokenAddress(state).call(),
-        'offer_amount': offer_lib.functions.getCloseFlag(state).call(),
-        'ipfs_uri': web3.toText(offer_info[3]),
-        'verdicts': offer_info[5]
+        'offer_amount': web3.toInt(offer_info[1]),
+        'artifact_hash': web3.toText(offer_info[2]).replace('\x00', ''),
+        'mask': int_to_bool_list(web3.toInt(offer_info[6])),
+        'verdicts': int_to_bool_list(web3.toInt(offer_info[7])),
     }
 
 def new_init_channel_event_to_dict(new_init_event):
@@ -178,7 +179,6 @@ def to_padded_hex(val):
 def dict_to_state(state_dict):
     state_str = '0x'
 
-    # should always be included
     state_str = state_str + to_padded_hex(state_dict['close_flag'])
     state_str = state_str + to_padded_hex(state_dict['nonce'])
     state_str = state_str + to_padded_hex(state_dict['ambassador'])
@@ -187,12 +187,11 @@ def dict_to_state(state_dict):
     state_str = state_str + to_padded_hex(state_dict['ambassador_balance'])
     state_str = state_str + to_padded_hex(state_dict['expert_balance'])
     state_str = state_str + to_padded_hex(state_dict['token_address'])
-    state_str = state_str + to_padded_hex(state_dict['guid'])
+    state_str = state_str + to_padded_hex(int(state_dict['guid']))
     state_str = state_str + to_padded_hex(state_dict['offer_amount'])
 
+    # no longer storing in state object due to size limitations
     if 'artifact_hash' in state_dict:
-        state_str = state_str + to_padded_hex(state_dict['artifact_hash'])
-    else:
         state_str = state_str + to_padded_hex('')
 
     if 'ipfs_hash' in state_dict:
@@ -211,8 +210,8 @@ def dict_to_state(state_dict):
     else:
         state_str = state_str + to_padded_hex('')
 
-    if 'current_commitment' in state_dict:
-        state_str = state_str + to_padded_hex(state_dict['current_commitment'])
+    if 'mask' in state_dict:
+        state_str = state_str + to_padded_hex(state_dict['mask'])
     else:
         state_str = state_str + to_padded_hex('')
 
