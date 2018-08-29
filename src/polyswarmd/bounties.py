@@ -3,7 +3,7 @@ import jsonschema
 import uuid
 
 from ethereum.utils import sha3
-from flask import Blueprint, request
+from flask import Blueprint, g, request
 from jsonschema.exceptions import ValidationError
 
 from polyswarmd import eth
@@ -57,11 +57,7 @@ def post_bounties():
     web3 = web3_chains[chain]
     nectar_token = nectar_chains[chain]
     bounty_registry = bounty_chains[chain]
-
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
-    account = web3.toChecksumAddress(account)
+    account = web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
         request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
@@ -180,11 +176,7 @@ def post_bounties_guid_vote(guid):
 
     web3 = web3_chains[chain]
     bounty_registry = bounty_chains[chain]
-
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
-    account = web3.toChecksumAddress(account)
+    account = web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
         request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
@@ -231,11 +223,7 @@ def post_bounties_guid_settle(guid):
 
     web3 = web3_chains[chain]
     bounty_registry = bounty_chains[chain]
-
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
-    account = web3.toChecksumAddress(account)
+    account = web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
         request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
@@ -257,11 +245,7 @@ def post_bounties_guid_assertions(guid):
     web3 = web3_chains[chain]
     nectar_token = nectar_chains[chain]
     bounty_registry = bounty_chains[chain]
-
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
-    account = web3.toChecksumAddress(account)
+    account = web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
         request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
@@ -331,11 +315,7 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
     web3 = web3_chains[chain]
     nectar_token = nectar_chains[chain]
     bounty_registry = bounty_chains[chain]
-
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
-    account = web3.toChecksumAddress(account)
+    account = web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
         request.args.get('base_nonce', web3.eth.getTransactionCount(account)))

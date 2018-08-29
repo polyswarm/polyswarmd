@@ -1,7 +1,7 @@
 import jsonschema
 from jsonschema.exceptions import ValidationError
 
-from flask import Blueprint, request
+from flask import Blueprint, g, request
 
 from polyswarmd.response import success, failure
 from polyswarmd.eth import web3 as web3_chains, build_transaction, nectar_token as nectar_chains
@@ -27,11 +27,7 @@ def send_funds_from(chain):
     web3 = web3_chains[chain]
     nectar_token = nectar_chains[chain]
     erc20_relay_address = erc20_chains[chain]
-
-    account = request.args.get('account')
-    if not account or not web3.isAddress(account):
-        return failure('Source account required', 401)
-    account = web3.toChecksumAddress(account)
+    account = web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
         request.args.get('base_nonce', web3.eth.getTransactionCount(account)))

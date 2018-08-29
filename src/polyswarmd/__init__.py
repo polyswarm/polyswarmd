@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 
 import datetime
+import logging
 
-from flask import Flask, request
+from flask import Flask, g, request
 
-from polyswarmd.config import init_config, whereami
+from polyswarmd.config import init_config
 init_config()
+
+from polyswarmd.config import require_api_key, whereami
+
+if require_api_key:
+    from polyswarmd.db import init_db, db_session, lookup_api_key, add_api_key
+    init_db()
 
 from polyswarmd.eth import misc, web3
 from polyswarmd.response import success, failure, install_error_handlers
@@ -32,6 +39,40 @@ app.register_blueprint(staking, url_prefix='/staking')
 init_websockets(app)
 
 
+@app.teardown_appcontext
+def teardown_appcontext(exception=None):
+    if require_api_key:
+        db_session.remove()
+
+
 @app.before_request
 def before_request():
-    print(datetime.datetime.now(), request.method, request.path)
+    g.user = None
+    g.eth_address = None
+
+    if not require_api_key:
+        g.eth_address = request.args.get('account')
+        if not g.eth_address:
+            return failure('Account must be provided', 400)
+    else:
+        # Ignore prefix if present
+        try:
+            api_key = request.headers.get('Authorization').split()[-1]
+        except:
+            return failure('API key required', 401)
+
+        if api_key:
+            api_key_obj = lookup_api_key(api_key)
+            if api_key_obj:
+                g.user = api_key_obj.eth_address.user
+                g.eth_address = api_key_obj.eth_address.eth_address
+
+        if not g.user or not g.eth_address:
+            return failure('API key required', 401)
+
+
+@app.after_request
+def after_request(response):
+    logging.info('%s %s %s %s', datetime.datetime.now(), request.method,
+                 response.status_code, request.path)
+    return response
