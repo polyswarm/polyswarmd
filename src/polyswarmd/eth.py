@@ -163,9 +163,6 @@ def post_transactions():
         for k, v in events.items():
             ret[k].extend(v)
 
-    
-    print(ret)
-    print(txhashes)
     return success(ret)
 
 
