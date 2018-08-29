@@ -10,9 +10,9 @@ from flask import request
 from flask_sockets import Sockets
 from geventwebsocket import WebSocketError
 
-from polyswarmd.eth import web3 as web3_chains, bounty_registry as bounty_chains, offer_registry
+from polyswarmd.eth import web3 as web3_chains, bounty_registry as bounty_chains, offer_registry, bind_contract, offer_msig_artifact
 from polyswarmd.config import chain_id as chain_ids
-from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict, state_to_dict, new_init_channel_event_to_dict, new_quorum_event_to_dict, settled_bounty_event_to_dict, revealed_assertion_event_to_dict
+from polyswarmd.utils import channel_to_dict, new_cancel_agreement_event_to_dict, new_settle_started_event, new_settle_challenged_event, new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict, state_to_dict, new_init_channel_event_to_dict, new_quorum_event_to_dict, settled_bounty_event_to_dict, revealed_assertion_event_to_dict
 
 
 def init_websockets(app):
@@ -127,6 +127,60 @@ def init_websockets(app):
                 break
             except Exception as e:
                 logging.error('Error in /events: %s', e)
+                continue
+
+    @sockets.route('/events/<uuid:guid>')
+    def channel_events(ws, guid):
+        chain = request.args.get('chain', 'home')
+        if chain != 'side' and chain != 'home':
+            print('Chain must be either home or side', file=sys.stderr)
+            ws.close()
+
+        web3 = web3_chains[chain]
+
+        offer_channel = channel_to_dict(
+            offer_registry.functions.guidToChannel(guid.int).call())
+        msig_address = offer_channel['msig_address']
+        offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+
+        closed_agreement_filter = offer_msig.eventFilter('ClosedAgreement')
+        settle_started_filter = offer_msig.eventFilter('StartedSettle')
+        settle_challenged_filter = offer_msig.eventFilter('SettleStateChallenged')
+
+        while not ws.closed:
+            try:
+                for event in closed_agreement_filter.get_new_entries():
+                    ws.send(
+                        json.dumps({
+                            'event':
+                            'closed_agreement',
+                            'data':
+                            new_cancel_agreement_event_to_dict(event.args),
+                        }))
+
+                for event in settle_started_filter.get_new_entries():
+                    ws.send(
+                        json.dumps({
+                            'event':
+                            'settle_started',
+                            'data':
+                            new_settle_started_event(event.args),
+                        }))
+
+                for event in settle_challenged_filter.get_new_entries():
+                    ws.send(
+                        json.dumps({
+                            'event':
+                            'settle_challenged',
+                            'data':
+                            new_settle_challenged_event(event.args),
+                        }))
+
+                gevent.sleep(1)
+            except WebSocketError:
+                break
+            except Exception as e:
+                print('Error in /events:', e, file=sys.stderr)
                 continue
 
     # for receiving messages about offers that might need to be signed
