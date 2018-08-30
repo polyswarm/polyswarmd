@@ -50,8 +50,15 @@ def init_config():
     with open(config_file, 'r') as f:
         y = yaml.load(f.read())
         ipfs_uri = y['ipfs_uri']
-        db_uri = y['db_uri']
-        require_api_key = y['require_api_key']
+        db_uri = y.get('db_uri')
+        # fallback to env variable in case we can't get this out of our config file.
+        if db_uri is None:
+            db_uri = os.environ.get("DB_URI")
+
+        # require if we've set our DB up.
+
+        if db_uri is not None:
+            require_api_key = True
 
         home = y['homechain']
         eth_uri['home'] = home['eth_uri']
