@@ -4,7 +4,7 @@ set -e
 
 
 
-while getopts ":p" opt; do
+while getopts ":pw" opt; do
   case ${opt} in
     p ) # process option a
       mkdir -p /etc/polyswarmd
@@ -17,7 +17,7 @@ while getopts ":p" opt; do
 
       ;;
 
-    \? )
+    w )
       until [ -e /etc/polyswarmd/.ready ] ; do
           >&2 echo "The migration is incomplete - sleeping..."
           sleep 1
