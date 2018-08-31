@@ -124,8 +124,8 @@ def post_bounties():
     return success({'transactions': transactions})
 
 
-@bounties.route('/window/reveal', methods=['GET'])
-def get_bounty_reveal_window():
+@bounties.route('/parameters', methods=['GET'])
+def get_bounty_parameters():
     chain = request.args.get('chain', 'home')
     if chain != 'side' and chain != 'home':
         return failure('Chain must be either home or side', 400)
@@ -133,22 +133,25 @@ def get_bounty_reveal_window():
     web3 = web3_chains[chain]
     bounty_registry = bounty_chains[chain]
 
+    bounty_fee = bounty_registry.functions.BOUNTY_FEE().call()
+    assertion_fee = bounty_registry.functions.ASSERTION_FEE().call()
+    bounty_amount_minimum = bounty_registry.functions.BOUNTY_AMOUNT_MINIMUM().call()
+    assertion_bid_minimum = bounty_registry.functions.ASSERTION_BID_MINIMUM().call()
+    arbiter_lookback_range = bounty_registry.functions.ARBITER_LOOKBACK_RANGE().call()
+    max_duration = bounty_registry.functions.MAX_DURATION().call()
     assertion_reveal_window = bounty_registry.functions.ASSERTION_REVEAL_WINDOW().call()
+    arbiter_vote_window = bounty_registry.functions.arbiterVoteWindow().call()
 
-    return success({ 'blocks': assertion_reveal_window })
-
-@bounties.route('/window/vote', methods=['GET'])
-def get_bounty_vote_window():
-    chain = request.args.get('chain', 'home')
-    if chain != 'side' and chain != 'home':
-        return failure('Chain must be either home or side', 400)
-
-    web3 = web3_chains[chain]
-    bounty_registry = bounty_chains[chain]
-
-    assertion_vote_window = bounty_registry.functions.arbiterVoteWindow().call()
-
-    return success({ 'blocks': assertion_vote_window })
+    return success({
+        'bounty_fee': bounty_fee,
+        'assertion_fee': assertion_fee,
+        'bounty_amount_minimum': bounty_amount_minimum,
+        'assertion_bid_minimum': assertion_bid_minimum,
+        'arbiter_lookback_range': arbiter_lookback_range,
+        'max_duration': max_duration,
+        'assertion_reveal_window': assertion_reveal_window,
+        'arbiter_vote_window':arbiter_vote_window
+    })
 
 @bounties.route('/<uuid:guid>', methods=['GET'])
 def get_bounties_guid(guid):
