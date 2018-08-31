@@ -76,6 +76,15 @@ def init_websockets(app):
                             new_assertion_event_to_dict(event.args),
                         }))
 
+                for event in reveal_filter.get_new_entries():
+                    ws.send(
+                        json.dumps({
+                            'event':
+                            'reveal',
+                            'data':
+                            revealed_assertion_event_to_dict(event.args),
+                        }))
+
                 for event in verdict_filter.get_new_entries():
                     ws.send(
                         json.dumps({
@@ -89,7 +98,7 @@ def init_websockets(app):
                     ws.send(
                         json.dumps({
                             'event':
-                            'qourum',
+                            'quorum',
                             'data':
                             new_quorum_event_to_dict(event.args),
                         }))
@@ -110,15 +119,6 @@ def init_websockets(app):
                             'initialized_channel',
                             'data':
                             new_init_channel_event_to_dict(event.args),
-                        }))
-
-                for event in reveal_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event':
-                            'reveal',
-                            'data':
-                            revealed_assertion_event_to_dict(event.args),
                         }))
 
                 gevent.sleep(1)
