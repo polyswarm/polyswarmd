@@ -9,6 +9,28 @@ from polyswarmd.response import success, failure
 staking = Blueprint('staking', __name__)
 
 
+@staking.route('/parameters', methods=['GET'])
+def get_staking_parameters():
+    chain = request.args.get('chain', 'home')
+    if chain != 'side' and chain != 'home':
+        return failure('Chain must be either home or side', 400)
+
+    web3 = web3_chains[chain]
+    arbiter_staking = arbiter_chains[chain]
+
+    minimum_stake = arbiter_staking.functions.MINIMUM_STAKE().call()
+    maximum_stake = arbiter_staking.functions.MAXIMUM_STAKE().call()
+    vote_ratio_numerator = arbiter_staking.functions.VOTE_RATIO_NUMERATOR().call()
+    vote_ratio_denominator = arbiter_staking.functions.VOTE_RATIO_DENOMINATOR().call()
+
+    return success({
+        'minimum_stake': minimum_stake,
+        'maximum_stake': maximum_stake,
+        'vote_ratio_numerator': vote_ratio_numerator,
+        'vote_ratio_denominator': vote_ratio_denominator
+    })
+
+
 @staking.route('/deposit', methods=['POST'])
 def post_arbiter_staking_deposit():
     # Must read chain before account to have a valid web3 ref

@@ -16,9 +16,9 @@ from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict
 bounties = Blueprint('bounties', __name__)
 
 
-def calculate_bloom(arts):
+def calculate_bloom(artifacts):
     bf = BloomFilter()
-    for _, h in arts:
+    for _, h in artifacts:
         bf.add(h.encode('utf-8'))
 
     v = int(bf)
