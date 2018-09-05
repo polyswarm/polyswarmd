@@ -85,39 +85,40 @@ def new_verdict_event_to_dict(new_verdict_event):
     return {
         'bounty_guid': str(uuid.UUID(int=new_verdict_event.bountyGuid)),
         'verdicts': int_to_bool_list(new_verdict_event.verdicts),
-        'voter': new_verdict_event.voter
+        'voter': new_verdict_event.voter,
     }
 
 def settled_bounty_event_to_dict(new_settled_event):
     return {
         'settled_block': new_settled_event.block,
-        'settler': new_settled_event.settler
+        'settler': new_settled_event.settler,
     }
 
 def new_quorum_event_to_dict(new_quorum_event):
     return {
-        'quorum_block': new_quorum_event.block
+        'bounty_guid': str(uuid.UUID(int=new_quorum_event.bountyGuid)),
+        'quorum_block': new_quorum_event.block,
     }
 
 def transfer_event_to_dict(transfer_event):
     return {
         'from': transfer_event['from'],
         'to': transfer_event['to'],
-        'value': str(transfer_event['value'])
+        'value': str(transfer_event['value']),
     }
 
 
 def new_deposit_event_to_dict(deposit_event):
     return {
         'from': deposit_event['from'],
-        'value': deposit_event['value']
+        'value': deposit_event['value'],
     }
 
 
 def new_withdrawal_event_to_dict(withdrawal_event):
     return {
         'to': withdrawal_event['to'],
-        'value': withdrawal_event['value']
+        'value': withdrawal_event['value'],
     }
 
 
@@ -125,7 +126,7 @@ def channel_to_dict(channel_data):
     return {
         'msig_address': channel_data[0],
         'ambassador': channel_data[1],
-        'expert': channel_data[2]
+        'expert': channel_data[2],
     }
 
 def state_to_dict(state):
