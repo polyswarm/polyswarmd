@@ -150,8 +150,12 @@ def post_transactions():
             continue
 
         # TODO: Additional validation (addresses, methods, etc)
-
-        txhashes.append(w3.eth.sendRawTransaction(HexBytes(raw_tx)))
+        try:
+            txhashes.append(w3.eth.sendRawTransaction(HexBytes(raw_tx)))
+        except ValueError as e:
+            logging.warning(
+                'Got invalid transaction error %s', e)
+            return failure({'error': str(e)}, 400)
 
     ret = defaultdict(list)
     for txhash in txhashes:
