@@ -1,11 +1,8 @@
 import uuid
-
 import json
 import jsonschema
 from jsonschema.exceptions import ValidationError
-
 from flask import Blueprint, g, request
-
 from websocket import create_connection
 
 from polyswarmd.eth import web3 as web3_chains, build_transaction, \
@@ -291,10 +288,10 @@ def post_close(guid):
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message)
 
-    state = body['state']
+    state = web3.toBytes(hexstr=body['state'])
     v = body['v']
-    r = body['r']
-    s = body['s']
+    r = list(map(lambda s: web3.toBytes(hexstr=s), body['r']))
+    s = list(map(lambda s: web3.toBytes(hexstr=s), body['s']))
 
     transactions = [
         build_transaction(
@@ -330,14 +327,17 @@ def post_close_challenged(guid):
             'r': {
                 'type': 'array',
                 'minLength': 2,
+                'maxLength': 2,
             },
             'v': {
                 'type': 'array',
-                'minimum': 2,
+                'minLength': 2,
+                'maxLength': 2,
             },
             's': {
                 'type': 'array',
-                'minLength': 2
+                'minLength': 2,
+                'maxLength': 2,
             },
         },
         'required': ['state', 'r', 'v', 's'],
@@ -348,10 +348,10 @@ def post_close_challenged(guid):
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message)
 
-    state = body['state']
+    state = web3.toBytes(hexstr=body['state'])
     v = body['v']
-    r = body['r']
-    s = body['s']
+    r = list(map(lambda s: web3.toBytes(hexstr=s), body['r']))
+    s = list(map(lambda s: web3.toBytes(hexstr=s), body['s']))
 
     transactions = [
         build_transaction(
@@ -407,10 +407,10 @@ def post_settle(guid):
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message)
 
-    state = body['state']
+    state = web3.toBytes(hexstr=body['state'])
     v = body['v']
-    r = body['r']
-    s = body['s']
+    r = list(map(lambda s: web3.toBytes(hexstr=s), body['r']))
+    s = list(map(lambda s: web3.toBytes(hexstr=s), body['s']))
 
     transactions = [
         build_transaction(
