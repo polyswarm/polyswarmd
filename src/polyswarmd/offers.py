@@ -4,7 +4,6 @@ import jsonschema
 from jsonschema.exceptions import ValidationError
 from flask import Blueprint, g, request
 from websocket import create_connection
-
 from polyswarmd.eth import web3 as web3_chains, build_transaction, \
         nectar_token, offer_registry, bind_contract, offer_msig_artifact, offer_lib
 from polyswarmd.response import success, failure
@@ -236,7 +235,7 @@ def post_join(guid):
 
     transactions = [
         build_transaction(
-            offer_msig.functions.joinAgreement(state, v, r, s), chain,
+            offer_msig.functions.joinAgreement(state, v, to_padded_hex(r), to_padded_hex(s)), chain,
             base_nonce),
     ]
 
@@ -517,10 +516,10 @@ def create_state():
 
     if 'verdicts' in body and not 'mask' in body or 'mask' in body and not 'verdicts' in body:
         return failure('Invalid JSON: Both `verdicts` and `mask` properties must be sent')
-    elif 'verdicts' in body and 'mask' in body:
+    elif 'verdicts' in body and 'mask' in body:    
         body['verdicts'] = bool_list_to_int(body['verdicts'])
         body['mask'] = bool_list_to_int(body['mask'])
-        
+
     return success({'state': dict_to_state(body)})
 
 
@@ -569,10 +568,10 @@ def post_challange(guid):
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message)
 
-    state = body['state']
+    state = web3.toBytes(hexstr=body['state'])
     v = body['v']
-    r = body['r']
-    s = body['s']
+    r = list(map(lambda s: web3.toBytes(hexstr=s), body['r']))
+    s = list(map(lambda s: web3.toBytes(hexstr=s), body['s']))
 
     transactions = [
         build_transaction(
