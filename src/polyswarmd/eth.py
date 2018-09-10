@@ -155,7 +155,7 @@ def post_transactions():
         except ValueError as e:
             logging.warning(
                 'Got invalid transaction error %s', e)
-            return failure({'error': str(e)}, 400)
+            return failure(str(e), 400)
 
     ret = defaultdict(list)
     for txhash in txhashes:

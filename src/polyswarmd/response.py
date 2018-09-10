@@ -20,4 +20,4 @@ def success(result=None):
 
 
 def failure(message, code=500):
-    return jsonify({'status': 'FAIL', 'message': message}), code
+    return jsonify({'status': 'FAIL', 'errors': message}), code
