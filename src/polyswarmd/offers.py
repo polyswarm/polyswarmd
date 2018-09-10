@@ -3,7 +3,6 @@ import json
 import jsonschema
 from jsonschema.exceptions import ValidationError
 from flask import Blueprint, g, request
-from websocket import create_connection
 from polyswarmd.eth import web3 as web3_chains, build_transaction, \
         nectar_token, offer_registry, bind_contract, offer_msig_artifact, offer_lib
 from polyswarmd.response import success, failure
