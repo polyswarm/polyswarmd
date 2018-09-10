@@ -257,6 +257,12 @@ def init_websockets(app):
                 if 'artifact' in body:
                     ret['artifact'] = body['artifact']
 
+                if body['type'] != 'accept' and body['type'] != 'payout':
+                    # delete zero verdict
+                    if 'mask' in ret['state']:
+                        del ret['state']['mask']
+                        del ret['state']['verdicts']
+
                 for message_websocket in message_sockets[guid]:
                     if not message_websocket.closed:
                         message_websocket.send(

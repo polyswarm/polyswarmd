@@ -2,7 +2,6 @@ import re
 import uuid
 from polyswarmd.eth import offer_lib, web3 as web3_chains, zero_address
 
-
 def bool_list_to_int(bs):
     return sum([1 << n if b else 0 for n, b in enumerate(bs)])
 
@@ -133,6 +132,7 @@ def state_to_dict(state):
     # gets state of non required state
     offer_info = offer_lib.functions.getOfferState(state).call()
     web3 = web3_chains['home']
+
     return {
         'isClosed': offer_lib.functions.getCloseFlag(state).call(),
         'nonce': offer_lib.functions.getSequence(state).call(),
@@ -143,7 +143,6 @@ def state_to_dict(state):
         'expert_balance': offer_lib.functions.getBalanceB(state).call(),
         'token': offer_lib.functions.getTokenAddress(state).call(),
         'offer_amount': web3.toInt(offer_info[1]),
-        'artifact_hash': web3.toText(offer_info[2]).replace('\x00', ''),
         'mask': int_to_bool_list(web3.toInt(offer_info[6])),
         'verdicts': int_to_bool_list(web3.toInt(offer_info[7])),
     }
@@ -209,7 +208,7 @@ def dict_to_state(state_dict):
     state_str = state_str + to_padded_hex(int(state_dict['guid']))
     state_str = state_str + to_padded_hex(state_dict['offer_amount'])
 
-    # no longer storing in state object due to size limitations
+    # no longer storing in contract state
     if 'artifact_hash' in state_dict:
         state_str = state_str + to_padded_hex('')
 
