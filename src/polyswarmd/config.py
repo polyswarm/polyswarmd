@@ -91,7 +91,11 @@ def set_config(**kwargs):
     }
     ipfs_uri = kwargs.get('ipfs_uri', 'http://localhost:5001')
     db_uri = kwargs.get('db_uri', 'sqlite:///tmp/polyswarmd.sqlite')
-    free = kwargs.get('free', False)
+
+    free = {
+        'home': kwargs.get('free', False),
+        'side': kwargs.get('free', False)
+    }
 
     nectar_token_address = {
         'home': kwargs.get('nectar_token_address', ''),
