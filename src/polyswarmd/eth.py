@@ -1,3 +1,4 @@
+import gevent
 import json
 import jsonschema
 import logging
@@ -184,7 +185,20 @@ def events_from_transaction(txhash, chain):
 
     # TODO: Check for out of gas, other
     # TODO: Report contract errors
-    receipt = web3[chain].eth.waitForTransactionReceipt(txhash)
+    try:
+        with gevent.Timeout(60, Exception('Timeout waiting for transaction receipt')) as timeout:
+            while True:
+                receipt = web3[chain].eth.getTransactionReceipt(txhash)
+                if receipt is not None:
+                    break
+                gevent.sleep(0.1)
+    except Exception:
+        return {
+            'errors':
+            ['transaction {0}: timeout waiting for receipt'.format(bytes(txhash).hex())]
+        }
+
+
     txhash = bytes(txhash).hex()
     if not receipt:
         return {
