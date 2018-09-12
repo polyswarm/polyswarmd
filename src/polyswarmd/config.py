@@ -76,7 +76,7 @@ def init_config():
         bounty_registry_address['side'] = side['bounty_registry_address']
         erc20_relay_address['side'] = side['erc20_relay_address']
         chain_id['side'] = side['chain_id']
-        free["home"] = side.get('free', False)
+        free["side"] = side.get('free', False)
 
 
 def set_config(**kwargs):
@@ -91,7 +91,11 @@ def set_config(**kwargs):
     }
     ipfs_uri = kwargs.get('ipfs_uri', 'http://localhost:5001')
     db_uri = kwargs.get('db_uri', 'sqlite:///tmp/polyswarmd.sqlite')
-    free = kwargs.get('free', False)
+
+    free = {
+        'home': kwargs.get('free', False),
+        'side': kwargs.get('free', False)
+    }
 
     nectar_token_address = {
         'home': kwargs.get('nectar_token_address', ''),
