@@ -76,7 +76,7 @@ def init_config():
         bounty_registry_address['side'] = side['bounty_registry_address']
         erc20_relay_address['side'] = side['erc20_relay_address']
         chain_id['side'] = side['chain_id']
-        free["home"] = side.get('free', False)
+        free["side"] = side.get('free', False)
 
 
 def set_config(**kwargs):
