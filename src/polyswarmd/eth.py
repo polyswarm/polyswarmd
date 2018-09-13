@@ -210,8 +210,8 @@ def events_from_transaction(txhash, chain):
     if receipt.status != 1:
         return {
             'errors': [
-                'transaction {0}: transaction failed, check parameters'.format(
-                    txhash)
+                'transaction {0}: transaction failed at block {1}, check parameters'.format(
+                    txhash, receipt.blockNumber)
             ]
         }
 
