@@ -14,7 +14,7 @@ from web3 import Web3, HTTPProvider
 from web3.middleware import geth_poa_middleware
 
 from polyswarmd.artifacts import is_valid_ipfshash
-from polyswarmd.config import config_location, chain_id, eth_uri, nectar_token_address, bounty_registry_address, offer_registry_address, whereami, free
+from polyswarmd.config import config_location, chain_id, eth_uri as eth_chains, nectar_token_address as nectar_chains, bounty_registry_address as bounty_chains, offer_registry_address, whereami, free
 from polyswarmd.response import success, failure
 
 misc = Blueprint('misc', __name__)
@@ -46,30 +46,39 @@ offer_registry = None
 offer_lib = None
 
 for chain in ('home', 'side'):
-    temp = Web3(HTTPProvider(eth_uri[chain]))
-    temp.middleware_stack.inject(geth_poa_middleware, layer=0)
-    web3[chain] = temp
-    nectar_token[chain] = bind_contract(
-        web3[chain], nectar_token_address[chain],
-        os.path.join(config_location, 'contracts', 'NectarToken.json'))
+    # Grab all the values for the chain. If they aren't defined, skip
+    eth_uri=eth_chains.get(chain)
+    bounty_registry_address = bounty_chains.get(chain)
+    nectar_token_address = nectar_chains.get(chain)
 
-    bounty_registry[chain] = bind_contract(
-        web3[chain], bounty_registry_address[chain],
-        os.path.join(config_location, 'contracts', 'BountyRegistry.json'))
-    arbiter_staking[chain] = bind_contract(
-        web3[chain], bounty_registry[chain].functions.staking().call(),
-        os.path.join(config_location, 'contracts', 'ArbiterStaking.json'))
+    if ( eth_uri is not None
+        and bounty_registry_address is not None
+        and nectar_token_address is not None ):
 
-    if chain == 'home':
-        offer_registry = bind_contract(
-            web3[chain], offer_registry_address[chain],
-            os.path.join(config_location, 'contracts', 'OfferRegistry.json'))
+        temp = Web3(HTTPProvider(eth_uri))
+        temp.middleware_stack.inject(geth_poa_middleware, layer=0)
+        web3[chain] = temp
+        nectar_token[chain] = bind_contract(
+            web3[chain], nectar_token_address,
+            os.path.join(config_location, 'contracts', 'NectarToken.json'))
 
-        offer_lib_address = offer_registry.functions.offerLib().call()
+        bounty_registry[chain] = bind_contract(
+            web3[chain], bounty_registry_address,
+            os.path.join(config_location, 'contracts', 'BountyRegistry.json'))
+        arbiter_staking[chain] = bind_contract(
+            web3[chain], bounty_registry[chain].functions.staking().call(),
+            os.path.join(config_location, 'contracts', 'ArbiterStaking.json'))
 
-        offer_lib = bind_contract(
-            web3[chain], offer_lib_address,
-            os.path.join(config_location, 'contracts', 'OfferLib.json'))
+        if chain == 'home':
+            offer_registry = bind_contract(
+                web3[chain], offer_registry_address[chain],
+                os.path.join(config_location, 'contracts', 'OfferRegistry.json'))
+
+            offer_lib_address = offer_registry.functions.offerLib().call()
+
+            offer_lib = bind_contract(
+                web3[chain], offer_lib_address,
+                os.path.join(config_location, 'contracts', 'OfferLib.json'))
 
 
 @misc.route('/syncing', methods=['GET'])
