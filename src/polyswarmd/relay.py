@@ -4,37 +4,35 @@ from jsonschema.exceptions import ValidationError
 from flask import Blueprint, g, request
 
 from polyswarmd.response import success, failure
-from polyswarmd.eth import web3 as web3_chains, build_transaction, nectar_token as nectar_chains
-from polyswarmd.config import erc20_relay_address as erc20_chains
+from polyswarmd.chains import select_chain
+from polyswarmd.eth import build_transaction
 
 relay = Blueprint('relay', __name__)
 
-
 @relay.route('/deposit', methods=['POST'])
+@select_chain(chain_name='home')
 def deposit_funds():
     # Move funds from home to side
-    return send_funds_from('home')
+    return send_funds_from()
 
 
 @relay.route('/withdrawal', methods=['POST'])
+@select_chain(chain_name='side')
 def withdraw_funds():
     # Move funds from side to home
-    return send_funds_from('side')
+    return send_funds_from()
 
 
-def send_funds_from(chain):
+def send_funds_from():
     # Grab correct versions by chain type
-    web3 = web3_chains[chain]
-    nectar_token = nectar_chains[chain]
-    erc20_relay_address = erc20_chains[chain]
-    account = web3.toChecksumAddress(g.eth_address)
+    account = g.web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
-        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
+        request.args.get('base_nonce', g.web3.eth.getTransactionCount(account)))
 
-    if not erc20_relay_address or not web3.isAddress(erc20_relay_address):
+    if not g.erc20_relay_address or not g.web3.isAddress(g.erc20_relay_address):
         return failure('ERC20 Relay misconfigured', 500)
-    erc20_relay_address = web3.toChecksumAddress(erc20_relay_address)
+    erc20_relay_address = g.web3.toChecksumAddress(g.erc20_relay_address)
 
     schema = {
         'type': 'object',
@@ -59,8 +57,7 @@ def send_funds_from(chain):
 
     transactions = [
         build_transaction(
-            nectar_token.functions.transfer(erc20_relay_address, amount),
-            chain, base_nonce),
+            g.nectar_token.functions.transfer(erc20_relay_address, amount), base_nonce),
     ]
 
     return success({'transactions': transactions})

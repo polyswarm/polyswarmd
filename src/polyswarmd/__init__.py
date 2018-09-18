@@ -14,7 +14,7 @@ if require_api_key:
     from polyswarmd.db import init_db, db_session, lookup_api_key, add_api_key
     init_db()
 
-from polyswarmd.eth import misc, web3
+from polyswarmd.eth import misc
 from polyswarmd.response import success, failure, install_error_handlers
 from polyswarmd.utils import bool_list_to_int, int_to_bool_list
 from polyswarmd.artifacts import artifacts

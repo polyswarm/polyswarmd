@@ -3,8 +3,8 @@ import json
 import jsonschema
 from jsonschema.exceptions import ValidationError
 from flask import Blueprint, g, request
-from polyswarmd.eth import web3 as web3_chains, build_transaction, \
-        nectar_token, offer_registry, bind_contract, offer_msig_artifact, offer_lib
+from polyswarmd.chains import select_chain
+from polyswarmd.eth import build_transaction, offer_msig_artifact, bind_contract
 from polyswarmd.response import success, failure
 from polyswarmd.utils import channel_to_dict, validate_ws_url, dict_to_state, to_padded_hex, bool_list_to_int
 
@@ -13,12 +13,12 @@ offers = Blueprint('offers', __name__)
 
 
 @offers.route('', methods=['POST'])
+@select_chain(chain_name='home')
 def post_create_offer_channel():
-    web3 = web3_chains[chain]
-    account = web3.toChecksumAddress(g.eth_address)
+    account = g.web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
-        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
+        request.args.get('base_nonce', g.web3.eth.getTransactionCount(account)))
 
     body = request.get_json()
 
@@ -47,14 +47,14 @@ def post_create_offer_channel():
         return failure('Invalid JSON: ' + e.message)
 
     guid = uuid.uuid4()
-    ambassador = web3.toChecksumAddress(body['ambassador'])
-    expert = web3.toChecksumAddress(body['expert'])
+    ambassador = g.web3.toChecksumAddress(body['ambassador'])
+    expert = g.web3.toChecksumAddress(body['expert'])
     settlement_period_length = body['settlementPeriodLength']
 
     transactions = [
         build_transaction(
-            offer_registry.functions.initializeOfferChannel(
-                guid.int, ambassador, expert, settlement_period_length), chain,
+            g.offer_registry.functions.initializeOfferChannel(
+                guid.int, ambassador, expert, settlement_period_length),
             base_nonce),
     ]
 
@@ -62,16 +62,16 @@ def post_create_offer_channel():
 
 
 @offers.route('/<uuid:guid>/uri', methods=['POST'])
+@select_chain(chain_name='home')
 def post_uri(guid):
-    web3 = web3_chains[chain]
     offer_channel = channel_to_dict(
-        offer_registry.functions.guidToChannel(guid.int).call())
+        g.offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-    account = web3.toChecksumAddress(g.eth_address)
+    offer_msig = bind_contract(g.web3, msig_address, offer_msig_artifact)
+    account = g.web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
-        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
+        request.args.get('base_nonce', g.web3.eth.getTransactionCount(account)))
 
     body = request.get_json()
 
@@ -97,8 +97,7 @@ def post_uri(guid):
     transactions = [
         build_transaction(
             offer_msig.functions.setCommunicationUri(
-                web3.toHex(text=websocket_uri)),
-            chain,
+                g.web3.toHex(text=websocket_uri)),
             base_nonce),
     ]
 
@@ -106,16 +105,16 @@ def post_uri(guid):
 
 
 @offers.route('/<uuid:guid>/open', methods=['POST'])
+@select_chain(chain_name='home')
 def post_open(guid):
-    web3 = web3_chains[chain]
     offer_channel = channel_to_dict(
-        offer_registry.functions.guidToChannel(guid.int).call())
+        g.offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-    account = web3.toChecksumAddress(g.eth_address)
+    offer_msig = bind_contract(g.web3, msig_address, offer_msig_artifact)
+    account = g.web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
-        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
+        request.args.get('base_nonce', g.web3.eth.getTransactionCount(account)))
 
     body = request.get_json()
 
@@ -152,14 +151,14 @@ def post_open(guid):
     r = body['r']
     s = body['s']
 
-    approve_amount = offer_lib.functions.getBalanceA(state).call()
+    approve_amount = g.offer_lib.functions.getBalanceA(state).call()
 
     transactions = [
         build_transaction(
-            nectar_token['home'].functions.approve(
-                msig_address, approve_amount), chain, base_nonce),
+            g.nectar_token['home'].functions.approve(
+                msig_address, approve_amount),  base_nonce),
         build_transaction(
-            offer_msig.functions.openAgreement(to_padded_hex(state), v, to_padded_hex(r), to_padded_hex(s)), chain,
+            offer_msig.functions.openAgreement(to_padded_hex(state), v, to_padded_hex(r), to_padded_hex(s)),
             base_nonce + 1),
     ]
 
@@ -167,35 +166,35 @@ def post_open(guid):
 
 
 @offers.route('/<uuid:guid>/cancel', methods=['POST'])
+@select_chain(chain_name='home')
 def post_cancel(guid):
-    web3 = web3_chains[chain]
     offer_channel = channel_to_dict(
-        offer_registry.functions.guidToChannel(guid.int).call())
+        g.offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-    account = web3.toChecksumAddress(g.eth_address)
+    offer_msig = bind_contract(g.web3, msig_address, offer_msig_artifact)
+    account = g.web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
-        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
+        request.args.get('base_nonce', g.web3.eth.getTransactionCount(account)))
 
     transactions = [
-        build_transaction(offer_msig.functions.cancel(), chain, base_nonce),
+        build_transaction(offer_msig.functions.cancel(), base_nonce),
     ]
 
     return success({'transactions': transactions})
 
 
 @offers.route('/<uuid:guid>/join', methods=['POST'])
+@select_chain(chain_name='home')
 def post_join(guid):
-    web3 = web3_chains[chain]
     offer_channel = channel_to_dict(
-        offer_registry.functions.guidToChannel(guid.int).call())
+        g.offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-    account = web3.toChecksumAddress(g.eth_address)
+    offer_msig = bind_contract(g.web3, msig_address, offer_msig_artifact)
+    account = g.web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
-        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
+        request.args.get('base_nonce', g.web3.eth.getTransactionCount(account)))
 
     body = request.get_json()
 
@@ -234,7 +233,7 @@ def post_join(guid):
 
     transactions = [
         build_transaction(
-            offer_msig.functions.joinAgreement(state, v, to_padded_hex(r), to_padded_hex(s)), chain,
+            offer_msig.functions.joinAgreement(state, v, to_padded_hex(r), to_padded_hex(s)),
             base_nonce),
     ]
 
@@ -242,16 +241,16 @@ def post_join(guid):
 
 
 @offers.route('/<uuid:guid>/close', methods=['POST'])
+@select_chain(chain_name='home')
 def post_close(guid):
-    web3 = web3_chains[chain]
     offer_channel = channel_to_dict(
-        offer_registry.functions.guidToChannel(guid.int).call())
+        g.offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-    account = web3.toChecksumAddress(g.eth_address)
+    offer_msig = bind_contract(g.web3, msig_address, offer_msig_artifact)
+    account = g.web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
-        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
+        request.args.get('base_nonce', g.web3.eth.getTransactionCount(account)))
 
     body = request.get_json()
 
@@ -286,14 +285,14 @@ def post_close(guid):
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message)
 
-    state = web3.toBytes(hexstr=body['state'])
+    state = g.web3.toBytes(hexstr=body['state'])
     v = body['v']
-    r = list(map(lambda s: web3.toBytes(hexstr=s), body['r']))
-    s = list(map(lambda s: web3.toBytes(hexstr=s), body['s']))
+    r = list(map(lambda s: g.web3.toBytes(hexstr=s), body['r']))
+    s = list(map(lambda s: g.web3.toBytes(hexstr=s), body['s']))
 
     transactions = [
         build_transaction(
-            offer_msig.functions.closeAgreement(state, v, r, s), chain,
+            offer_msig.functions.closeAgreement(state, v, r, s),
             base_nonce),
     ]
 
@@ -302,16 +301,16 @@ def post_close(guid):
 
 # for closing a challenged state with a timeout
 @offers.route('/<uuid:guid>/closeChallenged', methods=['POST'])
+@select_chain(chain_name='home')
 def post_close_challenged(guid):
-    web3 = web3_chains[chain]
     offer_channel = channel_to_dict(
-        offer_registry.functions.guidToChannel(guid.int).call())
+        g.offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-    account = web3.toChecksumAddress(g.eth_address)
+    offer_msig = bind_contract(g.web3, msig_address, offer_msig_artifact)
+    account = g.web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
-        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
+        request.args.get('base_nonce', g.web3.eth.getTransactionCount(account)))
 
     body = request.get_json()
 
@@ -346,31 +345,31 @@ def post_close_challenged(guid):
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message)
 
-    state = web3.toBytes(hexstr=body['state'])
+    state = g.web3.toBytes(hexstr=body['state'])
     v = body['v']
-    r = list(map(lambda s: web3.toBytes(hexstr=s), body['r']))
-    s = list(map(lambda s: web3.toBytes(hexstr=s), body['s']))
+    r = list(map(lambda s: g.web3.toBytes(hexstr=s), body['r']))
+    s = list(map(lambda s: g.web3.toBytes(hexstr=s), body['s']))
 
     transactions = [
         build_transaction(
             offer_msig.functions.closeAgreementWithTimeout(state, v, r, s),
-            chain, base_nonce),
+            base_nonce),
     ]
 
     return success({'transactions': transactions})
 
 
 @offers.route('/<uuid:guid>/settle', methods=['POST'])
+@select_chain(chain_name='home')
 def post_settle(guid):
-    web3 = web3_chains[chain]
     offer_channel = channel_to_dict(
-        offer_registry.functions.guidToChannel(guid.int).call())
+        g.offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-    account = web3.toChecksumAddress(g.eth_address)
+    offer_msig = bind_contract(g.web3, msig_address, offer_msig_artifact)
+    account = g.web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
-        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
+        request.args.get('base_nonce', g.web3.eth.getTransactionCount(account)))
 
     body = request.get_json()
 
@@ -405,14 +404,14 @@ def post_settle(guid):
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message)
 
-    state = web3.toBytes(hexstr=body['state'])
+    state = g.web3.toBytes(hexstr=body['state'])
     v = body['v']
-    r = list(map(lambda s: web3.toBytes(hexstr=s), body['r']))
-    s = list(map(lambda s: web3.toBytes(hexstr=s), body['s']))
+    r = list(map(lambda s: g.web3.toBytes(hexstr=s), body['r']))
+    s = list(map(lambda s: g.web3.toBytes(hexstr=s), body['s']))
 
     transactions = [
         build_transaction(
-            offer_msig.functions.startSettle(state, v, r, s), chain,
+            offer_msig.functions.startSettle(state, v, r, s),
             base_nonce),
     ]
 
@@ -420,6 +419,7 @@ def post_settle(guid):
 
 
 @offers.route('/state', methods=['POST'])
+@select_chain(chain_name='home')
 def create_state():
 
     body = request.get_json()
@@ -511,11 +511,11 @@ def create_state():
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message)
 
-    body['token_address'] = str(nectar_token[chain].address)
+    body['token_address'] = str(g.nectar_token.address)
 
     if 'verdicts' in body and not 'mask' in body or 'mask' in body and not 'verdicts' in body:
         return failure('Invalid JSON: Both `verdicts` and `mask` properties must be sent')
-    elif 'verdicts' in body and 'mask' in body:    
+    elif 'verdicts' in body and 'mask' in body:
         body['verdicts'] = bool_list_to_int(body['verdicts'])
         body['mask'] = bool_list_to_int(body['mask'])
 
@@ -523,16 +523,16 @@ def create_state():
 
 
 @offers.route('/<uuid:guid>/challenge', methods=['POST'])
+@select_chain(chain_name='home')
 def post_challange(guid):
-    web3 = web3_chains[chain]
     offer_channel = channel_to_dict(
-        offer_registry.functions.guidToChannel(guid.int).call())
+        g.offer_registry.functions.guidToChannel(guid.int).call())
     msig_address = offer_channel['msig_address']
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
-    account = web3.toChecksumAddress(g.eth_address)
+    offer_msig = bind_contract(g.web3, msig_address, offer_msig_artifact)
+    account = g.web3.toChecksumAddress(g.eth_address)
 
     base_nonce = int(
-        request.args.get('base_nonce', web3.eth.getTransactionCount(account)))
+        request.args.get('base_nonce', g.web3.eth.getTransactionCount(account)))
 
     body = request.get_json()
 
@@ -567,32 +567,33 @@ def post_challange(guid):
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message)
 
-    state = web3.toBytes(hexstr=body['state'])
+    state = g.web3.toBytes(hexstr=body['state'])
     v = body['v']
-    r = list(map(lambda s: web3.toBytes(hexstr=s), body['r']))
-    s = list(map(lambda s: web3.toBytes(hexstr=s), body['s']))
+    r = list(map(lambda s: g.web3.toBytes(hexstr=s), body['r']))
+    s = list(map(lambda s: g.web3.toBytes(hexstr=s), body['s']))
 
     transactions = [
         build_transaction(
-            offer_msig.functions.challengeSettle(state, v, r, s), chain,
+            offer_msig.functions.challengeSettle(state, v, r, s),
             base_nonce),
     ]
 
     return success({'transactions': transactions})
 
 @offers.route('/<uuid:guid>', methods=['GET'])
+@select_chain(chain_name='home')
 def get_channel_address(guid):
-    offer_channel = offer_registry.functions.guidToChannel(guid.int).call()
+    offer_channel = g.offer_registry.functions.guidToChannel(guid.int).call()
 
     return success({'offer_channel': channel_to_dict(offer_channel)})
 
 
 @offers.route('/<uuid:guid>/settlementPeriod', methods=['GET'])
+@select_chain(chain_name='home')
 def get_settlement_period(guid):
-    web3 = web3_chains[chain]
-    offer_channel = offer_registry.functions.guidToChannel(guid.int).call()
+    offer_channel = g.offer_registry.functions.guidToChannel(guid.int).call()
     channel_data = channel_to_dict(offer_channel)
-    offer_msig = bind_contract(web3, channel_data['msig_address'],
+    offer_msig = bind_contract(g.web3, channel_data['msig_address'],
                                offer_msig_artifact)
 
     settlement_period_end = offer_msig.functions.settlementPeriodEnd().call()
@@ -601,36 +602,36 @@ def get_settlement_period(guid):
 
 
 @offers.route('/<uuid:guid>/websocket', methods=['GET'])
+@select_chain(chain_name='home')
 def get_websocket(guid):
-    web3 = web3_chains[chain]
-    offer_channel = offer_registry.functions.guidToChannel(guid.int).call()
+    offer_channel = g.offer_registry.functions.guidToChannel(guid.int).call()
     channel_data = channel_to_dict(offer_channel)
     msig_address = channel_data['msig_address']
-    offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+    offer_msig = bind_contract(g.web3, msig_address, offer_msig_artifact)
     socket_uri = offer_msig.functions.websocketUri().call()
     # TODO find a better way than replace
-    socket_uri = web3.toText(socket_uri).replace('\u0000', '')
+    socket_uri = g.web3.toText(socket_uri).replace('\u0000', '')
 
     if not validate_ws_url(socket_uri):
         return failure(
             'Contract does not have a valid websocket uri',
             400)
-        
+
     return success({'websocket': socket_uri})
 
 
 @offers.route('pending', methods=['GET'])
+@select_chain(chain_name='home')
 def get_pending():
-    web3 = web3_chains[chain]
     offers_pending = []
-    num_of_offers = offer_registry.functions.getNumberOfOffers().call()
+    num_of_offers = g.offer_registry.functions.getNumberOfOffers().call()
 
     for i in range(0, num_of_offers):
-        guid = offer_registry.functions.channelsGuids(i).call()
-        offer_channel = offer_registry.functions.guidToChannel(guid).call()
+        guid = g.offer_registry.functions.channelsGuids(i).call()
+        offer_channel = g.offer_registry.functions.guidToChannel(guid).call()
         channel_data = channel_to_dict(offer_channel)
         msig_address = channel_data['msig_address']
-        offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+        offer_msig = bind_contract(g.web3, msig_address, offer_msig_artifact)
         pending_channel = offer_msig.functions.isPending().call()
         if pending_channel:
             offers_pending.append({'guid': guid, 'address': msig_address})
@@ -639,17 +640,17 @@ def get_pending():
 
 
 @offers.route('opened', methods=['GET'])
+@select_chain(chain_name='home')
 def get_opened():
     offers_opened = []
-    web3 = web3_chains[chain]
-    num_of_offers = offer_registry.functions.getNumberOfOffers().call()
+    num_of_offers = g.offer_registry.functions.getNumberOfOffers().call()
 
     for i in range(0, num_of_offers):
-        guid = offer_registry.functions.channelsGuids(i).call()
-        offer_channel = offer_registry.functions.guidToChannel(guid).call()
+        guid = g.offer_registry.functions.channelsGuids(i).call()
+        offer_channel = g.offer_registry.functions.guidToChannel(guid).call()
         channel_data = channel_to_dict(offer_channel)
         msig_address = channel_data['msig_address']
-        offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+        offer_msig = bind_contract(g.web3, msig_address, offer_msig_artifact)
         opened_channel = offer_msig.functions.isOpen().call()
         if opened_channel:
             offers_opened.append({'guid': guid, 'address': msig_address})
@@ -658,17 +659,17 @@ def get_opened():
 
 
 @offers.route('closed', methods=['GET'])
+@select_chain(chain_name='home')
 def get_closed():
     offers_closed = []
-    web3 = web3_chains[chain]
-    num_of_offers = offer_registry.functions.getNumberOfOffers().call()
+    num_of_offers = g.offer_registry.functions.getNumberOfOffers().call()
 
     for i in range(0, num_of_offers):
-        guid = offer_registry.functions.channelsGuids(i).call()
-        offer_channel = offer_registry.functions.guidToChannel(guid).call()
+        guid = g.offer_registry.functions.channelsGuids(i).call()
+        offer_channel = g.offer_registry.functions.guidToChannel(guid).call()
         channel_data = channel_to_dict(offer_channel)
         msig_address = channel_data['msig_address']
-        offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+        offer_msig = bind_contract(g.web3, msig_address, offer_msig_artifact)
         closed_channel = offer_msig.functions.isClosed().call()
         if closed_channel:
             offers_closed.append({'guid': guid, 'address': msig_address})
@@ -677,19 +678,19 @@ def get_closed():
 
 
 @offers.route('myoffers', methods=['GET'])
+@select_chain(chain_name='home')
 def get_myoffers():
-    web3 = web3_chains[chain]
-    account = web3.toChecksumAddress(g.eth_address)
+    account = g.web3.toChecksumAddress(g.eth_address)
 
     my_offers = []
-    num_of_offers = offer_registry.functions.getNumberOfOffers().call()
+    num_of_offers = g.offer_registry.functions.getNumberOfOffers().call()
 
     for i in range(0, num_of_offers):
-        guid = offer_registry.functions.channelsGuids(i).call()
-        offer_channel = offer_registry.functions.guidToChannel(guid).call()
+        guid = g.offer_registry.functions.channelsGuids(i).call()
+        offer_channel = g.offer_registry.functions.guidToChannel(guid).call()
         channel_data = channel_to_dict(offer_channel)
         msig_address = channel_data['msig_address']
-        offer_msig = bind_contract(web3, msig_address, offer_msig_artifact)
+        offer_msig = bind_contract(g.web3, msig_address, offer_msig_artifact)
         expert = offer_msig.functions.expert().call()
         ambassador = offer_msig.functions.ambassador().call()
         if account == expert or account == ambassador:

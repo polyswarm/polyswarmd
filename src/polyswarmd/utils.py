@@ -1,6 +1,7 @@
 import re
 import uuid
-from polyswarmd.eth import offer_lib, web3 as web3_chains, zero_address
+from flask import g
+from polyswarmd.eth import zero_address
 
 def bool_list_to_int(bs):
     return sum([1 << n if b else 0 for n, b in enumerate(bs)])
@@ -130,21 +131,20 @@ def channel_to_dict(channel_data):
 
 def state_to_dict(state):
     # gets state of non required state
-    offer_info = offer_lib.functions.getOfferState(state).call()
-    web3 = web3_chains['home']
+    offer_info = g.offer_lib.functions.getOfferState(state).call()
 
     return {
-        'isClosed': offer_lib.functions.getCloseFlag(state).call(),
-        'nonce': offer_lib.functions.getSequence(state).call(),
-        'ambassador': offer_lib.functions.getPartyA(state).call(),
-        'expert': offer_lib.functions.getPartyB(state).call(),
-        'msig_address': offer_lib.functions.getMultiSigAddress(state).call(),
-        'ambassador_balance': offer_lib.functions.getBalanceA(state).call(),
-        'expert_balance': offer_lib.functions.getBalanceB(state).call(),
-        'token': offer_lib.functions.getTokenAddress(state).call(),
-        'offer_amount': web3.toInt(offer_info[1]),
-        'mask': int_to_bool_list(web3.toInt(offer_info[6])),
-        'verdicts': int_to_bool_list(web3.toInt(offer_info[7])),
+        'isClosed': g.offer_lib.functions.getCloseFlag(state).call(),
+        'nonce': g.offer_lib.functions.getSequence(state).call(),
+        'ambassador': g.offer_lib.functions.getPartyA(state).call(),
+        'expert': g.offer_lib.functions.getPartyB(state).call(),
+        'msig_address': g.offer_lib.functions.getMultiSigAddress(state).call(),
+        'ambassador_balance': g.offer_lib.functions.getBalanceA(state).call(),
+        'expert_balance': g.offer_lib.functions.getBalanceB(state).call(),
+        'token': g.offer_lib.functions.getTokenAddress(state).call(),
+        'offer_amount': g.web3.toInt(offer_info[1]),
+        'mask': int_to_bool_list(g.web3.toInt(offer_info[6])),
+        'verdicts': int_to_bool_list(g.web3.toInt(offer_info[7])),
     }
 
 def new_init_channel_event_to_dict(new_init_event):
@@ -176,15 +176,13 @@ def new_cancel_agreement_event_to_dict(new_event):
     }
 
 def to_padded_hex(val):
-    web3 = web3_chains['home']
-
     if type(val) == str:
         if val.startswith('0x'):
-            padded_hex = web3.toHex(hexstr=val)[2:]
+            padded_hex = g.web3.toHex(hexstr=val)[2:]
         else:
-            padded_hex = web3.toHex(text=val)[2:]
+            padded_hex = g.web3.toHex(text=val)[2:]
     else:
-        padded_hex = web3.toHex(val)[2:]
+        padded_hex = g.web3.toHex(val)[2:]
 
     l = 64 - len(padded_hex)
 

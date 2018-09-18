@@ -4,6 +4,7 @@ import jsonschema
 import logging
 import os
 import rlp
+import functools
 
 from collections import defaultdict
 from ethereum.transactions import Transaction
@@ -11,10 +12,10 @@ from flask import Blueprint, g, request
 from hexbytes import HexBytes
 from jsonschema.exceptions import ValidationError
 from web3 import Web3, HTTPProvider
-from web3.middleware import geth_poa_middleware
+
 
 from polyswarmd.artifacts import is_valid_ipfshash
-from polyswarmd.config import config_location, chain_id, eth_uri as eth_chains, nectar_token_address as nectar_chains, bounty_registry_address as bounty_chains, offer_registry_address, whereami, free
+from polyswarmd.config import config_location, whereami
 from polyswarmd.response import success, failure
 
 misc = Blueprint('misc', __name__)
@@ -34,94 +35,29 @@ zero_address = '0x0000000000000000000000000000000000000000'
 offer_msig_artifact = os.path.join(config_location, 'contracts',
                                    'OfferMultiSig.json')
 
-web3 = {}
-
-# Create token bindings for each chain
-bounty_registry = {}
-nectar_token = {}
-arbiter_staking = {}
-
-# exists only on home
-offer_registry = None
-offer_lib = None
-
-for chain in ('home', 'side'):
-    # Grab all the values for the chain. If they aren't defined, skip
-    eth_uri=eth_chains.get(chain)
-    bounty_registry_address = bounty_chains.get(chain)
-    nectar_token_address = nectar_chains.get(chain)
-
-    if ( eth_uri is not None
-        and bounty_registry_address is not None
-        and nectar_token_address is not None ):
-
-        temp = Web3(HTTPProvider(eth_uri))
-        temp.middleware_stack.inject(geth_poa_middleware, layer=0)
-        web3[chain] = temp
-        nectar_token[chain] = bind_contract(
-            web3[chain], nectar_token_address,
-            os.path.join(config_location, 'contracts', 'NectarToken.json'))
-
-        bounty_registry[chain] = bind_contract(
-            web3[chain], bounty_registry_address,
-            os.path.join(config_location, 'contracts', 'BountyRegistry.json'))
-        arbiter_staking[chain] = bind_contract(
-            web3[chain], bounty_registry[chain].functions.staking().call(),
-            os.path.join(config_location, 'contracts', 'ArbiterStaking.json'))
-
-        if chain == 'home':
-            offer_registry = bind_contract(
-                web3[chain], offer_registry_address[chain],
-                os.path.join(config_location, 'contracts', 'OfferRegistry.json'))
-
-            offer_lib_address = offer_registry.functions.offerLib().call()
-
-            offer_lib = bind_contract(
-                web3[chain], offer_lib_address,
-                os.path.join(config_location, 'contracts', 'OfferLib.json'))
-
+from polyswarmd.chains import select_chain
 
 @misc.route('/syncing', methods=['GET'])
+@select_chain
 def get_syncing():
-    # Must read chain before account to have a valid web3 ref
-    chain = request.args.get('chain')
-    if not chain:
-        chain = 'home'
-    elif chain != 'side' and chain != 'home':
-        return failure('Chain must be either home or side', 400)
-
-    w3 = web3[chain]
-
-    if not w3.eth.syncing:
+    if not g.web3.eth.syncing:
         return success(False)
 
-    return success(dict(w3.eth.syncing))
+    return success(dict(g.web3.eth.syncing))
 
 
 @misc.route('/nonce', methods=['GET'])
+@select_chain
 def get_nonce():
-    # Must read chain before account to have a valid web3 ref
-    chain = request.args.get('chain')
-    if not chain:
-        chain = 'home'
-    elif chain != 'side' and chain != 'home':
-        return failure('Chain must be either home or side', 400)
+    account = g.web3.toChecksumAddress(g.eth_address)
 
-    w3 = web3[chain]
-    account = w3.toChecksumAddress(g.eth_address)
-
-    return success(w3.eth.getTransactionCount(account))
+    return success(g.web3.eth.getTransactionCount(account))
 
 
 @misc.route('/transactions', methods=['POST'])
+@select_chain
 def post_transactions():
-    # Must read chain before account to have a valid web3 ref
-    chain = request.args.get('chain', 'home')
-    if chain != 'side' and chain != 'home':
-        return failure('Chain must be either home or side', 400)
-
-    w3 = web3[chain]
-    account = w3.toChecksumAddress(g.eth_address)
+    account = g.web3.toChecksumAddress(g.eth_address)
 
     schema = {
         'type': 'object',
@@ -152,7 +88,7 @@ def post_transactions():
         except:
             continue
 
-        sender = w3.toChecksumAddress(tx.sender.hex())
+        sender = g.web3.toChecksumAddress(tx.sender.hex())
         if sender != account:
             logging.warning(
                 'Got invalid transaction sender, expected %s got %s', account,
@@ -161,7 +97,7 @@ def post_transactions():
 
         # TODO: Additional validation (addresses, methods, etc)
         try:
-            txhashes.append(w3.eth.sendRawTransaction(HexBytes(raw_tx)))
+            txhashes.append(g.web3.eth.sendRawTransaction(HexBytes(raw_tx)))
         except ValueError as e:
             logging.warning(
                 'Got invalid transaction error %s', e)
@@ -169,25 +105,26 @@ def post_transactions():
 
     ret = defaultdict(list)
     for txhash in txhashes:
-        events = events_from_transaction(txhash, chain)
+        events = events_from_transaction(txhash)
         for k, v in events.items():
             ret[k].extend(v)
 
     return success(ret)
 
 
-def build_transaction(call, chain, nonce):
+def build_transaction(call, nonce):
     options = {
         'nonce': nonce,
-        'chainId': int(chain_id[chain]),
+        'chainId': int(g.chain_id),
         'gas': gas_limit,
     }
-    if free.get(chain):
+    if g.free:
         options["gasPrice"] = 0
+
     return call.buildTransaction(options)
 
 
-def events_from_transaction(txhash, chain):
+def events_from_transaction(txhash):
     from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, \
             new_verdict_event_to_dict, revealed_assertion_event_to_dict, \
             transfer_event_to_dict, new_withdrawal_event_to_dict, new_deposit_event_to_dict
@@ -197,7 +134,7 @@ def events_from_transaction(txhash, chain):
     try:
         with gevent.Timeout(60, Exception('Timeout waiting for transaction receipt')) as timeout:
             while True:
-                receipt = web3[chain].eth.getTransactionReceipt(txhash)
+                receipt = g.web3.eth.getTransactionReceipt(txhash)
                 if receipt is not None:
                     break
                 gevent.sleep(0.1)
@@ -227,13 +164,13 @@ def events_from_transaction(txhash, chain):
     ret = {}
 
     # Transfers
-    processed = nectar_token[chain].events.Transfer().processReceipt(receipt)
+    processed = g.nectar_token.events.Transfer().processReceipt(receipt)
     if processed:
         transfer = transfer_event_to_dict(processed[0]['args'])
         ret['transfers'] = ret.get('transfers', []) + [transfer]
 
     # Bounties
-    processed = bounty_registry[chain].events.NewBounty().processReceipt(
+    processed = g.bounty_registry.events.NewBounty().processReceipt(
         receipt)
     if processed:
         bounty = new_bounty_event_to_dict(processed[0]['args'])
@@ -241,32 +178,31 @@ def events_from_transaction(txhash, chain):
         if is_valid_ipfshash(bounty['uri']):
             ret['bounties'] = ret.get('bounties', []) + [bounty]
 
-    processed = bounty_registry[chain].events.NewAssertion().processReceipt(
+    processed = g.bounty_registry.events.NewAssertion().processReceipt(
         receipt)
     if processed:
         assertion = new_assertion_event_to_dict(processed[0]['args'])
         ret['assertions'] = ret.get('assertions', []) + [assertion]
 
-    processed = bounty_registry[chain].events.NewVerdict().processReceipt(
+    processed = g.bounty_registry.events.NewVerdict().processReceipt(
         receipt)
     if processed:
         verdict = new_verdict_event_to_dict(processed[0]['args'])
         ret['verdicts'] = ret.get('verdicts', []) + [verdict]
 
-    processed = bounty_registry[
-        chain].events.RevealedAssertion().processReceipt(receipt)
+    processed = g.bounty_registry.events.RevealedAssertion().processReceipt(receipt)
     if processed:
         reveal = revealed_assertion_event_to_dict(processed[0]['args'])
         ret['reveals'] = ret.get('reveals', []) + [reveal]
 
     # Arbiter
-    processed = arbiter_staking[chain].events.NewWithdrawal().processReceipt(
+    processed = g.arbiter_staking.events.NewWithdrawal().processReceipt(
         receipt)
     if processed:
         withdrawal = new_withdrawal_event_to_dict(processed[0]['args'])
         ret['withdrawals'] = ret.get('withdrawals', []) + [withdrawal]
 
-    processed = arbiter_staking[chain].events.NewDeposit().processReceipt(
+    processed = g.arbiter_staking.events.NewDeposit().processReceipt(
         receipt)
     if processed:
         deposit = new_deposit_event_to_dict(processed[0]['args'])
@@ -274,9 +210,11 @@ def events_from_transaction(txhash, chain):
 
     # Offers
     # TODO: no conversion functions for most of these, do we want those?
-    offer_msig = bind_contract(web3['home'], zero_address, offer_msig_artifact)
+    if g.offer_registry is None:
+        return ret
 
-    processed = offer_registry.events.InitializedChannel().processReceipt(
+    offer_msig = bind_contract(g.web3, zero_address, offer_msig_artifact)
+    processed = g.offer_registry.events.InitializedChannel().processReceipt(
         receipt)
     if processed:
         initialized = dict(processed[0]['args'])
@@ -318,25 +256,25 @@ def events_from_transaction(txhash, chain):
     return ret
 
 
-def bounty_fee(chain):
-    return bounty_registry[chain].functions.BOUNTY_FEE().call()
+def bounty_fee(bounty_registry):
+    return bounty_registry.functions.BOUNTY_FEE().call()
 
 
-def assertion_fee(chain):
-    return bounty_registry[chain].functions.ASSERTION_FEE().call()
+def assertion_fee(bounty_registry):
+    return bounty_registry.functions.ASSERTION_FEE().call()
 
 
-def bounty_amount_min(chain):
-    return bounty_registry[chain].functions.BOUNTY_AMOUNT_MINIMUM().call()
+def bounty_amount_min(bounty_registry):
+    return bounty_registry.functions.BOUNTY_AMOUNT_MINIMUM().call()
 
 
-def assertion_bid_min(chain):
-    return bounty_registry[chain].functions.ASSERTION_BID_MINIMUM().call()
+def assertion_bid_min(bounty_registry):
+    return bounty_registry.functions.ASSERTION_BID_MINIMUM().call()
 
 
-def staking_total_max(chain):
-    return arbiter_staking[chain].functions.MAXIMUM_STAKE().call()
+def staking_total_max(arbiter_staking):
+    return arbiter_staking.functions.MAXIMUM_STAKE().call()
 
 
-def staking_total_min(chain):
-    return arbiter_staking[chain].functions.MINIMUM_STAKE().call()
+def staking_total_min(arbiter_staking):
+    return arbiter_staking.functions.MINIMUM_STAKE().call()
