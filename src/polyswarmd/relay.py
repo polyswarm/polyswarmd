@@ -4,20 +4,20 @@ from jsonschema.exceptions import ValidationError
 from flask import Blueprint, g, request
 
 from polyswarmd.response import success, failure
-from polyswarmd.chains import select_chain
+from polyswarmd.chains import chain
 from polyswarmd.eth import build_transaction
 
 relay = Blueprint('relay', __name__)
 
 @relay.route('/deposit', methods=['POST'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def deposit_funds():
     # Move funds from home to side
     return send_funds_from()
 
 
 @relay.route('/withdrawal', methods=['POST'])
-@select_chain(chain_name='side')
+@chain(chain_name='side')
 def withdraw_funds():
     # Move funds from side to home
     return send_funds_from()

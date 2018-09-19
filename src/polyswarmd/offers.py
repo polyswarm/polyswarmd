@@ -3,17 +3,16 @@ import json
 import jsonschema
 from jsonschema.exceptions import ValidationError
 from flask import Blueprint, g, request
-from polyswarmd.chains import select_chain
+from polyswarmd.chains import chain
 from polyswarmd.eth import build_transaction, offer_msig_artifact, bind_contract
 from polyswarmd.response import success, failure
 from polyswarmd.utils import channel_to_dict, validate_ws_url, dict_to_state, to_padded_hex, bool_list_to_int
 
-chain = 'home'  # only on home chain
 offers = Blueprint('offers', __name__)
 
 
 @offers.route('', methods=['POST'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def post_create_offer_channel():
     account = g.web3.toChecksumAddress(g.eth_address)
 
@@ -62,7 +61,7 @@ def post_create_offer_channel():
 
 
 @offers.route('/<uuid:guid>/uri', methods=['POST'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def post_uri(guid):
     offer_channel = channel_to_dict(
         g.offer_registry.functions.guidToChannel(guid.int).call())
@@ -105,7 +104,7 @@ def post_uri(guid):
 
 
 @offers.route('/<uuid:guid>/open', methods=['POST'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def post_open(guid):
     offer_channel = channel_to_dict(
         g.offer_registry.functions.guidToChannel(guid.int).call())
@@ -166,7 +165,7 @@ def post_open(guid):
 
 
 @offers.route('/<uuid:guid>/cancel', methods=['POST'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def post_cancel(guid):
     offer_channel = channel_to_dict(
         g.offer_registry.functions.guidToChannel(guid.int).call())
@@ -185,7 +184,7 @@ def post_cancel(guid):
 
 
 @offers.route('/<uuid:guid>/join', methods=['POST'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def post_join(guid):
     offer_channel = channel_to_dict(
         g.offer_registry.functions.guidToChannel(guid.int).call())
@@ -241,7 +240,7 @@ def post_join(guid):
 
 
 @offers.route('/<uuid:guid>/close', methods=['POST'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def post_close(guid):
     offer_channel = channel_to_dict(
         g.offer_registry.functions.guidToChannel(guid.int).call())
@@ -301,7 +300,7 @@ def post_close(guid):
 
 # for closing a challenged state with a timeout
 @offers.route('/<uuid:guid>/closeChallenged', methods=['POST'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def post_close_challenged(guid):
     offer_channel = channel_to_dict(
         g.offer_registry.functions.guidToChannel(guid.int).call())
@@ -360,7 +359,7 @@ def post_close_challenged(guid):
 
 
 @offers.route('/<uuid:guid>/settle', methods=['POST'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def post_settle(guid):
     offer_channel = channel_to_dict(
         g.offer_registry.functions.guidToChannel(guid.int).call())
@@ -419,7 +418,7 @@ def post_settle(guid):
 
 
 @offers.route('/state', methods=['POST'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def create_state():
 
     body = request.get_json()
@@ -523,7 +522,7 @@ def create_state():
 
 
 @offers.route('/<uuid:guid>/challenge', methods=['POST'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def post_challange(guid):
     offer_channel = channel_to_dict(
         g.offer_registry.functions.guidToChannel(guid.int).call())
@@ -581,7 +580,7 @@ def post_challange(guid):
     return success({'transactions': transactions})
 
 @offers.route('/<uuid:guid>', methods=['GET'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def get_channel_address(guid):
     offer_channel = g.offer_registry.functions.guidToChannel(guid.int).call()
 
@@ -589,7 +588,7 @@ def get_channel_address(guid):
 
 
 @offers.route('/<uuid:guid>/settlementPeriod', methods=['GET'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def get_settlement_period(guid):
     offer_channel = g.offer_registry.functions.guidToChannel(guid.int).call()
     channel_data = channel_to_dict(offer_channel)
@@ -602,7 +601,7 @@ def get_settlement_period(guid):
 
 
 @offers.route('/<uuid:guid>/websocket', methods=['GET'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def get_websocket(guid):
     offer_channel = g.offer_registry.functions.guidToChannel(guid.int).call()
     channel_data = channel_to_dict(offer_channel)
@@ -621,7 +620,7 @@ def get_websocket(guid):
 
 
 @offers.route('pending', methods=['GET'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def get_pending():
     offers_pending = []
     num_of_offers = g.offer_registry.functions.getNumberOfOffers().call()
@@ -640,7 +639,7 @@ def get_pending():
 
 
 @offers.route('opened', methods=['GET'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def get_opened():
     offers_opened = []
     num_of_offers = g.offer_registry.functions.getNumberOfOffers().call()
@@ -659,7 +658,7 @@ def get_opened():
 
 
 @offers.route('closed', methods=['GET'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def get_closed():
     offers_closed = []
     num_of_offers = g.offer_registry.functions.getNumberOfOffers().call()
@@ -678,7 +677,7 @@ def get_closed():
 
 
 @offers.route('myoffers', methods=['GET'])
-@select_chain(chain_name='home')
+@chain(chain_name='home')
 def get_myoffers():
     account = g.web3.toChecksumAddress(g.eth_address)
 

@@ -35,10 +35,10 @@ zero_address = '0x0000000000000000000000000000000000000000'
 offer_msig_artifact = os.path.join(config_location, 'contracts',
                                    'OfferMultiSig.json')
 
-from polyswarmd.chains import select_chain
+from polyswarmd.chains import chain
 
 @misc.route('/syncing', methods=['GET'])
-@select_chain
+@chain
 def get_syncing():
     if not g.web3.eth.syncing:
         return success(False)
@@ -47,7 +47,7 @@ def get_syncing():
 
 
 @misc.route('/nonce', methods=['GET'])
-@select_chain
+@chain
 def get_nonce():
     account = g.web3.toChecksumAddress(g.eth_address)
 
@@ -55,7 +55,7 @@ def get_nonce():
 
 
 @misc.route('/transactions', methods=['POST'])
-@select_chain
+@chain
 def post_transactions():
     account = g.web3.toChecksumAddress(g.eth_address)
 

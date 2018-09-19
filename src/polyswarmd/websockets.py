@@ -10,7 +10,7 @@ from flask import request, g
 from flask_sockets import Sockets
 from geventwebsocket import WebSocketError
 
-from polyswarmd.chains import select_chain
+from polyswarmd.chains import chain
 from polyswarmd.eth import offer_msig_artifact, bind_contract
 from polyswarmd.config import chain_id as chain_ids
 from polyswarmd.utils import channel_to_dict, new_cancel_agreement_event_to_dict, new_settle_started_event, new_settle_challenged_event, new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict, state_to_dict, new_init_channel_event_to_dict, new_quorum_event_to_dict, settled_bounty_event_to_dict, revealed_assertion_event_to_dict
@@ -22,7 +22,7 @@ def init_websockets(app):
     message_sockets = dict()
 
     @sockets.route('/events')
-    @select_chain
+    @chain
     def events(ws):
         block_filter = g.web3.eth.filter('latest')
         bounty_filter = g.bounty_registry.eventFilter('NewBounty')
@@ -126,7 +126,7 @@ def init_websockets(app):
                 continue
 
     @sockets.route('/events/<uuid:guid>')
-    @select_chain
+    @chain
     def channel_events(ws, guid):
 
         offer_channel = channel_to_dict(
@@ -176,7 +176,7 @@ def init_websockets(app):
 
     # for receiving messages about offers that might need to be signed
     @sockets.route('/messages/<uuid:guid>')
-    @select_chain(chain_name='home')
+    @chain(chain_name='home')
     def messages(ws, guid):
 
         if guid not in message_sockets:

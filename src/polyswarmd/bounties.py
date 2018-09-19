@@ -8,7 +8,7 @@ from jsonschema.exceptions import ValidationError
 
 from polyswarmd import eth
 from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts
-from polyswarmd.chains import select_chain
+from polyswarmd.chains import chain
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
 from polyswarmd.eth import build_transaction, zero_address
 from polyswarmd.response import success, failure
@@ -49,7 +49,7 @@ def calculate_commitment(account, verdicts):
 
 
 @bounties.route('', methods=['POST'])
-@select_chain
+@chain
 def post_bounties():
     account = g.web3.toChecksumAddress(g.eth_address)
 
@@ -119,21 +119,21 @@ def post_bounties():
 
 
 @bounties.route('/window/reveal', methods=['GET'])
-@select_chain
+@chain
 def get_bounty_reveal_window():
     assertion_reveal_window = g.bounty_registry.functions.ASSERTION_REVEAL_WINDOW().call()
 
     return success({'blocks': assertion_reveal_window})
 
 @bounties.route('/window/vote', methods=['GET'])
-@select_chain
+@chain
 def get_bounty_vote_window():
     assertion_vote_window = g.bounty_registry.functions.arbiterVoteWindow().call()
 
     return success({'blocks': assertion_vote_window})
 
 @bounties.route('/<uuid:guid>', methods=['GET'])
-@select_chain
+@chain
 def get_bounties_guid(guid):
     bounty = bounty_to_dict(
         g.bounty_registry.functions.bountiesByGuid(guid.int).call())
@@ -146,7 +146,7 @@ def get_bounties_guid(guid):
 
 
 @bounties.route('/<uuid:guid>/vote', methods=['POST'])
-@select_chain
+@chain
 def post_bounties_guid_vote(guid):
     account = g.web3.toChecksumAddress(g.eth_address)
 
@@ -188,7 +188,7 @@ def post_bounties_guid_vote(guid):
 
 
 @bounties.route('/<uuid:guid>/settle', methods=['POST'])
-@select_chain
+@chain
 def post_bounties_guid_settle(guid):
     account = g.web3.toChecksumAddress(g.eth_address)
 
@@ -204,7 +204,7 @@ def post_bounties_guid_settle(guid):
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['POST'])
-@select_chain
+@chain
 def post_bounties_guid_assertions(guid):
     account = g.web3.toChecksumAddress(g.eth_address)
 
@@ -268,7 +268,7 @@ def post_bounties_guid_assertions(guid):
 
 
 @bounties.route('/<uuid:guid>/assertions/<int:id_>/reveal', methods=['POST'])
-@select_chain
+@chain
 def post_bounties_guid_assertions_id_reveal(guid, id_):
     account = g.web3.toChecksumAddress(g.eth_address)
 
@@ -318,7 +318,7 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['GET'])
-@select_chain
+@chain
 def get_bounties_guid_assertions(guid):
     num_assertions = g.bounty_registry.functions.getNumberOfAssertions(
         guid.int).call()
@@ -332,7 +332,7 @@ def get_bounties_guid_assertions(guid):
 
 
 @bounties.route('/<uuid:guid>/assertions/<int:id_>', methods=['GET'])
-@select_chain
+@chain
 def get_bounties_guid_assertions_id(guid, id_):
     try:
         return success(

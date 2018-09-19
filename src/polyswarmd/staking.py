@@ -4,14 +4,14 @@ from flask import Blueprint, g, request
 
 from polyswarmd import eth
 from polyswarmd.eth import build_transaction
-from polyswarmd.chains import select_chain
+from polyswarmd.chains import chain
 from polyswarmd.response import success, failure
 
 staking = Blueprint('staking', __name__)
 
 
 @staking.route('/deposit', methods=['POST'])
-@select_chain
+@chain
 def post_arbiter_staking_deposit():
     account = g.web3.toChecksumAddress(g.eth_address)
 
@@ -55,7 +55,7 @@ def post_arbiter_staking_deposit():
 
 
 @staking.route('/withdraw', methods=['POST'])
-@select_chain
+@chain
 def post_arbiter_staking_withdrawal():
     account = g.web3.toChecksumAddress(g.eth_address)
 

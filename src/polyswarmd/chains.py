@@ -57,7 +57,7 @@ for chain in ('home', 'side'):
                 web3, offer_lib_address,
                 os.path.join(config_location, 'contracts', 'OfferLib.json'))
 
-def select_chain(_func=None, *, chain_name=None):
+def chain(_func=None, *, chain_name=None):
     """This decorator takes the chain passed as a request arg and modifies a set of globals.
        There are a few guarantees made by this function.
 
