@@ -20,35 +20,34 @@ arbiter_staking_chains = {}
 offer_registry_home = None
 offer_lib_home = None
 
-for chain in ('home', 'side'):
+for name in ('home', 'side'):
     # Grab all the values for the chain. If they aren't defined, skip
-    eth_uri = eth_chains.get(chain)
-    bounty_registry_address = bounty_chains.get(chain)
-    nectar_token_address = nectar_chains.get(chain)
+    eth_uri = eth_chains.get(name)
+    bounty_registry_address = bounty_chains.get(name)
+    nectar_token_address = nectar_chains.get(name)
 
     if (
             eth_uri is not None
             and bounty_registry_address is not None
-            and nectar_token_address is not None
-        ):
+            and nectar_token_address is not None):
 
         web3 = Web3(HTTPProvider(eth_uri))
         web3.middleware_stack.inject(geth_poa_middleware, layer=0)
-        web3_chains[chain] = web3
-        nectar_token_chains[chain] = bind_contract(
+        web3_chains[name] = web3
+        nectar_token_chains[name] = bind_contract(
             web3, nectar_token_address,
             os.path.join(config_location, 'contracts', 'NectarToken.json'))
 
-        bounty_registry_chains[chain] = bind_contract(
+        bounty_registry_chains[name] = bind_contract(
             web3, bounty_registry_address,
             os.path.join(config_location, 'contracts', 'BountyRegistry.json'))
-        arbiter_staking_chains[chain] = bind_contract(
-            web3, bounty_registry_chains[chain].functions.staking().call(),
+        arbiter_staking_chains[name] = bind_contract(
+            web3, bounty_registry_chains[name].functions.staking().call(),
             os.path.join(config_location, 'contracts', 'ArbiterStaking.json'))
 
-        if chain == 'home':
+        if name == 'home':
             offer_registry_home = bind_contract(
-                web3, offer_registry_address[chain],
+                web3, offer_registry_address[name],
                 os.path.join(config_location, 'contracts', 'OfferRegistry.json'))
 
             offer_lib_address = offer_registry_home.functions.offerLib().call()
@@ -73,11 +72,9 @@ def chain(_func=None, *, chain_name=None):
             if chain_name is None:
                 chain_name = request.args.get('chain', 'home')
 
-            if chain_name != "home" and chain_name != "side":
-                return failure('Chain must be either home or side', 400)
-
-            if chain_name == "side" and chain_name not in nectar_chains.keys():
-                return failure('Side chain not supported in this instance of polyswarmd', 400)
+            if chain_name not in nectar_chains.keys():
+                chain_options = ", ".join(nectar_chains)
+                return failure('Chain must one of %s' % chain_options, 400)
 
             chain_data = {
                 "chain_id": id_chains.get(chain_name),
@@ -109,14 +106,14 @@ def chain(_func=None, *, chain_name=None):
                     g.offer_registry = None
 
                 return func(*args, **kwargs)
-            else:
-                return failure("Server experienced an error finding %s chain values" % chain_name, 500)
+
+            return failure("Server experienced an error finding %s chain values" % chain_name, 500)
         return wrapper
 
     if _func is None:
         return decorator_wrapper
-    else:
-        return decorator_wrapper(_func)
+
+    return decorator_wrapper(_func)
 
 
 def validate(chain_data):
