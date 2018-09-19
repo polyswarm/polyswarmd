@@ -1,18 +1,33 @@
-#!/bin/sh
+#!/bin/bash
 
 set -e
 
+if [ -e $CONSUL_TOKEN ]; then
+  header="X-Consul-Token: $CONSUL_TOKEN"
+else
+  header=""
+fi
+
 create_config() {
-  response=$(curl --silent "$CONSUL/v1/kv/config")
+  response=$(curl --header $header --silent "$CONSUL/v1/kv/gamma/config")
   config_blob=$(echo $response | jq .[0].Value)
   config_json=$(echo $config_blob | tr -d '"' | base64 --decode)
 
-  python -c "import yaml, json; print(yaml.dump($config_json, default_flow_style=False))" > /etc/polyswarmd/polyswarmd.yml
+  response=$(curl --header $header --silent "$CONSUL/v1/kv/homechain")
+  config_blob=$(echo $response | jq .[0].Value)
+  homechain_config_json=$(echo $config_blob | tr -d '"' | base64 --decode)
+
+  response=$(curl --header $header --silent "$CONSUL/v1/kv/sidechain")
+  config_blob=$(echo $response | jq .[0].Value)
+  sidechain_config_json=$(echo $config_blob | tr -d '"' | base64 --decode)
+
+  combined_configs_json=$(python -c "import json; print({**$config_json,**{'homechain':$homechain_config_json },**{'sidechain':$sidechain_config_json}})")
+  python -c "import yaml; print(yaml.dump($combined_configs_json, default_flow_style=False))" > /etc/polyswarmd/polyswarmd.yml
 
 }
 
 create_contract_abi() {
-  response=$(curl --silent "$CONSUL/v1/kv/$1")
+  response=$(curl --header $header --silent "$CONSUL/v1/kv/gamma/$1")
   config_blob=$(echo $response | jq .[0].Value)
   config_json=$(echo $config_blob | tr -d '"' | base64 --decode)
 
@@ -24,7 +39,7 @@ while getopts ":pw" opt; do
   case ${opt} in
     p ) # process option a
       mkdir -p /etc/polyswarmd/contracts
-      curl --connect-timeout 3 --max-time 10 --retry 60 --retry-delay 3 --output /dev/null --retry-max-time 60 "$CONSUL/v1/kv/config"
+      curl --header $header --connect-timeout 3 --max-time 10 --retry 60 --retry-delay 3 --output /dev/null --retry-max-time 60 "$CONSUL/v1/kv/config"
 
       create_contract_abi "BountyRegistry"
       create_contract_abi "NectarToken"
@@ -40,7 +55,7 @@ while getopts ":pw" opt; do
       ;;
 
     w )
-      until $(curl --output /dev/null --silent --fail "$CONSUL/v1/kv/config") ; do
+      until $(curl --header $header --output /dev/null --silent --fail "$CONSUL/v1/kv/gamma/config") ; do
           >&2 echo "The migration is incomplete - sleeping..."
           sleep 1
       done
