@@ -47,13 +47,13 @@ for chain in ('home', 'side'):
             os.path.join(config_location, 'contracts', 'ArbiterStaking.json'))
 
         if chain == 'home':
-            offer_registry = bind_contract(
+            offer_registry_home = bind_contract(
                 web3, offer_registry_address[chain],
                 os.path.join(config_location, 'contracts', 'OfferRegistry.json'))
 
-            offer_lib_address = offer_registry.functions.offerLib().call()
+            offer_lib_address = offer_registry_home.functions.offerLib().call()
 
-            offer_lib = bind_contract(
+            offer_lib_home = bind_contract(
                 web3, offer_lib_address,
                 os.path.join(config_location, 'contracts', 'OfferLib.json'))
 
