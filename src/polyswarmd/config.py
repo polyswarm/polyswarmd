@@ -69,7 +69,7 @@ def init_config():
             offer_registry_address['home'] = home.get(
                 'offer_registry_address')  # only on home chain
             chain_id['home'] = home.get('chain_id')
-            free["home"] = home.get('free', False)
+            free['home'] = home.get('free', False)
 
         side = y.get('sidechain')
         if side is not None:
@@ -78,7 +78,7 @@ def init_config():
             bounty_registry_address['side'] = side.get('bounty_registry_address')
             erc20_relay_address['side'] = side.get('erc20_relay_address')
             chain_id['side'] = side.get('chain_id')
-            free["side"] = side.get('free', False)
+            free['side'] = side.get('free', False)
 
 
 def set_config(**kwargs):

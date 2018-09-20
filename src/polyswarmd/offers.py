@@ -154,7 +154,7 @@ def post_open(guid):
 
     transactions = [
         build_transaction(
-            g.nectar_token['home'].functions.approve(
+            g.nectar_token.functions.approve(
                 msig_address, approve_amount),  base_nonce),
         build_transaction(
             offer_msig.functions.openAgreement(to_padded_hex(state), v, to_padded_hex(r), to_padded_hex(s)),
