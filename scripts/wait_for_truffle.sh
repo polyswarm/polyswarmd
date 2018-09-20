@@ -9,15 +9,15 @@ else
 fi
 
 create_config() {
-  response=$(curl --header $header --silent "$CONSUL/v1/kv/gamma/config")
+  response=$(curl --header $header --silent "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/config")
   config_blob=$(echo $response | jq .[0].Value)
   config_json=$(echo $config_blob | tr -d '"' | base64 --decode)
 
-  response=$(curl --header $header --silent "$CONSUL/v1/kv/homechain")
+  response=$(curl --header $header --silent "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/homechain")
   config_blob=$(echo $response | jq .[0].Value)
   homechain_config_json=$(echo $config_blob | tr -d '"' | base64 --decode)
 
-  response=$(curl --header $header --silent "$CONSUL/v1/kv/sidechain")
+  response=$(curl --header $header --silent "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/sidechain")
   config_blob=$(echo $response | jq .[0].Value)
   sidechain_config_json=$(echo $config_blob | tr -d '"' | base64 --decode)
 
@@ -27,7 +27,7 @@ create_config() {
 }
 
 create_contract_abi() {
-  response=$(curl --header $header --silent "$CONSUL/v1/kv/gamma/$1")
+  response=$(curl --header $header --silent "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/$1")
   config_blob=$(echo $response | jq .[0].Value)
   config_json=$(echo $config_blob | tr -d '"' | base64 --decode)
 
@@ -55,7 +55,7 @@ while getopts ":pw" opt; do
       ;;
 
     w )
-      until $(curl --header $header --output /dev/null --silent --fail "$CONSUL/v1/kv/gamma/config") ; do
+      until $(curl --header $header --output /dev/null --silent --fail "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/config") ; do
           >&2 echo "The migration is incomplete - sleeping..."
           sleep 1
       done
