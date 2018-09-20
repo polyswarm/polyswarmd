@@ -16,6 +16,7 @@ from polyswarmd import app
 @click.option('--port', default=31337,
         help='Port to listen on')
 def main(log, host, port):
+    # todo change this
     loglevel = getattr(logging, log.upper(), None)
     if not isinstance(loglevel, int):
         logging.error('invalid log level')
