@@ -35,11 +35,17 @@ create_contract_abi() {
 
 }
 
+check_config() {
+  curl --header $header --silent --fail "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/config" | grep -vq Value
+  return $?
+}
+
+
 while getopts ":pw" opt; do
   case ${opt} in
     p ) # process option a
       mkdir -p /etc/polyswarmd/contracts
-      curl --header $header --connect-timeout 3 --max-time 10 --retry 60 --retry-delay 3 --output /dev/null --retry-max-time 60 "$CONSUL/v1/kv/config"
+      curl --header $header --connect-timeout 3 --max-time 10 --retry 60 --retry-delay 3 --retry-max-time 60 "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/config"
 
       create_contract_abi "BountyRegistry"
       create_contract_abi "NectarToken"
@@ -55,7 +61,7 @@ while getopts ":pw" opt; do
       ;;
 
     w )
-      until $(curl --header $header --output /dev/null --silent --fail "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/config") ; do
+      until check_config; do
           >&2 echo "The migration is incomplete - sleeping..."
           sleep 1
       done
