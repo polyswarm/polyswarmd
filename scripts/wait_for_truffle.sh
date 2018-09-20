@@ -1,23 +1,23 @@
 #!/bin/bash
 
-set -e
+set -ex
+HEADER="X-Consul-Token: ${CONSUL_TOKEN}"
 
-if [ -e $CONSUL_TOKEN ]; then
-  header="X-Consul-Token: $CONSUL_TOKEN"
-else
-  header=""
+
+if [ -z "$CONSUL_TOKEN" ]; then
+  HEADER=""
 fi
 
 create_config() {
-  response=$(curl --header $header --silent "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/config")
+  response=$(curl --header "$HEADER" --silent "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/config")
   config_blob=$(echo $response | jq .[0].Value)
   config_json=$(echo $config_blob | tr -d '"' | base64 --decode)
 
-  response=$(curl --header $header --silent "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/homechain")
+  response=$(curl --header "$HEADER" --silent "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/homechain")
   config_blob=$(echo $response | jq .[0].Value)
   homechain_config_json=$(echo $config_blob | tr -d '"' | base64 --decode)
 
-  response=$(curl --header $header --silent "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/sidechain")
+  response=$(curl --header "$HEADER" --silent "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/sidechain")
   config_blob=$(echo $response | jq .[0].Value)
   sidechain_config_json=$(echo $config_blob | tr -d '"' | base64 --decode)
 
@@ -27,7 +27,7 @@ create_config() {
 }
 
 create_contract_abi() {
-  response=$(curl --header $header --silent "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/$1")
+  response=$(curl --header "$HEADER" --silent "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/$1")
   config_blob=$(echo $response | jq .[0].Value)
   config_json=$(echo $config_blob | tr -d '"' | base64 --decode)
 
@@ -36,7 +36,7 @@ create_contract_abi() {
 }
 
 check_config() {
-  curl --header $header --silent --fail "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/config" | grep -vq Value
+  curl --header ""$HEADER"" --silent --fail "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/config" | grep -vq Value
   return $?
 }
 
@@ -45,7 +45,7 @@ while getopts ":pw" opt; do
   case ${opt} in
     p ) # process option a
       mkdir -p /etc/polyswarmd/contracts
-      curl --header $header --connect-timeout 3 --max-time 10 --retry 60 --retry-delay 3 --retry-max-time 60 "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/config"
+      curl --header "$HEADER" --connect-timeout 3 --max-time 10 --retry 60 --retry-delay 3 --retry-max-time 60 "$CONSUL/v1/kv/$POLY_SIDECHAIN_NAME/config"
 
       create_contract_abi "BountyRegistry"
       create_contract_abi "NectarToken"
