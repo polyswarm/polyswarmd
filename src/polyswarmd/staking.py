@@ -10,6 +10,22 @@ from polyswarmd.response import success, failure
 staking = Blueprint('staking', __name__)
 
 
+@staking.route('/parameters', methods=['GET'])
+@chain
+def get_staking_parameters():
+    minimum_stake = g.arbiter_staking.functions.MINIMUM_STAKE().call()
+    maximum_stake = g.arbiter_staking.functions.MAXIMUM_STAKE().call()
+    vote_ratio_numerator = g.arbiter_staking.functions.VOTE_RATIO_NUMERATOR().call()
+    vote_ratio_denominator = g.arbiter_staking.functions.VOTE_RATIO_DENOMINATOR().call()
+
+    return success({
+        'minimum_stake': minimum_stake,
+        'maximum_stake': maximum_stake,
+        'vote_ratio_numerator': vote_ratio_numerator,
+        'vote_ratio_denominator': vote_ratio_denominator
+    })
+
+
 @staking.route('/deposit', methods=['POST'])
 @chain
 def post_arbiter_staking_deposit():

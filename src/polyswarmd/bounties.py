@@ -17,9 +17,9 @@ from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict
 bounties = Blueprint('bounties', __name__)
 
 
-def calculate_bloom(arts):
+def calculate_bloom(artifacts):
     bf = BloomFilter()
-    for _, h in arts:
+    for _, h in artifacts:
         bf.add(h.encode('utf-8'))
 
     v = int(bf)
@@ -118,19 +118,28 @@ def post_bounties():
     return success({'transactions': transactions})
 
 
-@bounties.route('/window/reveal', methods=['GET'])
+@bounties.route('/parameters', methods=['GET'])
 @chain
-def get_bounty_reveal_window():
+def get_bounty_parameters():
+    bounty_fee = g.bounty_registry.functions.BOUNTY_FEE().call()
+    assertion_fee = g.bounty_registry.functions.ASSERTION_FEE().call()
+    bounty_amount_minimum = g.bounty_registry.functions.BOUNTY_AMOUNT_MINIMUM().call()
+    assertion_bid_minimum = g.bounty_registry.functions.ASSERTION_BID_MINIMUM().call()
+    arbiter_lookback_range = g.bounty_registry.functions.ARBITER_LOOKBACK_RANGE().call()
+    max_duration = g.bounty_registry.functions.MAX_DURATION().call()
     assertion_reveal_window = g.bounty_registry.functions.ASSERTION_REVEAL_WINDOW().call()
+    arbiter_vote_window = g.bounty_registry.functions.arbiterVoteWindow().call()
 
-    return success({'blocks': assertion_reveal_window})
-
-@bounties.route('/window/vote', methods=['GET'])
-@chain
-def get_bounty_vote_window():
-    assertion_vote_window = g.bounty_registry.functions.arbiterVoteWindow().call()
-
-    return success({'blocks': assertion_vote_window})
+    return success({
+        'bounty_fee': bounty_fee,
+        'assertion_fee': assertion_fee,
+        'bounty_amount_minimum': bounty_amount_minimum,
+        'assertion_bid_minimum': assertion_bid_minimum,
+        'arbiter_lookback_range': arbiter_lookback_range,
+        'max_duration': max_duration,
+        'assertion_reveal_window': assertion_reveal_window,
+        'arbiter_vote_window':arbiter_vote_window
+    })
 
 @bounties.route('/<uuid:guid>', methods=['GET'])
 @chain
