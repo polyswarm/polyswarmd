@@ -1,13 +1,15 @@
+import contextlib
 import json
 import logging
 import os
+import socket
 import sys
 import tempfile
-import time
-from urllib.parse import urlparse
-
 import yaml
+
 from consul import Consul
+from consul.base import Timeout
+from urllib.parse import urlparse
 
 eth_uri = {}
 ipfs_uri = ''
@@ -21,7 +23,7 @@ erc20_relay_address = {}
 offer_registry_address = {}
 chain_id = {}
 free = {}
-consul_url = None
+consul_uri = None
 
 CONFIG_LOCATIONS = ['/etc/polyswarmd', '~/.config/polyswarmd', './config']
 
@@ -36,6 +38,31 @@ def whereami():
     return os.path.dirname(os.path.abspath(__file__))
 
 
+def wait_for_consul(consul_uri):
+    u = urlparse(consul_uri)
+    logging.info('Waiting for consul')
+    while True:
+        with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+            sock.settimeout(1)
+            if sock.connect_ex((u.hostname, u.port)) == 0:
+                logging.info('Consul available, continuing')
+                return
+            else:
+                logging.info('Consul not available, sleeping')
+
+
+def fetch_from_consul_or_wait(client, key, recurse=False, index=0):
+    # Need new approach for hot-reload, don't block
+    logging.info('Fetching key: %s', key)
+    while True:
+        try:
+            index, data = client.kv.get(key, recurse=recurse, index=index, wait='2m')
+            if data is not None:
+                logging.info('Got: %s', data)
+                return data
+        except Timeout:
+            logging.info('Consul up but key %s not available, retrying...', key)
+            continue
 
 
 def init_config():
@@ -43,52 +70,43 @@ def init_config():
     Read config from yaml file
     """
     global eth_uri, ipfs_uri, db_uri, require_api_key, config_location, nectar_token_address, \
-            bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id, free, sidechain_name, consul_o
+            bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id, free, sidechain_name, consul_client
     y = None
-    if os.environ.get("CONSUL"):
+    if os.environ.get('CONSUL'):
+        consul_uri = os.environ.get('CONSUL')
+        consul_token = os.environ.get('CONSUL_TOKEN', None)
 
-        consul_u = os.environ.get("CONSUL")
-        u = urlparse(consul_u)
-        # todo assuming http
-        # todo document env variable that controls sidechain
-        consul_o = Consul(host=u.hostname, port=u.port, token=os.environ.get("CONSUL_HTTP_TOKEN", None))
+        wait_for_consul(consul_uri)
+
+        u = urlparse(consul_uri)
+
+        consul_client = Consul(host=u.hostname, port=u.port, scheme=u.scheme, token=consul_token)
+        # TODO document env variable that controls sidechain
         sidechain_name = os.environ['POLY_SIDECHAIN_NAME']
-        # wait on this key to appear
-        # todo schema check json
-        base_config = json.loads(consul_o.kv.get("{}/config".format(sidechain_name), index=0, wait='2m')[1]['Value'].decode('utf-8'))
-        base_config['homechain'] = json.loads(consul_o.kv.get("{}/homechain".format(sidechain_name), index=0, wait='2m')[1]['Value'].decode('utf-8'))
-        base_config['sidechain'] = json.loads(consul_o.kv.get("{}/sidechain".format(sidechain_name), index=0, wait='2m')[1]['Value'].decode('utf-8'))
-        # todo recurse and write contracts.
-        y = base_config
-        # todo push contracts key to separate dir
-        filter_k = [x.format(sidechain_name) for x in ["{}/homechain", "{}/sidechain", "{}/config"]]
-        idx, all_ks = consul_o.kv.get("{}/".format(sidechain_name), recurse=True)
-        contract_location = None
-        for config_location in CONFIG_LOCATIONS:
-            potential = os.path.abspath(os.path.expanduser(config_location))
-            if os.path.exists(potential):
-                contract_location = os.path.join(potential, "contracts")
-                break
 
-        if contract_location is None:
-            # create from last
-            config_location = tempfile.mkdtemp(prefix="polyconfig")
-            contract_location = os.path.join(config_location, "contracts")
-            os.mkdir(contract_location)
+        # TODO schema check json
+        y = json.loads(fetch_from_consul_or_wait(consul_client, '{}/config'.format(sidechain_name))['Value'].decode('utf-8'))
+        y['homechain'] = json.loads(fetch_from_consul_or_wait(consul_client, '{}/homechain'.format(sidechain_name))['Value'].decode('utf-8'))
+        y['sidechain'] = json.loads(fetch_from_consul_or_wait(consul_client, '{}/sidechain'.format(sidechain_name))['Value'].decode('utf-8'))
 
-        for kvs in filter(lambda k: k.get("Key") not in filter_k, all_ks):
-            # check for abi key and assume contract, write.
+        # TODO recurse and write contracts.
+        # TODO push contracts key to separate dir
+        config_location = tempfile.mkdtemp(prefix='polyconfig')
+        contract_location = os.path.join(config_location, 'contracts')
+        os.mkdir(contract_location)
+
+        filter_k = [x.format(sidechain_name) for x in ['{}/homechain', '{}/sidechain', '{}/config']]
+        all_ks = fetch_from_consul_or_wait(consul_client, '{}/'.format(sidechain_name), recurse=True)
+
+        for kvs in filter(lambda k: k.get('Key') not in filter_k, all_ks):
             potential_contract = json.loads(kvs['Value'].decode('utf-8'))
 
-
-
-            if potential_contract.get("abi"):
-                # then write it to ContractName.json
-                contract_name = "{}.json".format(kvs['Key'].lstrip("{}/".format(sidechain_name)))
+            # If ABI key exists, write contract
+            if potential_contract.get('abi'):
+                contract_name = '{}.json'.format(kvs['Key'].lstrip('{}/'.format(sidechain_name)))
                 with open(os.path.join(contract_location, contract_name), 'wb') as f:
                     f.write(kvs['Value'])
-                    logging.info("Writing contract {}".format(contract_name))
-        pass
+                    logging.info('Writing contract {}'.format(contract_name))
     else:
         for config_location in CONFIG_LOCATIONS:
             config_location = os.path.abspath(os.path.expanduser(config_location))
@@ -97,20 +115,16 @@ def init_config():
                 break
 
         if not os.path.isfile(config_file):
-            logging.error("MISSING CONFIG")
+            logging.error('MISSING CONFIG')
             sys.exit(-1)
-    # already done if we've parsed from consul
+
         with open(config_file, 'r') as f:
             y = yaml.load(f.read())
 
     ipfs_uri = y['ipfs_uri']
-    db_uri = y.get('db_uri')
+
     # fallback to env variable in case we can't get this out of our config file.
-    if db_uri is None:
-        db_uri = os.environ.get("DB_URI")
-
-    # require if we've set our DB up.
-
+    db_uri = y.get('db_uri', os.environ.get('DB_URI'))
     if db_uri is not None:
         require_api_key = True
 
@@ -119,10 +133,9 @@ def init_config():
     nectar_token_address['home'] = home['nectar_token_address']
     bounty_registry_address['home'] = home['bounty_registry_address']
     erc20_relay_address['home'] = home['erc20_relay_address']
-    offer_registry_address['home'] = home[
-        'offer_registry_address']  # only on home chain
+    offer_registry_address['home'] = home['offer_registry_address']
     chain_id['home'] = home['chain_id']
-    free["home"] = home.get('free', False)
+    free['home'] = home.get('free', False)
 
     side = y['sidechain']
     eth_uri['side'] = side['eth_uri']
@@ -130,7 +143,7 @@ def init_config():
     bounty_registry_address['side'] = side['bounty_registry_address']
     erc20_relay_address['side'] = side['erc20_relay_address']
     chain_id['side'] = side['chain_id']
-    free["side"] = side.get('free', False)
+    free['side'] = side.get('free', False)
 
 
 def set_config(**kwargs):

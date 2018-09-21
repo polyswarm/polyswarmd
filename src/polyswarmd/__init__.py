@@ -3,6 +3,9 @@
 import datetime
 import logging
 
+# __main__:main() overrides this but let's get init logs by default
+logging.basicConfig(level=logging.INFO)
+
 from flask import Flask, g, request
 
 from polyswarmd.config import init_config
