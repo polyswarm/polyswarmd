@@ -60,23 +60,25 @@ def init_config():
         if db_uri is not None:
             require_api_key = True
 
-        home = y['homechain']
-        eth_uri['home'] = home['eth_uri']
-        nectar_token_address['home'] = home['nectar_token_address']
-        bounty_registry_address['home'] = home['bounty_registry_address']
-        erc20_relay_address['home'] = home['erc20_relay_address']
-        offer_registry_address['home'] = home[
-            'offer_registry_address']  # only on home chain
-        chain_id['home'] = home['chain_id']
-        free["home"] = home.get('free', False)
+        home = y.get('homechain')
+        if home is not None:
+            eth_uri['home'] = home.get('eth_uri')
+            nectar_token_address['home'] = home.get('nectar_token_address')
+            bounty_registry_address['home'] = home.get('bounty_registry_address')
+            erc20_relay_address['home'] = home.get('erc20_relay_address')
+            offer_registry_address['home'] = home.get(
+                'offer_registry_address')  # only on home chain
+            chain_id['home'] = home.get('chain_id')
+            free['home'] = home.get('free', False)
 
-        side = y['sidechain']
-        eth_uri['side'] = side['eth_uri']
-        nectar_token_address['side'] = side['nectar_token_address']
-        bounty_registry_address['side'] = side['bounty_registry_address']
-        erc20_relay_address['side'] = side['erc20_relay_address']
-        chain_id['side'] = side['chain_id']
-        free["side"] = side.get('free', False)
+        side = y.get('sidechain')
+        if side is not None:
+            eth_uri['side'] = side.get('eth_uri')
+            nectar_token_address['side'] = side.get('nectar_token_address')
+            bounty_registry_address['side'] = side.get('bounty_registry_address')
+            erc20_relay_address['side'] = side.get('erc20_relay_address')
+            chain_id['side'] = side.get('chain_id')
+            free['side'] = side.get('free', False)
 
 
 def set_config(**kwargs):

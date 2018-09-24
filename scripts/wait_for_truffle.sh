@@ -91,7 +91,7 @@ done
 
 shift $(expr $OPTIND - 1 )
 cmd="$@"
-echo "gonna run"
+printf "gonna run"
 echo $cmd
 exec $cmd
 
