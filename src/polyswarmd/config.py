@@ -70,7 +70,7 @@ def init_config():
     Read config from yaml file
     """
     global eth_uri, ipfs_uri, db_uri, require_api_key, config_location, nectar_token_address, \
-            bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id, free, sidechain_name, consul_client
+        bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id, free, sidechain_name, consul_client
     y = None
     if os.environ.get('CONSUL'):
         consul_uri = os.environ.get('CONSUL')
@@ -98,7 +98,7 @@ def init_config():
         filter_k = [x.format(sidechain_name) for x in ['{}/homechain', '{}/sidechain', '{}/config']]
         all_ks = fetch_from_consul_or_wait(consul_client, '{}/'.format(sidechain_name), recurse=True)
 
-        for kvs in filter(lambda k: k.get('Key') not in filter_k, all_ks):
+        for kvs in [k for k in all_ks if k.get('Key') not in filter_k]:
             potential_contract = json.loads(kvs['Value'].decode('utf-8'))
 
             # If ABI key exists, write contract
@@ -151,7 +151,7 @@ def set_config(**kwargs):
     Set up config from arguments for testing purposes
     """
     global eth_uri, ipfs_uri, db_uri, require_api_key, nectar_token_address, \
-            bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id, free
+        bounty_registry_address, erc20_relay_address, offer_registry_address, chain_id, free
     eth_uri = {
         'home': kwargs.get('eth_uri', 'http://localhost:8545'),
         'side': kwargs.get('eth_uri', 'http://localhost:7545'),

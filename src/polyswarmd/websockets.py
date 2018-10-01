@@ -9,10 +9,10 @@ from jsonschema.exceptions import ValidationError
 from flask import request, g
 from flask_sockets import Sockets
 from geventwebsocket import WebSocketError
+from requests.exceptions import ConnectionError
 
 from polyswarmd.chains import chain
 from polyswarmd.eth import offer_msig_artifact, bind_contract
-from polyswarmd.config import chain_id as chain_ids
 from polyswarmd.utils import channel_to_dict, new_cancel_agreement_event_to_dict, new_settle_started_event, new_settle_challenged_event, new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict, state_to_dict, new_init_channel_event_to_dict, new_quorum_event_to_dict, settled_bounty_event_to_dict, revealed_assertion_event_to_dict
 
 
@@ -24,17 +24,6 @@ def init_websockets(app):
     @sockets.route('/events')
     @chain
     def events(ws):
-        block_filter = g.web3.eth.filter('latest')
-        bounty_filter = g.bounty_registry.eventFilter('NewBounty')
-        assertion_filter = g.bounty_registry.eventFilter('NewAssertion')
-        verdict_filter = g.bounty_registry.eventFilter('NewVerdict')
-        quorum_filiter = g.bounty_registry.eventFilter('QuorumReached')
-        settled_filter = g.bounty_registry.eventFilter('BountySettled')
-        reveal_filter = g.bounty_registry.eventFilter('RevealedAssertion')
-        init_filter = None
-        if g.offer_registry is not None:
-            init_filter = g.offer_registry.eventFilter('InitializedChannel')
-
         ws.send(
             json.dumps({
                 'event': 'connected',
@@ -43,8 +32,23 @@ def init_websockets(app):
                 }
             }))
 
+        filters_initialized = False
         while not ws.closed:
             try:
+                if not filters_initialized:
+                    block_filter = g.web3.eth.filter('latest')
+                    bounty_filter = g.bounty_registry.eventFilter('NewBounty')
+                    assertion_filter = g.bounty_registry.eventFilter('NewAssertion')
+                    verdict_filter = g.bounty_registry.eventFilter('NewVerdict')
+                    quorum_filiter = g.bounty_registry.eventFilter('QuorumReached')
+                    settled_filter = g.bounty_registry.eventFilter('BountySettled')
+                    reveal_filter = g.bounty_registry.eventFilter('RevealedAssertion')
+                    init_filter = None
+                    if g.offer_registry is not None:
+                        init_filter = g.offer_registry.eventFilter('InitializedChannel')
+
+                    filters_initialized = True
+
                 for event in block_filter.get_new_entries():
                     ws.send(
                         json.dumps({
@@ -120,9 +124,14 @@ def init_websockets(app):
 
                 gevent.sleep(1)
             except WebSocketError:
+                logging.info('Websocket connection closed, exiting loop')
                 break
+            except ConnectionError as e:
+                logging.error('ConnectionError in /events (is geth down?): %s', e)
+                filters_initialized = False
+                continue
             except Exception as e:
-                logging.error('Error in /events: %s', e)
+                logging.error('Exception in /events (%s): %s', type(e), e)
                 continue
 
     @sockets.route('/events/<uuid:guid>')
@@ -134,12 +143,17 @@ def init_websockets(app):
         msig_address = offer_channel['msig_address']
         offer_msig = bind_contract(g.web3, msig_address, offer_msig_artifact)
 
-        closed_agreement_filter = offer_msig.eventFilter('ClosedAgreement')
-        settle_started_filter = offer_msig.eventFilter('StartedSettle')
-        settle_challenged_filter = offer_msig.eventFilter('SettleStateChallenged')
 
+        filters_initialized = False
         while not ws.closed:
             try:
+                if not filters_initialized:
+                    closed_agreement_filter = offer_msig.eventFilter('ClosedAgreement')
+                    settle_started_filter = offer_msig.eventFilter('StartedSettle')
+                    settle_challenged_filter = offer_msig.eventFilter('SettleStateChallenged')
+
+                    filters_initialized = True
+
                 for event in closed_agreement_filter.get_new_entries():
                     ws.send(
                         json.dumps({
@@ -169,9 +183,14 @@ def init_websockets(app):
 
                 gevent.sleep(1)
             except WebSocketError:
+                logging.info('Websocket connection closed, exiting loop')
                 break
+            except ConnectionError:
+                logging.error('ConnectionError in offer /events (is geth down?): %s', e)
+                filters_initialized = False
+                continue
             except Exception as e:
-                print('Error in /events:', e, file=sys.stderr)
+                logging.error('Exception in /events (%s): %s', type(e), e)
                 continue
 
     # for receiving messages about offers that might need to be signed
@@ -262,7 +281,8 @@ def init_websockets(app):
 
                 gevent.sleep(1)
             except WebSocketError:
+                logging.info('Websocket connection closed, exiting loop')
                 break
             except Exception as e:
-                print('Error in /messages:', e, file=sys.stderr)
+                logging.error('Exception in /events (%s): %s', type(e), e)
                 continue
