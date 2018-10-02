@@ -103,7 +103,7 @@ def init_config():
 
             # If ABI key exists, write contract
             if potential_contract.get('abi'):
-                contract_name = '{}.json'.format(kvs['Key'].lstrip('{}/'.format(sidechain_name)))
+                contract_name = '{}.json'.format(kvs['Key'].lstrip('chain/{}/'.format(sidechain_name)))
                 with open(os.path.join(contract_location, contract_name), 'wb') as f:
                     f.write(kvs['Value'])
                     logging.info('Writing contract {}'.format(contract_name))
