@@ -85,9 +85,9 @@ def init_config():
         sidechain_name = os.environ['POLY_SIDECHAIN_NAME']
 
         # TODO schema check json
-        y = json.loads(fetch_from_consul_or_wait(consul_client, '{}/config'.format(sidechain_name))['Value'].decode('utf-8'))
-        y['homechain'] = json.loads(fetch_from_consul_or_wait(consul_client, '{}/homechain'.format(sidechain_name))['Value'].decode('utf-8'))
-        y['sidechain'] = json.loads(fetch_from_consul_or_wait(consul_client, '{}/sidechain'.format(sidechain_name))['Value'].decode('utf-8'))
+        y = json.loads(fetch_from_consul_or_wait(consul_client, 'chain/{}/config'.format(sidechain_name))['Value'].decode('utf-8'))
+        y['homechain'] = json.loads(fetch_from_consul_or_wait(consul_client, 'chain/{}/homechain'.format(sidechain_name))['Value'].decode('utf-8'))
+        y['sidechain'] = json.loads(fetch_from_consul_or_wait(consul_client, 'chain/{}/sidechain'.format(sidechain_name))['Value'].decode('utf-8'))
 
         # TODO recurse and write contracts.
         # TODO push contracts key to separate dir
@@ -95,7 +95,7 @@ def init_config():
         contract_location = os.path.join(config_location, 'contracts')
         os.mkdir(contract_location)
 
-        filter_k = [x.format(sidechain_name) for x in ['{}/homechain', '{}/sidechain', '{}/config']]
+        filter_k = [x.format(sidechain_name) for x in ['chain/{}/homechain', 'chain/{}/sidechain', 'chain/{}/config']]
         all_ks = fetch_from_consul_or_wait(consul_client, '{}/'.format(sidechain_name), recurse=True)
 
         for kvs in [k for k in all_ks if k.get('Key') not in filter_k]:
