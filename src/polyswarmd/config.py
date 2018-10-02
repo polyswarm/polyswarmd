@@ -96,7 +96,7 @@ def init_config():
         os.mkdir(contract_location)
 
         filter_k = [x.format(sidechain_name) for x in ['chain/{}/homechain', 'chain/{}/sidechain', 'chain/{}/config']]
-        all_ks = fetch_from_consul_or_wait(consul_client, '{}/'.format(sidechain_name), recurse=True)
+        all_ks = fetch_from_consul_or_wait(consul_client, 'chain/{}/'.format(sidechain_name), recurse=True)
 
         for kvs in [k for k in all_ks if k.get('Key') not in filter_k]:
             potential_contract = json.loads(kvs['Value'].decode('utf-8'))
