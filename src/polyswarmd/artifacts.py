@@ -11,7 +11,6 @@ from polyswarmd.response import success, failure
 
 artifacts = Blueprint('artifacts', __name__)
 
-
 def is_valid_ipfshash(ipfshash):
     # TODO: Further multihash validation
     try:
@@ -28,7 +27,7 @@ def list_artifacts(ipfshash):
             ipfs_uri + '/api/v0/ls', params={'arg': ipfshash}, timeout=1)
         r.raise_for_status()
     except Exception as e:
-        logging.error('Received error listing files on IPFS: %s', e)
+        logger.error('Received error listing files on IPFS: %s', e)
         return []
 
     links = [(l['Name'], l['Hash']) for l in r.json()['Objects'][0]['Links']]
@@ -44,7 +43,7 @@ def get_artifacts_status():
         r = requests.get(ipfs_uri + '/api/v0/diag/sys', timeout=1)
         r.raise_for_status()
     except Exception as e:
-        logging.error('Received error connecting to IPFS: %s', e)
+        logger.error('Received error connecting to IPFS: %s', e)
         return failure('Could not connect to IPFS', 500)
 
     online = r.json()['net']['online']
@@ -65,7 +64,7 @@ def post_artifacts():
             params={'wrap-with-directory': True})
         r.raise_for_status()
     except Exception as e:
-        logging.error('Received error posting to IPFS: %s', e)
+        logger.error('Received error posting to IPFS: %s', e)
         return failure("Could not add artifacts to IPFS", 400)
 
     ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
@@ -105,7 +104,7 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
             ipfs_uri + '/api/v0/cat', params={'arg': artifact}, timeout=1)
         r.raise_for_status()
     except Exception as e:
-        logging.error('Received error retrieving files from IPFS: %s', e)
+        logger.error('Received error retrieving files from IPFS: %s', e)
         return failure("Could not locate IPFS resource", 404)
 
     return r.content
@@ -130,7 +129,7 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
             ipfs_uri + '/api/v0/object/stat', params={'arg': artifact})
         r.raise_for_status()
     except Exception as e:
-        logging.error('Received error stating files from IPFS: %s', e)
+        logger.error('Received error stating files from IPFS: %s', e)
         return failure("Could not locate IPFS resource", 400)
 
     # Convert stats to snake_case

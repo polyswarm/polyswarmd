@@ -5,7 +5,6 @@ from polyswarmd.response import success, failure
 
 balances = Blueprint('balances', __name__)
 
-
 @balances.route('/<address>/eth', methods=['GET'])
 @chain
 def get_balance_address_eth(address):

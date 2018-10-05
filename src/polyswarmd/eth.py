@@ -18,6 +18,7 @@ from polyswarmd.artifacts import is_valid_ipfshash
 from polyswarmd.config import config_location, whereami
 from polyswarmd.response import success, failure
 
+logger = logging.getLogger(__name__)
 misc = Blueprint('misc', __name__)
 
 
@@ -90,7 +91,7 @@ def post_transactions():
 
         sender = g.web3.toChecksumAddress(tx.sender.hex())
         if sender != account:
-            logging.warning(
+            logger.warning(
                 'Got invalid transaction sender, expected %s got %s', account,
                 sender)
             continue
@@ -99,7 +100,7 @@ def post_transactions():
         try:
             txhashes.append(g.web3.eth.sendRawTransaction(HexBytes(raw_tx)))
         except ValueError as e:
-            logging.warning(
+            logger.warning(
                 'Got invalid transaction error %s', e)
             return failure(str(e), 400)
 
