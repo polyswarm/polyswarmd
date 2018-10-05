@@ -15,6 +15,7 @@ from polyswarmd.chains import chain
 from polyswarmd.eth import offer_msig_artifact, bind_contract
 from polyswarmd.utils import channel_to_dict, new_cancel_agreement_event_to_dict, new_settle_started_event, new_settle_challenged_event, new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict, state_to_dict, new_init_channel_event_to_dict, new_quorum_event_to_dict, settled_bounty_event_to_dict, revealed_assertion_event_to_dict
 
+logger = logging.getLogger(__name__)
 
 def init_websockets(app):
     sockets = Sockets(app)
@@ -124,14 +125,14 @@ def init_websockets(app):
 
                 gevent.sleep(1)
             except WebSocketError:
-                logging.info('Websocket connection closed, exiting loop')
+                logger.info('Websocket connection closed, exiting loop')
                 break
             except ConnectionError as e:
-                logging.error('ConnectionError in /events (is geth down?): %s', e)
+                logger.error('ConnectionError in /events (is geth down?): %s', e)
                 filters_initialized = False
                 continue
             except Exception as e:
-                logging.error('Exception in /events (%s): %s', type(e), e)
+                logger.error('Exception in /events (%s): %s', type(e), e)
                 continue
 
     @sockets.route('/events/<uuid:guid>')
@@ -183,14 +184,14 @@ def init_websockets(app):
 
                 gevent.sleep(1)
             except WebSocketError:
-                logging.info('Websocket connection closed, exiting loop')
+                logger.info('Websocket connection closed, exiting loop')
                 break
             except ConnectionError:
-                logging.error('ConnectionError in offer /events (is geth down?): %s', e)
+                logger.error('ConnectionError in offer /events (is geth down?): %s', e)
                 filters_initialized = False
                 continue
             except Exception as e:
-                logging.error('Exception in /events (%s): %s', type(e), e)
+                logger.error('Exception in /events (%s): %s', type(e), e)
                 continue
 
     # for receiving messages about offers that might need to be signed
@@ -246,7 +247,7 @@ def init_websockets(app):
                 try:
                     jsonschema.validate(body, schema)
                 except ValidationError as e:
-                    logging.error('Invalid JSON: %s', e)
+                    logger.error('Invalid JSON: %s', e)
 
                 state_dict = state_to_dict(body['state'])
                 state_dict['guid'] = guid.int
@@ -281,8 +282,8 @@ def init_websockets(app):
 
                 gevent.sleep(1)
             except WebSocketError:
-                logging.info('Websocket connection closed, exiting loop')
+                logger.info('Websocket connection closed, exiting loop')
                 break
             except Exception as e:
-                logging.error('Exception in /events (%s): %s', type(e), e)
+                logger.error('Exception in /events (%s): %s', type(e), e)
                 continue

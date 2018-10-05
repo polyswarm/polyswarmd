@@ -2,14 +2,15 @@
 
 import datetime
 import logging
-
-# __main__:main() overrides this but let's get init logs by default
-logging.basicConfig(level=logging.INFO)
+import os
 
 from flask import Flask, g, request
 
-from polyswarmd.config import init_config
+from polyswarmd.config import init_config, init_logging
+log_format = os.environ['LOG_FORMAT'] if 'LOG_FORMAT' in os.environ else None
+init_logging(log_format)
 init_config()
+
 
 from polyswarmd.config import require_api_key, whereami
 
@@ -41,6 +42,8 @@ app.register_blueprint(offers, url_prefix='/offers')
 app.register_blueprint(staking, url_prefix='/staking')
 init_websockets(app)
 
+# Init logger
+logger = logging.getLogger(__name__)
 
 @app.teardown_appcontext
 def teardown_appcontext(exception=None):
@@ -76,6 +79,6 @@ def before_request():
 
 @app.after_request
 def after_request(response):
-    logging.info('%s %s %s %s', datetime.datetime.now(), request.method,
+    logger.info('%s %s %s %s', datetime.datetime.now(), request.method,
                  response.status_code, request.path)
     return response

@@ -9,7 +9,11 @@ import yaml
 
 from consul import Consul
 from consul.base import Timeout
+from polyswarmd.logger import PolyswarmdJsonFormatter
+from pythonjsonlogger import jsonlogger
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 eth_uri = {}
 ipfs_uri = ''
@@ -40,29 +44,47 @@ def whereami():
 
 def wait_for_consul(consul_uri):
     u = urlparse(consul_uri)
-    logging.info('Waiting for consul')
+    logger.info('Waiting for consul')
     while True:
         with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
             sock.settimeout(1)
             if sock.connect_ex((u.hostname, u.port)) == 0:
-                logging.info('Consul available, continuing')
+                logger.info('Consul available, continuing')
                 return
             else:
-                logging.info('Consul not available, sleeping')
+                logger.info('Consul not available, sleeping')
 
 
 def fetch_from_consul_or_wait(client, key, recurse=False, index=0):
     # Need new approach for hot-reload, don't block
-    logging.info('Fetching key: %s', key)
+    logger.info('Fetching key: %s', key)
     while True:
         try:
             index, data = client.kv.get(key, recurse=recurse, index=index, wait='2m')
             if data is not None:
-                logging.info('Got: %s', data)
+                logger.info('Got: %s', data)
                 return data
         except Timeout:
-            logging.info('Consul up but key %s not available, retrying...', key)
+            logger.info('Consul up but key %s not available, retrying...', key)
             continue
+
+
+def init_logging(log_format):
+    """
+    Logic to support JSON logging.
+    """
+    logger = logging.getLogger()  # Root logger
+    if log_format and log_format in ['json', 'datadog']:
+        logHandler = logging.StreamHandler()
+        formatter = jsonlogger.JsonFormatter()
+        formatter = PolyswarmdJsonFormatter('(timestamp) (level) (name) (message)')
+        logHandler.setFormatter(formatter)
+        logger.addHandler(logHandler)
+        logger.setLevel(logging.INFO)
+        logger.info("Logging in JSON format.")
+    else:
+        logging.basicConfig(level=logging.INFO)
+        logger.info("Logging in text format.")
 
 
 def init_config():
@@ -106,7 +128,7 @@ def init_config():
                 contract_name = '{}.json'.format(kvs['Key'].lstrip('chain/{}/'.format(sidechain_name)))
                 with open(os.path.join(contract_location, contract_name), 'wb') as f:
                     f.write(kvs['Value'])
-                    logging.info('Writing contract {}'.format(contract_name))
+                    logger.info('Writing contract {}'.format(contract_name))
     else:
         for config_location in CONFIG_LOCATIONS:
             config_location = os.path.abspath(os.path.expanduser(config_location))
@@ -115,7 +137,7 @@ def init_config():
                 break
 
         if not os.path.isfile(config_file):
-            logging.error('MISSING CONFIG')
+            logger.error('MISSING CONFIG')
             sys.exit(-1)
 
         with open(config_file, 'r') as f:

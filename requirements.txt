@@ -12,6 +12,7 @@ hexbytes==0.1.0
 psycopg2-binary==2.7.5
 PyYaml==3.12
 pytest==3.5.1
+python-json-logger==0.1.9
 requests==2.18.4
 requests-mock==1.5.0
 rlp==0.6.0

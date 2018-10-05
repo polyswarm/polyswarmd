@@ -6,6 +6,7 @@ from sqlalchemy.ext.declarative import declarative_base
 
 from polyswarmd.config import db_uri
 
+logger = logging.getLogger(__name__)
 engine = create_engine(db_uri, convert_unicode=True)
 db_session = scoped_session(
     sessionmaker(autocommit=False, autoflush=False, bind=engine))
@@ -84,5 +85,5 @@ def add_api_key(email, eth_address, api_key):
         db_session.add(user_obj)
         db_session.commit()
     except Exception as e:
-        logging.error('Error inserting new API key into DB: %s', e)
+        logger.error('Error inserting new API key into DB: %s', e)
         db_session.rollback()
