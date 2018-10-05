@@ -9,7 +9,6 @@ import yaml
 
 from consul import Consul
 from consul.base import Timeout
-from flask.cli import with_appcontext
 from polyswarmd.logger import PolyswarmdJsonFormatter
 from pythonjsonlogger import jsonlogger
 from urllib.parse import urlparse
