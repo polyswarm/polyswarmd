@@ -6,13 +6,9 @@ import os
 
 from flask import Flask, g, request
 
-from polyswarmd.config import init_config, init_logging
-log_format = os.environ['LOG_FORMAT'] if 'LOG_FORMAT' in os.environ else None
-init_logging(log_format)
+from polyswarmd.config import init_config, init_logging, require_api_key, whereami
+init_logging(os.environ.get('LOG_FORMAT'))
 init_config()
-
-
-from polyswarmd.config import require_api_key, whereami
 
 if require_api_key:
     from polyswarmd.db import init_db, db_session, lookup_api_key, add_api_key
