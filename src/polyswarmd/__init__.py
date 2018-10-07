@@ -6,10 +6,14 @@ import os
 
 from flask import Flask, g, request
 
-from polyswarmd.config import init_config, init_logging, require_api_key, whereami
+from polyswarmd.config import init_config, init_logging, whereami
 init_logging(os.environ.get('LOG_FORMAT'))
 init_config()
 
+# XXX: Due to weird way config init works this is required to be separate. We should
+# figure out better way to do this, but its tricky because of flask etc wanting
+# to set up stuff at import time.
+from polyswarmd.config import require_api_key
 if require_api_key:
     from polyswarmd.db import init_db, db_session, lookup_api_key, add_api_key
     init_db()
