@@ -6,9 +6,12 @@ import os
 
 from flask import Flask, g, request
 
-from polyswarmd.config import init_config, init_logging, require_api_key, whereami
+from polyswarmd.config import init_config, init_logging
 init_logging(os.environ.get('LOG_FORMAT'))
 init_config()
+
+# don't move this, import order seems to be important here.
+from polyswarmd.config import require_api_key, whereami
 
 if require_api_key:
     from polyswarmd.db import init_db, db_session, lookup_api_key, add_api_key
