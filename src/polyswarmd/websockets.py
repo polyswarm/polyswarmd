@@ -131,12 +131,9 @@ def init_websockets(app):
                 logger.error('ConnectionError in /events (is geth down?): %s', e)
                 filters_initialized = False
                 continue
-            except ValueError as e:
-                logger.error('ValueError in /events, resetting filters: %s', e)
-                filters_initialized = False
-                continue
             except Exception as e:
-                logger.error('Exception in /events (%s): %s', type(e), e)
+                logger.error('Exception in /events, resetting filters (%s): %s', type(e), e)
+                filters_initialized = False
                 continue
 
     @sockets.route('/events/<uuid:guid>')
@@ -147,7 +144,6 @@ def init_websockets(app):
             g.offer_registry.functions.guidToChannel(guid.int).call())
         msig_address = offer_channel['msig_address']
         offer_msig = bind_contract(g.web3, msig_address, offer_msig_artifact)
-
 
         filters_initialized = False
         while not ws.closed:
@@ -194,12 +190,9 @@ def init_websockets(app):
                 logger.error('ConnectionError in offer /events (is geth down?): %s', e)
                 filters_initialized = False
                 continue
-            except ValueError as e:
-                logger.error('ValueError in /events, resetting filters: %s', e)
-                filters_initialized = False
-                continue
             except Exception as e:
-                logger.error('Exception in /events (%s): %s', type(e), e)
+                logger.error('Exception in /events, resetting filters (%s): %s', type(e), e)
+                filters_initialized = False
                 continue
 
     # for receiving messages about offers that might need to be signed
