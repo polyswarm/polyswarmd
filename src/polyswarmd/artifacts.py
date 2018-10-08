@@ -9,7 +9,9 @@ from flask import Blueprint, request
 from polyswarmd.config import ipfs_uri
 from polyswarmd.response import success, failure
 
+logger = logging.getLogger(__name__)  # Init logger
 artifacts = Blueprint('artifacts', __name__)
+
 
 def is_valid_ipfshash(ipfshash):
     # TODO: Further multihash validation

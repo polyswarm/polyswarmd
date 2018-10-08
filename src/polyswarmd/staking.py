@@ -1,4 +1,5 @@
 import jsonschema
+import logging
 from jsonschema.exceptions import ValidationError
 from flask import Blueprint, g, request
 
@@ -7,6 +8,7 @@ from polyswarmd.eth import build_transaction
 from polyswarmd.chains import chain
 from polyswarmd.response import success, failure
 
+logger = logging.getLogger(__name__)  # Init logger
 staking = Blueprint('staking', __name__)
 
 

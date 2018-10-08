@@ -1,10 +1,12 @@
 # Based on eth-bloom (https://github.com/ethereum/eth-bloom, used under MIT
 # license) with modifications
-
+import logging
 import numbers
 import operator
 
 from ethereum.utils import sha3
+
+logger = logging.getLogger(__name__)  # Init logger
 
 FILTER_BITS = 8 * 256
 HASH_FUNCS = 8

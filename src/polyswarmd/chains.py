@@ -1,4 +1,5 @@
 import functools
+import logging
 import os
 
 from flask import g, request
@@ -10,6 +11,7 @@ from polyswarmd.response import failure
 from polyswarmd.config import config_location, chain_id as id_chains, eth_uri as eth_chains, nectar_token_address as nectar_chains, bounty_registry_address as bounty_chains, offer_registry_address, free as free_chains, erc20_relay_address as erc20_relay_chains
 from polyswarmd.eth import bind_contract
 
+logger = logging.getLogger(__name__)  # Init logger
 web3_chains = {}
 # Create token bindings for each chain
 bounty_registry_chains = {}

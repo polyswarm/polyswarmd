@@ -13,7 +13,7 @@ from polyswarmd.logger import PolyswarmdJsonFormatter
 from pythonjsonlogger import jsonlogger
 from urllib.parse import urlparse
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)  # Init logger
 
 eth_uri = {}
 ipfs_uri = ''

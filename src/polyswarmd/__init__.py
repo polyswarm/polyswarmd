@@ -41,8 +41,8 @@ app.register_blueprint(offers, url_prefix='/offers')
 app.register_blueprint(staking, url_prefix='/staking')
 init_websockets(app)
 
-# Init logger
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)  # Init logger
+
 
 @app.teardown_appcontext
 def teardown_appcontext(exception=None):

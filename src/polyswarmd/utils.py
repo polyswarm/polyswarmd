@@ -1,7 +1,11 @@
+import logging
 import re
 import uuid
 from flask import g
 from polyswarmd.eth import zero_address
+
+logger = logging.getLogger(__name__)  # Init logger
+
 
 def bool_list_to_int(bs):
     return sum([1 << n if b else 0 for n, b in enumerate(bs)])

@@ -1,8 +1,11 @@
+import logging
+
 from flask import Blueprint, request, g
 
 from polyswarmd.chains import chain
 from polyswarmd.response import success, failure
 
+logger = logging.getLogger(__name__)  # Init logger
 balances = Blueprint('balances', __name__)
 
 @balances.route('/<address>/eth', methods=['GET'])

@@ -1,3 +1,4 @@
+import logging
 import os
 import jsonschema
 import uuid
@@ -14,7 +15,9 @@ from polyswarmd.eth import build_transaction, zero_address
 from polyswarmd.response import success, failure
 from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict
 
+logger = logging.getLogger(__name__)  # Init logger
 bounties = Blueprint('bounties', __name__)
+
 
 def calculate_bloom(artifacts):
     bf = BloomFilter()
