@@ -6,6 +6,7 @@ import socket
 import sys
 import tempfile
 import yaml
+import time
 
 from consul import Consul
 from consul.base import Timeout
@@ -53,7 +54,7 @@ def wait_for_consul(consul_uri):
                 return
             else:
                 logger.info('Consul not available, sleeping')
-
+                time.sleep(1)
 
 def fetch_from_consul_or_wait(client, key, recurse=False, index=0):
     # Need new approach for hot-reload, don't block
