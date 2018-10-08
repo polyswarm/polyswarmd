@@ -1,4 +1,5 @@
 import jsonschema
+import logging
 from jsonschema.exceptions import ValidationError
 
 from flask import Blueprint, g, request

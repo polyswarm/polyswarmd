@@ -1,3 +1,4 @@
+import logging
 from flask import jsonify
 from werkzeug.exceptions import default_exceptions, HTTPException
 

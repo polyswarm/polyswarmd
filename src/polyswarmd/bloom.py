@@ -1,6 +1,6 @@
 # Based on eth-bloom (https://github.com/ethereum/eth-bloom, used under MIT
 # license) with modifications
-
+import logging
 import numbers
 import operator
 

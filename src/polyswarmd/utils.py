@@ -1,3 +1,4 @@
+import logging
 import re
 import uuid
 from flask import g

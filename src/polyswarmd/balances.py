@@ -1,3 +1,5 @@
+import logging
+
 from flask import Blueprint, request, g
 
 from polyswarmd.chains import chain

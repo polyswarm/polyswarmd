@@ -1,6 +1,7 @@
 import uuid
 import json
 import jsonschema
+import logging
 from jsonschema.exceptions import ValidationError
 from flask import Blueprint, g, request
 from polyswarmd.chains import chain
