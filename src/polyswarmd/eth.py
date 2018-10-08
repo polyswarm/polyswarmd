@@ -18,7 +18,7 @@ from polyswarmd.artifacts import is_valid_ipfshash
 from polyswarmd.config import config_location, whereami
 from polyswarmd.response import success, failure
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)  # Init logger
 misc = Blueprint('misc', __name__)
 
 

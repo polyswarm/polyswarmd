@@ -6,7 +6,7 @@ from sqlalchemy.ext.declarative import declarative_base
 
 from polyswarmd.config import db_uri
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)  # Init logger
 engine = create_engine(db_uri, convert_unicode=True)
 db_session = scoped_session(
     sessionmaker(autocommit=False, autoflush=False, bind=engine))

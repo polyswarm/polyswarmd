@@ -8,6 +8,7 @@ from polyswarmd.eth import build_transaction, offer_msig_artifact, bind_contract
 from polyswarmd.response import success, failure
 from polyswarmd.utils import channel_to_dict, validate_ws_url, dict_to_state, to_padded_hex, bool_list_to_int
 
+logger = logging.getLogger(__name__)  # Init logger
 offers = Blueprint('offers', __name__)
 
 

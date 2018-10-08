@@ -15,7 +15,8 @@ from polyswarmd.chains import chain
 from polyswarmd.eth import offer_msig_artifact, bind_contract
 from polyswarmd.utils import channel_to_dict, new_cancel_agreement_event_to_dict, new_settle_started_event, new_settle_challenged_event, new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict, state_to_dict, new_init_channel_event_to_dict, new_quorum_event_to_dict, settled_bounty_event_to_dict, revealed_assertion_event_to_dict
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)  # Init logger
+
 
 def init_websockets(app):
     sockets = Sockets(app)

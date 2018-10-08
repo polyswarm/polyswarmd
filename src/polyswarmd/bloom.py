@@ -6,6 +6,8 @@ import operator
 
 from ethereum.utils import sha3
 
+logger = logging.getLogger(__name__)  # Init logger
+
 FILTER_BITS = 8 * 256
 HASH_FUNCS = 8
 
