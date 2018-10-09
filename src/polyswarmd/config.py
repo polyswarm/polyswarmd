@@ -10,7 +10,7 @@ import time
 
 from consul import Consul
 from consul.base import Timeout
-from polyswarmd.logger import PolyswarmdJsonFormatter
+from polyswarmd.log_formatter import JSONFormatter
 from pythonjsonlogger import jsonlogger
 from urllib.parse import urlparse
 
@@ -78,7 +78,7 @@ def init_logging(log_format):
     if log_format and log_format in ['json', 'datadog']:
         logHandler = logging.StreamHandler()
         formatter = jsonlogger.JsonFormatter()
-        formatter = PolyswarmdJsonFormatter('(timestamp) (level) (name) (message)')
+        formatter = JSONFormatter('(timestamp) (level) (name) (message)')
         logHandler.setFormatter(formatter)
         logger.addHandler(logHandler)
         logger.setLevel(logging.INFO)
