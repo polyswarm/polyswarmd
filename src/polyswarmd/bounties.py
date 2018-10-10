@@ -331,12 +331,15 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 @bounties.route('/<uuid:guid>/assertions', methods=['GET'])
 @chain
 def get_bounties_guid_assertions(guid):
+    bounty = bounty_to_dict(
+        g.bounty_registry.functions.bountiesByGuid(guid.int).call())
     num_assertions = g.bounty_registry.functions.getNumberOfAssertions(
         guid.int).call()
     assertions = []
     for i in range(num_assertions):
         assertion = assertion_to_dict(
-            g.bounty_registry.functions.assertionsByGuid(guid.int, i).call())
+            g.bounty_registry.functions.assertionsByGuid(guid.int, i).call(),
+                bounty['num_artifacts'])
         assertions.append(assertion)
 
     return success(assertions)
