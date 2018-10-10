@@ -75,12 +75,18 @@ def new_assertion_event_to_dict(new_assertion_event):
 
 
 def revealed_assertion_event_to_dict(revealed_assertion_event):
+    if int(revealed_assertion_event.verdicts) == 0:
+        verdicts = [False]*int(revealed_assertion_event.numArtifacts)
+    else:
+        verdicts = int_to_bool_list(revealed_assertion_event.verdicts)
+
     return {
         'bounty_guid': str(uuid.UUID(int=revealed_assertion_event.bountyGuid)),
         'author': revealed_assertion_event.author,
         'index': revealed_assertion_event.index,
         'nonce': str(revealed_assertion_event.nonce),
-        'verdicts': int_to_bool_list(revealed_assertion_event.verdicts),
+        'verdicts': verdicts,
+        'num_artifacts': revealed_assertion_event.numArtifacts, 
         'metadata': revealed_assertion_event.metadata,
     }
 
