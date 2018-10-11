@@ -10,17 +10,22 @@ logger = logging.getLogger(__name__)  # Init logger
 def bool_list_to_int(bs):
     return sum([1 << n if b else 0 for n, b in enumerate(bs)])
 
-
 def int_to_bool_list(i):
     s = format(i, 'b')
     return [x == '1' for x in s[::-1]]
 
+def safe_int_to_bool_list(num, max):
+    if int(num) == 0:
+        return [False]*int(max)
+    else:
+        return verdicts = int_to_bool_list(num)
 
 def uint256_list_to_hex_string(us):
     return hex(sum([x << (256 * n) for n, x in enumerate(us)]))
 
-
 def bounty_to_dict(bounty):
+    bounty_has_voters_and_verdicts = len(bounty) > 10
+
     retval = {
         'guid': str(uuid.UUID(int=bounty[0])),
         'author': bounty[1],
@@ -31,12 +36,12 @@ def bounty_to_dict(bounty):
         'assigned_arbiter': bounty[6],
         'quorum_reached': bounty[7],
         'quorum_reached_block': bounty[8],
-        'quorum_mask': int_to_bool_list(bounty[9]),
+        'quorum_mask': safe_int_to_bool_list(bounty[9], retval['num_artifacts']),
     }
-    if len(bounty) > 10:
+    if bounty_has_voters_and_verdicts:
         retval['bloom'] = uint256_list_to_hex_string(bounty[10])
         retval['voters'] = bounty[11]
-        retval['verdicts'] = int_to_bool_list(bounty[12])
+        retval['verdicts'] = safe_int_to_bool_list(bounty[12], retval['num_artifacts'])
         retval['bloom_votes'] = bounty[13]
     return retval
 
@@ -51,14 +56,14 @@ def new_bounty_event_to_dict(new_bounty_event):
     }
 
 
-def assertion_to_dict(assertion):
+def assertion_to_dict(assertion, num_artifacts):
     return {
         'author': assertion[0],
         'bid': str(assertion[1]),
-        'mask': int_to_bool_list(assertion[2]),
+        'mask': safe_int_to_bool_list(assertion[2], num_artifacts),
         'commitment': str(assertion[3]),
         'nonce': str(assertion[4]),
-        'verdicts': int_to_bool_list(assertion[5]),
+        'verdicts': safe_int_to_bool_list(assertion[5], num_artifacts),
         'metadata': assertion[6],
     }
 
@@ -69,7 +74,7 @@ def new_assertion_event_to_dict(new_assertion_event):
         'author': new_assertion_event.author,
         'index': new_assertion_event.index,
         'bid': str(new_assertion_event.bid),
-        'mask': int_to_bool_list(new_assertion_event.mask),
+        'mask': safe_int_to_bool_list(new_assertion_event.mask, new_assertion_event.numArtifacts),
         'commitment': str(new_assertion_event.commitment),
     }
 
@@ -80,15 +85,14 @@ def revealed_assertion_event_to_dict(revealed_assertion_event):
         'author': revealed_assertion_event.author,
         'index': revealed_assertion_event.index,
         'nonce': str(revealed_assertion_event.nonce),
-        'verdicts': int_to_bool_list(revealed_assertion_event.verdicts),
+        'verdicts': safe_int_to_bool_list(revealed_assertion_event.verdicts, revealed_assertion_event.numArtifacts),
         'metadata': revealed_assertion_event.metadata,
     }
-
 
 def new_verdict_event_to_dict(new_verdict_event):
     return {
         'bounty_guid': str(uuid.UUID(int=new_verdict_event.bountyGuid)),
-        'verdicts': int_to_bool_list(new_verdict_event.verdicts),
+        'verdicts': safe_int_to_bool_list(new_verdict_event.verdicts, new_verdict_event.numArtifacts),
         'voter': new_verdict_event.voter,
     }
 
