@@ -58,7 +58,7 @@ for name in ('home', 'side'):
                 web3, offer_lib_address,
                 os.path.join(config_location, 'contracts', 'OfferLib.json'))
 
-def chain(_func=None, *, chain_name=None):
+def chain(_func=None, chain_name=None):
     """This decorator takes the chain passed as a request arg and modifies a set of globals.
        There are a few guarantees made by this function.
 
@@ -70,27 +70,29 @@ def chain(_func=None, *, chain_name=None):
     def decorator_wrapper(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            nonlocal chain_name
-            if chain_name is None:
-                chain_name = request.args.get('chain', 'home')
+            c = chain_name
+            if c is None:
+                c = request.args.get('chain', 'home')
 
-            if chain_name not in nectar_chains.keys():
+            logging.info("Chain: %s", c)
+
+            if c not in nectar_chains.keys():
                 chain_options = ", ".join(nectar_chains)
                 return failure('Chain must one of %s' % chain_options, 400)
 
             chain_data = {
-                "chain_id": id_chains.get(chain_name),
-                "nectar_token_address": nectar_chains.get(chain_name),
-                "bounty_registry_address": bounty_chains.get(chain_name),
-                "erc20_relay_address": erc20_relay_chains.get(chain_name),
-                "eth_uri": eth_chains.get(chain_name),
-                "free": free_chains.get(chain_name),
-                "bounty_registry": bounty_registry_chains.get(chain_name),
-                "nectar_token": nectar_token_chains.get(chain_name),
-                "arbiter_staking": arbiter_staking_chains.get(chain_name),
-                "web3": web3_chains.get(chain_name),
+                "chain_id": id_chains.get(c),
+                "nectar_token_address": nectar_chains.get(c),
+                "bounty_registry_address": bounty_chains.get(c),
+                "erc20_relay_address": erc20_relay_chains.get(c),
+                "eth_uri": eth_chains.get(c),
+                "free": free_chains.get(c),
+                "bounty_registry": bounty_registry_chains.get(c),
+                "nectar_token": nectar_token_chains.get(c),
+                "arbiter_staking": arbiter_staking_chains.get(c),
+                "web3": web3_chains.get(c),
             }
-            if chain_name == "home":
+            if c == "home":
                 chain_data["offer_lib"] = offer_lib_home
                 chain_data["offer_registry"] = offer_registry_home
 
@@ -109,7 +111,7 @@ def chain(_func=None, *, chain_name=None):
 
                 return func(*args, **kwargs)
 
-            return failure("Server experienced an error finding %s chain values" % chain_name, 500)
+            return failure("Server experienced an error finding %s chain values" % c, 500)
         return wrapper
 
     if _func is None:
