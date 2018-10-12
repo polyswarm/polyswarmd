@@ -93,16 +93,14 @@ def post_transactions():
 
         sender = g.web3.toChecksumAddress(tx.sender.hex())
         if sender != account:
-            errors.append('Got invalid transaction sender for tx {0}, expected {1} got {2}'.format(tx.hash.hex(), account, sender))
+            errors.append('Invalid transaction sender for tx {0}: expected {1} got {2}'.format(tx.hash.hex(), account, sender))
             continue
 
         # TODO: Additional validation (addresses, methods, etc)
         try:
             txhashes.append(g.web3.eth.sendRawTransaction(HexBytes(raw_tx)))
         except ValueError as e:
-            logger.warning(
-                'Got invalid transaction error %s', e)
-            return failure(str(e), 400)
+            errors.append('Invalid transaction error for tx {0}: {1}'.format(tx.hash.hex(), e))
 
     ret = defaultdict(list)
     ret['errors'].extend(errors)
@@ -113,6 +111,7 @@ def post_transactions():
 
     if ret['errors']:
         logging.error('Got transaction errors: %s', ret['errors'])
+        return failure(ret, 400)
 
     return success(ret)
 
