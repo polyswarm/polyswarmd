@@ -78,6 +78,6 @@ def before_request():
 
 @app.after_request
 def after_request(response):
-    logger.info('%s %s %s %s', datetime.datetime.now(), request.method,
-                 response.status_code, request.path)
+    logger.info('%s %s %s %s %s', datetime.datetime.now(), request.method,
+                 response.status_code, request.path, g.eth_address)
     return response
