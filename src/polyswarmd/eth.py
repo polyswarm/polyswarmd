@@ -13,7 +13,6 @@ from hexbytes import HexBytes
 from jsonschema.exceptions import ValidationError
 from web3 import Web3, HTTPProvider
 
-
 from polyswarmd.artifacts import is_valid_ipfshash
 from polyswarmd.config import config_location, whereami
 from polyswarmd.response import success, failure
@@ -29,6 +28,7 @@ def bind_contract(web3_, address, artifact):
     return web3_.eth.contract(
         address=web3_.toChecksumAddress(address), abi=abi)
 
+
 gas_limit = 5000000  # TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to settle bounty
 
 zero_address = '0x0000000000000000000000000000000000000000'
@@ -37,6 +37,7 @@ offer_msig_artifact = os.path.join(config_location, 'contracts',
                                    'OfferMultiSig.json')
 
 from polyswarmd.chains import chain
+
 
 @misc.route('/syncing', methods=['GET'])
 @chain
@@ -82,6 +83,7 @@ def post_transactions():
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
+    errors = []
     txhashes = []
     for raw_tx in body['transactions']:
         try:
@@ -91,9 +93,7 @@ def post_transactions():
 
         sender = g.web3.toChecksumAddress(tx.sender.hex())
         if sender != account:
-            logger.warning(
-                'Got invalid transaction sender, expected %s got %s', account,
-                sender)
+            errors.append('Got invalid transaction sender for tx {0}, expected {1} got {2}'.format(tx.hash.hex(), account, sender))
             continue
 
         # TODO: Additional validation (addresses, methods, etc)
@@ -105,10 +105,14 @@ def post_transactions():
             return failure(str(e), 400)
 
     ret = defaultdict(list)
+    ret['errors'].extend(errors)
     for txhash in txhashes:
         events = events_from_transaction(txhash)
         for k, v in events.items():
             ret[k].extend(v)
+
+    if ret['errors']:
+        logging.error('Got transaction errors: %s', ret['errors'])
 
     return success(ret)
 
@@ -127,8 +131,8 @@ def build_transaction(call, nonce):
 
 def events_from_transaction(txhash):
     from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, \
-            new_verdict_event_to_dict, revealed_assertion_event_to_dict, \
-            transfer_event_to_dict, new_withdrawal_event_to_dict, new_deposit_event_to_dict
+        new_verdict_event_to_dict, revealed_assertion_event_to_dict, \
+        transfer_event_to_dict, new_withdrawal_event_to_dict, new_deposit_event_to_dict
 
     # TODO: Check for out of gas, other
     # TODO: Report contract errors
@@ -142,15 +146,14 @@ def events_from_transaction(txhash):
     except Exception:
         return {
             'errors':
-            ['transaction {0}: timeout waiting for receipt'.format(bytes(txhash).hex())]
+                ['transaction {0}: timeout waiting for receipt'.format(bytes(txhash).hex())]
         }
-
 
     txhash = bytes(txhash).hex()
     if not receipt:
         return {
             'errors':
-            ['transaction {0}: receipt not available'.format(txhash)]
+                ['transaction {0}: receipt not available'.format(txhash)]
         }
     if receipt.gasUsed == gas_limit:
         return {'errors': ['transaction {0}: out of gas'.format(txhash)]}
