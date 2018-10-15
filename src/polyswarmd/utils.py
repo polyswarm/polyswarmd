@@ -36,7 +36,7 @@ def bounty_to_dict(bounty):
         'assigned_arbiter': bounty[6],
         'quorum_reached': bounty[7],
         'quorum_reached_block': bounty[8],
-        'quorum_mask': safe_int_to_bool_list(bounty[9], retval['num_artifacts']),
+        'quorum_mask': safe_int_to_bool_list(bounty[9], bounty[4]),
     }
     if bounty_has_voters_and_verdicts:
         retval['bloom'] = uint256_list_to_hex_string(bounty[10])
