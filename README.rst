@@ -115,6 +115,11 @@ Steps:
 5) Deploy truffle project onto (local private) Ethereum chain
    ``truffle migrate``
 6) Install python dependencies ``pip3 install -r requirements.txt``
+   + It has been a common practice to setup a python environment with
+     virtualenv, for use with either pip/setuptools. This will remove the
+     possibility of any issues arising from incompatible shared dependencies or
+     installing new dependencies using a priviledged account. Check out the
+     documentation for virtualenv here: https://virtualenv.pypa.io/en/stable/
 7) Run server with ``python3 -m polyswarmd``
 
 Docker
