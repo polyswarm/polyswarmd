@@ -78,6 +78,10 @@ def before_request():
 
 @app.after_request
 def after_request(response):
-    logger.info('%s %s %s %s %s', datetime.datetime.now(), request.method,
-                 response.status_code, request.path, g.eth_address)
+    if response.status_code == 200:
+        logger.info('%s %s %s %s %s', datetime.datetime.now(), request.method,
+                     response.status_code, request.path, g.eth_address)
+    else:
+        logger.error('%s %s %s %s %s: %s', datetime.datetime.now(), request.method,
+                     response.status_code, request.path, g.eth_address, response.get_data())
     return response
