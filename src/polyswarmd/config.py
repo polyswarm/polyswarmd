@@ -30,6 +30,8 @@ chain_id = {}
 free = {}
 consul_uri = None
 
+# 100MB limit
+MAX_ARTIFACT_SIZE = 100 * 1024 * 1024
 CONFIG_LOCATIONS = ['/etc/polyswarmd', '~/.config/polyswarmd', './config']
 
 

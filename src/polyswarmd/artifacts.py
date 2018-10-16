@@ -6,7 +6,7 @@ import base58
 import requests
 from flask import Blueprint, request
 
-from polyswarmd.config import ipfs_uri
+from polyswarmd.config import ipfs_uri, MAX_ARTIFACT_SIZE
 from polyswarmd.response import success, failure
 
 logger = logging.getLogger(__name__)  # Init logger
@@ -28,13 +28,14 @@ def list_artifacts(ipfshash):
         r = requests.get(
             ipfs_uri + '/api/v0/ls', params={'arg': ipfshash}, timeout=1)
         r.raise_for_status()
+        j = r.json()
     except Exception as e:
         logger.error('Received error listing files on IPFS: %s', e)
         return []
 
-    links = [(l['Name'], l['Hash']) for l in r.json()['Objects'][0]['Links']]
+    links = [(l['Name'], l['Hash'], l['Size']) for l in j['Objects'][0]['Links']]
     if not links:
-        links = [('', r.json()['Objects'][0]['Hash'])]
+        links = [('', j['Objects'][0]['Hash'], j['Objects'][0]['Size'])]
 
     return links
 
@@ -67,7 +68,7 @@ def post_artifacts():
         r.raise_for_status()
     except Exception as e:
         logger.error('Received error posting to IPFS: %s', e)
-        return failure("Could not add artifacts to IPFS", 400)
+        return failure('Could not add artifacts to IPFS', 400)
 
     ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
     return success(ipfshash)
@@ -99,7 +100,9 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
     if id_ < 0 or id_ > 256 or id_ >= len(arts):
         return failure('Could not locate artifact ID', 404)
 
-    artifact = arts[id_][1]
+    _, artifact, size = arts[id_]
+    if size > MAX_ARTIFACT_SIZE:
+        return failure('Artifact size greater than maximum allowed')
 
     try:
         r = requests.get(
@@ -107,7 +110,7 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
         r.raise_for_status()
     except Exception as e:
         logger.error('Received error retrieving files from IPFS: %s', e)
-        return failure("Could not locate IPFS resource", 404)
+        return failure('Could not locate IPFS resource', 404)
 
     return r.content
 
@@ -132,7 +135,7 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
         r.raise_for_status()
     except Exception as e:
         logger.error('Received error stating files from IPFS: %s', e)
-        return failure("Could not locate IPFS resource", 400)
+        return failure('Could not locate IPFS resource', 400)
 
     # Convert stats to snake_case
     stats = {

@@ -21,7 +21,7 @@ bounties = Blueprint('bounties', __name__)
 
 def calculate_bloom(artifacts):
     bf = BloomFilter()
-    for _, h in artifacts:
+    for _, h, _ in artifacts:
         bf.add(h.encode('utf-8'))
 
     v = int(bf)
