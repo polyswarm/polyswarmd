@@ -11,7 +11,7 @@ init_logging(os.environ.get('LOG_FORMAT'))
 init_config()
 
 # don't move this, import order seems to be important here.
-from polyswarmd.config import require_api_key, whereami
+from polyswarmd.config import require_api_key, whereami, MAX_ARTIFACT_SIZE
 
 if require_api_key:
     from polyswarmd.db import init_db, db_session, lookup_api_key, add_api_key
@@ -30,7 +30,7 @@ from polyswarmd.websockets import init_websockets
 
 app = Flask('polyswarmd', root_path=whereami(), instance_path=whereami())
 # 100MB limit
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = MAX_ARTIFACT_SIZE
 install_error_handlers(app)
 app.register_blueprint(misc, url_prefix='/')
 app.register_blueprint(artifacts, url_prefix='/artifacts')
