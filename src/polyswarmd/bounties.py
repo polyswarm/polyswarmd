@@ -110,7 +110,7 @@ def post_bounties():
     transactions = [
         build_transaction(
             g.nectar_token.functions.approve(g.bounty_registry.address,
-                                           approveAmount), base_nonce),
+                                             approveAmount), base_nonce),
         build_transaction(
             g.bounty_registry.functions.postBounty(
                 guid.int, amount, artifactURI, numArtifacts, durationBlocks,
@@ -140,8 +140,9 @@ def get_bounty_parameters():
         'arbiter_lookback_range': arbiter_lookback_range,
         'max_duration': max_duration,
         'assertion_reveal_window': assertion_reveal_window,
-        'arbiter_vote_window':arbiter_vote_window
+        'arbiter_vote_window': arbiter_vote_window
     })
+
 
 @bounties.route('/<uuid:guid>', methods=['GET'])
 @chain
@@ -268,7 +269,7 @@ def post_bounties_guid_assertions(guid):
     transactions = [
         build_transaction(
             g.nectar_token.functions.approve(g.bounty_registry.address,
-                                           approveAmount), base_nonce),
+                                             approveAmount), base_nonce),
         build_transaction(
             g.bounty_registry.functions.postAssertion(
                 guid.int, bid, mask, commitment), base_nonce + 1),
@@ -331,16 +332,24 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 @bounties.route('/<uuid:guid>/assertions', methods=['GET'])
 @chain
 def get_bounties_guid_assertions(guid):
-    bounty = bounty_to_dict(
-        g.bounty_registry.functions.bountiesByGuid(guid.int).call())
-    num_assertions = g.bounty_registry.functions.getNumberOfAssertions(
-        guid.int).call()
+    try:
+        bounty = bounty_to_dict(
+            g.bounty_registry.functions.bountiesByGuid(guid.int).call())
+        num_assertions = g.bounty_registry.functions.getNumberOfAssertions(
+            guid.int).call()
+    except:
+        return failure('Bounty not found', 404)
+
     assertions = []
     for i in range(num_assertions):
-        assertion = assertion_to_dict(
-            g.bounty_registry.functions.assertionsByGuid(guid.int, i).call(),
+        try:
+            assertion = assertion_to_dict(
+                g.bounty_registry.functions.assertionsByGuid(guid.int, i).call(),
                 bounty['num_artifacts'])
-        assertions.append(assertion)
+            assertions.append(assertion)
+        except:
+            logger.warning('Could not retrieve assertion')
+            continue
 
     return success(assertions)
 
@@ -349,9 +358,13 @@ def get_bounties_guid_assertions(guid):
 @chain
 def get_bounties_guid_assertions_id(guid, id_):
     try:
-        return success(
-            assertion_to_dict(
-                g.bounty_registry.functions.assertionsByGuid(guid.int,
-                                                           id_).call()))
+        bounty = bounty_to_dict(g.bounty_registry.functions.bountiesByGuid(guid.int).call())
+    except:
+        return failure('Bounty not found', 404)
+
+    try:
+        assertion = assertion_to_dict(g.bounty_registry.functions.assertionsByGuid(guid.int, id_).call(),
+                                      bounty['num_artifacts'])
+        return success(assertion)
     except:
         return failure('Assertion not found', 404)
