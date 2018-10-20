@@ -342,14 +342,10 @@ def get_bounties_guid_assertions(guid):
 
     assertions = []
     for i in range(num_assertions):
-        try:
-            assertion = assertion_to_dict(
-                g.bounty_registry.functions.assertionsByGuid(guid.int, i).call(),
-                bounty['num_artifacts'])
-            assertions.append(assertion)
-        except:
-            logger.warning('Could not retrieve assertion')
-            continue
+        assertion = assertion_to_dict(
+            g.bounty_registry.functions.assertionsByGuid(guid.int, i).call(),
+            bounty['num_artifacts'])
+        assertions.append(assertion)
 
     return success(assertions)
 
