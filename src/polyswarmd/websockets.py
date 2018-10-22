@@ -4,6 +4,7 @@ import jsonschema
 import logging
 import sys
 import time
+import traceback
 
 from jsonschema.exceptions import ValidationError
 from flask import request, g
@@ -134,6 +135,8 @@ def init_websockets(app):
                 continue
             except Exception as e:
                 logger.error('Exception in /events, resetting filters (%s): %s', type(e), e)
+                logger.error("Traceback follows.")
+                logger.error(traceback.print_exc())
                 filters_initialized = False
                 continue
 
@@ -193,6 +196,8 @@ def init_websockets(app):
                 continue
             except Exception as e:
                 logger.error('Exception in /events, resetting filters (%s): %s', type(e), e)
+                logger.error("Traceback follows.")
+                logger.error(traceback.print_exc())
                 filters_initialized = False
                 continue
 
@@ -288,4 +293,6 @@ def init_websockets(app):
                 break
             except Exception as e:
                 logger.error('Exception in /events (%s): %s', type(e), e)
+                logger.error("Traceback follows.")
+                logger.error(traceback.print_exc())
                 continue

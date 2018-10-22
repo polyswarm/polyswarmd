@@ -144,8 +144,8 @@ def events_from_transaction(txhash):
                     break
                 gevent.sleep(0.1)
     except Exception as e:
-        logging.error("Encountered an exception while waiting for transaction receipt. Traceback follows.")
-        logging.error(traceback.print_exc())
+        logger.error("Encountered an exception while waiting for transaction receipt. Traceback follows.")
+        logger.error(traceback.print_exc())
         return {
             'errors':
                 ['transaction {0}: exception occurred during wait for receipt'.format(bytes(txhash).hex())]
