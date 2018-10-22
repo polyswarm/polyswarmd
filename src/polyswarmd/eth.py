@@ -5,6 +5,7 @@ import logging
 import os
 import rlp
 import functools
+import traceback
 
 from collections import defaultdict
 from ethereum.transactions import Transaction
@@ -142,10 +143,12 @@ def events_from_transaction(txhash):
                 if receipt is not None:
                     break
                 gevent.sleep(0.1)
-    except Exception:
+    except Exception as e:
+        logging.error("Encountered an exception while waiting for transaction receipt. Traceback follows.")
+        logging.error(traceback.print_exc())
         return {
             'errors':
-                ['transaction {0}: timeout waiting for receipt'.format(bytes(txhash).hex())]
+                ['transaction {0}: exception occurred during wait for receipt'.format(bytes(txhash).hex())]
         }
 
     txhash = bytes(txhash).hex()
