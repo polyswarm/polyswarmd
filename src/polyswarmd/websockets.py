@@ -4,7 +4,6 @@ import jsonschema
 import logging
 import sys
 import time
-import traceback
 
 from jsonschema.exceptions import ValidationError
 from flask import request, g
@@ -129,14 +128,12 @@ def init_websockets(app):
             except WebSocketError:
                 logger.info('Websocket connection closed, exiting loop')
                 break
-            except ConnectionError as e:
-                logger.error('ConnectionError in /events (is geth down?): %s', e)
+            except ConnectionError:
+                logger.exception('ConnectionError in /events (is geth down?)')
                 filters_initialized = False
                 continue
-            except Exception as e:
-                logger.error('Exception in /events, resetting filters (%s): %s', type(e), e)
-                logger.error("Traceback follows.")
-                logger.error(traceback.print_exc())
+            except Exception:
+                logger.exception('Exception in /events, resetting filters')
                 filters_initialized = False
                 continue
 
@@ -191,13 +188,11 @@ def init_websockets(app):
                 logger.info('Websocket connection closed, exiting loop')
                 break
             except ConnectionError:
-                logger.error('ConnectionError in offer /events (is geth down?): %s', e)
+                logger.exception('ConnectionError in offer /events (is geth down?)')
                 filters_initialized = False
                 continue
-            except Exception as e:
-                logger.error('Exception in /events, resetting filters (%s): %s', type(e), e)
-                logger.error("Traceback follows.")
-                logger.error(traceback.print_exc())
+            except Exception:
+                logger.exception('Exception in /events, resetting filters')
                 filters_initialized = False
                 continue
 
@@ -253,8 +248,8 @@ def init_websockets(app):
 
                 try:
                     jsonschema.validate(body, schema)
-                except ValidationError as e:
-                    logger.error('Invalid JSON: %s', e)
+                except ValidationError:
+                    logger.exception('Invalid JSON')
 
                 state_dict = state_to_dict(body['state'])
                 state_dict['guid'] = guid.int
@@ -291,8 +286,6 @@ def init_websockets(app):
             except WebSocketError:
                 logger.info('Websocket connection closed, exiting loop')
                 break
-            except Exception as e:
-                logger.error('Exception in /events (%s): %s', type(e), e)
-                logger.error("Traceback follows.")
-                logger.error(traceback.print_exc())
+            except Exception:
+                logger.exception('Exception in /events')
                 continue
