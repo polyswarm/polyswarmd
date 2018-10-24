@@ -5,6 +5,7 @@ import logging
 import os
 import rlp
 import functools
+import traceback
 
 from collections import defaultdict
 from ethereum.transactions import Transaction
@@ -138,6 +139,12 @@ def events_from_transaction(txhash):
     timeout = gevent.Timeout(60)
     timeout.start()
     try:
+        with gevent.Timeout(60, Exception('Timeout waiting for transaction receipt')) as timeout:
+            while True:
+                receipt = g.web3.eth.getTransactionReceipt(txhash)
+                if receipt is not None:
+                    break
+                gevent.sleep(0.1)
         while True:
             receipt = g.web3.eth.getTransactionReceipt(txhash)
             if receipt is not None:
@@ -146,14 +153,15 @@ def events_from_transaction(txhash):
     except gevent.Timeout as t:
         if t is not timeout:
             raise
-
         logging.error('Transaction %s: timeout waiting for receipt', bytes(txhash).hex())
         return {
             'errors':
-                ['transaction {0}: timeout waiting for receipt'.format(bytes(txhash).hex())]
+                ['transaction {0}: exception occurred during wait for receipt'.format(bytes(txhash).hex())]
         }
     except Exception as e:
         logger.error('Transaction %s: error while fetching transaction receipt: %s', bytes(txhash).hex(), e)
+        logger.error("Traceback follows.")
+        logger.error(traceback.print_exc())
         return {
             'errors':
                 ['transaction {0}: unhandled error while fetching transaction receipt'.format(bytes(txhash).hex())]

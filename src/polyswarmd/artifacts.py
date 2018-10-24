@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import traceback
 
 import base58
 import requests
@@ -14,6 +15,10 @@ artifacts = Blueprint('artifacts', __name__)
 
 
 def is_valid_ipfshash(ipfshash):
+    """
+    :param ipfshash:
+    :return:
+    """
     # TODO: Further multihash validation
     try:
         return len(ipfshash) < 100 and base58.b58decode(ipfshash)
@@ -31,6 +36,8 @@ def list_artifacts(ipfshash):
         j = r.json()
     except Exception as e:
         logger.error('Received error listing files on IPFS: %s', e)
+        logger.error("Traceback follows.")
+        logger.error(traceback.print_exc())
         return []
 
     links = [(l['Name'], l['Hash'], l['Size']) for l in j['Objects'][0]['Links']]
@@ -47,6 +54,8 @@ def get_artifacts_status():
         r.raise_for_status()
     except Exception as e:
         logger.error('Received error connecting to IPFS: %s', e)
+        logger.error("Traceback follows.")
+        logger.error(traceback.print_exc())
         return failure('Could not connect to IPFS', 500)
 
     online = r.json()['net']['online']
@@ -68,6 +77,8 @@ def post_artifacts():
         r.raise_for_status()
     except Exception as e:
         logger.error('Received error posting to IPFS: %s', e)
+        logger.error("Traceback follows.")
+        logger.error(traceback.print_exc())
         return failure('Could not add artifacts to IPFS', 400)
 
     ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
@@ -110,6 +121,8 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
         r.raise_for_status()
     except Exception as e:
         logger.error('Received error retrieving files from IPFS: %s', e)
+        logger.error("Traceback follows.")
+        logger.error(traceback.print_exc())
         return failure('Could not locate IPFS resource', 404)
 
     return r.content
@@ -135,6 +148,8 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
         r.raise_for_status()
     except Exception as e:
         logger.error('Received error stating files from IPFS: %s', e)
+        logger.error("Traceback follows.")
+        logger.error(traceback.print_exc())
         return failure('Could not locate IPFS resource', 400)
 
     # Convert stats to snake_case
