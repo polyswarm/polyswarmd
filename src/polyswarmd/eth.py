@@ -5,7 +5,6 @@ import logging
 import os
 import rlp
 import functools
-import traceback
 
 from collections import defaultdict
 from ethereum.transactions import Transaction
@@ -111,7 +110,7 @@ def post_transactions():
             ret[k].extend(v)
 
     if ret['errors']:
-        logging.error('Got transaction errors: %s', ret['errors'])
+        logging.exception('Got transaction errors: %s', ret['errors'])
         return failure(ret, 400)
 
     return success(ret)
@@ -149,15 +148,13 @@ def events_from_transaction(txhash):
     except gevent.Timeout as t:
         if t is not timeout:
             raise
-        logging.error('Transaction %s: timeout waiting for receipt', bytes(txhash).hex())
+        logging.exception('Transaction %s: timeout waiting for receipt', bytes(txhash).hex())
         return {
             'errors':
                 ['transaction {0}: exception occurred during wait for receipt'.format(bytes(txhash).hex())]
         }
-    except Exception as e:
-        logger.error('Transaction %s: error while fetching transaction receipt: %s', bytes(txhash).hex(), e)
-        logger.error("Traceback follows.")
-        logger.error(traceback.print_exc())
+    except Exception:
+        logger.exception('Transaction %s: error while fetching transaction receipt', bytes(txhash).hex())
         return {
             'errors':
                 ['transaction {0}: unhandled error while fetching transaction receipt'.format(bytes(txhash).hex())]

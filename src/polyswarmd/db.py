@@ -1,5 +1,4 @@
 import logging
-import traceback
 
 from sqlalchemy import create_engine, Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship, scoped_session, sessionmaker
@@ -85,8 +84,6 @@ def add_api_key(email, eth_address, api_key):
 
         db_session.add(user_obj)
         db_session.commit()
-    except Exception as e:
-        logger.error('Error inserting new API key into DB: %s', e)
-        logger.error("Traceback follows.")
-        logger.error(traceback.print_exc())
+    except Exception:
+        logger.exception('Error inserting new API key into DB')
         db_session.rollback()

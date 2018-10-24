@@ -2,7 +2,6 @@ import logging
 import os
 import jsonschema
 import uuid
-import traceback
 
 from ethereum.utils import sha3
 from flask import Blueprint, g, request
@@ -349,9 +348,7 @@ def get_bounties_guid_assertions(guid):
                 bounty['num_artifacts'])
             assertions.append(assertion)
         except Exception:
-            logger.warning('Could not retrieve assertion')
-            logger.error('Traceback follows.')
-            logger.error(traceback.print_exc())
+            logger.exception('Could not retrieve assertion')
             continue
 
     return success(assertions)

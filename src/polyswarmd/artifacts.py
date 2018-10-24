@@ -1,7 +1,6 @@
 import json
 import logging
 import re
-import traceback
 
 import base58
 import requests
@@ -34,10 +33,8 @@ def list_artifacts(ipfshash):
             ipfs_uri + '/api/v0/ls', params={'arg': ipfshash}, timeout=1)
         r.raise_for_status()
         j = r.json()
-    except Exception as e:
-        logger.error('Received error listing files on IPFS: %s', e)
-        logger.error("Traceback follows.")
-        logger.error(traceback.print_exc())
+    except Exception:
+        logger.exception('Received error listing files on IPFS')
         return []
 
     links = [(l['Name'], l['Hash'], l['Size']) for l in j['Objects'][0]['Links']]
@@ -52,10 +49,8 @@ def get_artifacts_status():
     try:
         r = requests.get(ipfs_uri + '/api/v0/diag/sys', timeout=1)
         r.raise_for_status()
-    except Exception as e:
-        logger.error('Received error connecting to IPFS: %s', e)
-        logger.error("Traceback follows.")
-        logger.error(traceback.print_exc())
+    except Exception:
+        logger.exception('Received error connecting to IPFS')
         return failure('Could not connect to IPFS', 500)
 
     online = r.json()['net']['online']
@@ -75,10 +70,8 @@ def post_artifacts():
             files=files,
             params={'wrap-with-directory': True})
         r.raise_for_status()
-    except Exception as e:
-        logger.error('Received error posting to IPFS: %s', e)
-        logger.error("Traceback follows.")
-        logger.error(traceback.print_exc())
+    except Exception:
+        logger.exception('Received error posting to IPFS')
         return failure('Could not add artifacts to IPFS', 400)
 
     ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
@@ -119,10 +112,8 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
         r = requests.get(
             ipfs_uri + '/api/v0/cat', params={'arg': artifact}, timeout=1)
         r.raise_for_status()
-    except Exception as e:
-        logger.error('Received error retrieving files from IPFS: %s', e)
-        logger.error("Traceback follows.")
-        logger.error(traceback.print_exc())
+    except Exception:
+        logger.exception('Received error retrieving files from IPFS')
         return failure('Could not locate IPFS resource', 404)
 
     return r.content
@@ -146,10 +137,8 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
         r = requests.get(
             ipfs_uri + '/api/v0/object/stat', params={'arg': artifact})
         r.raise_for_status()
-    except Exception as e:
-        logger.error('Received error stating files from IPFS: %s', e)
-        logger.error("Traceback follows.")
-        logger.error(traceback.print_exc())
+    except Exception:
+        logger.exception('Received error stating files from IPFS')
         return failure('Could not locate IPFS resource', 400)
 
     # Convert stats to snake_case
