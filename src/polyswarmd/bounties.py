@@ -2,6 +2,7 @@ import logging
 import os
 import jsonschema
 import uuid
+import traceback
 
 from ethereum.utils import sha3
 from flask import Blueprint, g, request
@@ -347,8 +348,10 @@ def get_bounties_guid_assertions(guid):
                 g.bounty_registry.functions.assertionsByGuid(guid.int, i).call(),
                 bounty['num_artifacts'])
             assertions.append(assertion)
-        except:
+        except Exception:
             logger.warning('Could not retrieve assertion')
+            logger.error('Traceback follows.')
+            logger.error(traceback.print_exc())
             continue
 
     return success(assertions)
