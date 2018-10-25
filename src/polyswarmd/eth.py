@@ -138,18 +138,14 @@ def events_from_transaction(txhash):
     # TODO: Report contract errors
     timeout = gevent.Timeout(60)
     timeout.start()
+
     try:
-        with gevent.Timeout(60, Exception('Timeout waiting for transaction receipt')) as timeout:
-            while True:
-                receipt = g.web3.eth.getTransactionReceipt(txhash)
-                if receipt is not None:
-                    break
-                gevent.sleep(0.1)
         while True:
             receipt = g.web3.eth.getTransactionReceipt(txhash)
             if receipt is not None:
                 break
             gevent.sleep(0.1)
+
     except gevent.Timeout as t:
         if t is not timeout:
             raise
