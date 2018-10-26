@@ -97,7 +97,6 @@ def chain(_func=None, chain_name=None):
                 chain_data["offer_lib"] = offer_lib_home
                 chain_data["offer_registry"] = offer_registry_home
 
-
             if validate(chain_data):
                 # Add all validated fields to g
                 for k, v in chain_data.items():
