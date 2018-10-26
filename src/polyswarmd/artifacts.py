@@ -22,7 +22,7 @@ def is_valid_ipfshash(ipfshash):
     try:
         return len(ipfshash) < 100 and base58.b58decode(ipfshash)
     except Exception as e:
-        logger.exception('Exception of type %s caught in %s', e, __name__)
+        logger.exception('Exception of type %s caught in %s' % (e, __name__))
         pass
 
     return False
@@ -35,7 +35,7 @@ def list_artifacts(ipfshash):
         r.raise_for_status()
         j = r.json()
     except Exception as e:
-        logger.exception('Received error listing files on IPFS. Exception type: %s', e)
+        logger.exception('Received error listing files on IPFS. Exception type: %s' % e)
         return []
 
     links = [(l['Name'], l['Hash'], l['Size']) for l in j['Objects'][0]['Links']]
@@ -51,7 +51,7 @@ def get_artifacts_status():
         r = requests.get(ipfs_uri + '/api/v0/diag/sys', timeout=1)
         r.raise_for_status()
     except Exception as e:
-        logger.exception('Received error connecting to IPFS. Exception type: %s', e)
+        logger.exception('Received error connecting to IPFS. Exception type: %s' % e)
         return failure('Could not connect to IPFS', 500)
 
     online = r.json()['net']['online']
@@ -72,7 +72,7 @@ def post_artifacts():
             params={'wrap-with-directory': True})
         r.raise_for_status()
     except Exception as e:
-        logger.exception('Received error posting to IPFS. Exception type: %s', e)
+        logger.exception('Received error posting to IPFS. Exception type: %s' % e)
         return failure('Could not add artifacts to IPFS', 400)
 
     ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
@@ -114,7 +114,7 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
             ipfs_uri + '/api/v0/cat', params={'arg': artifact}, timeout=1)
         r.raise_for_status()
     except Exception as e:
-        logger.exception('Received error retrieving files from IPFS. Exception type: %s', e)
+        logger.exception('Received error retrieving files from IPFS. Exception type: %s' % e)
         return failure('Could not locate IPFS resource', 404)
 
     return r.content
@@ -139,7 +139,7 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
             ipfs_uri + '/api/v0/object/stat', params={'arg': artifact})
         r.raise_for_status()
     except Exception as e:
-        logger.exception('Received error stating files from IPFS. Exception type: %s', e)
+        logger.exception('Received error stating files from IPFS. Exception type: %s' % e)
         return failure('Could not locate IPFS resource', 400)
 
     # Convert stats to snake_case

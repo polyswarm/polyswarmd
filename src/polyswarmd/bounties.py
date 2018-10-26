@@ -337,8 +337,8 @@ def get_bounties_guid_assertions(guid):
             g.bounty_registry.functions.bountiesByGuid(guid.int).call())
         num_assertions = g.bounty_registry.functions.getNumberOfAssertions(
             guid.int).call()
-    except:
-        return failure('Bounty not found', 404)
+    except Exception as e:
+        return failure('Bounty not found. Exception: %s' % e, 404)
 
     assertions = []
     for i in range(num_assertions):
