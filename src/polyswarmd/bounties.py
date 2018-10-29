@@ -332,13 +332,13 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 @bounties.route('/<uuid:guid>/assertions', methods=['GET'])
 @chain
 def get_bounties_guid_assertions(guid):
-    try:
-        bounty = bounty_to_dict(
-            g.bounty_registry.functions.bountiesByGuid(guid.int).call())
-        num_assertions = g.bounty_registry.functions.getNumberOfAssertions(
-            guid.int).call()
-    except:
+    bounty = bounty_to_dict(
+        g.bounty_registry.functions.bountiesByGuid(guid.int).call())
+    if bounty['author'] == zero_address:
         return failure('Bounty not found', 404)
+
+    num_assertions = g.bounty_registry.functions.getNumberOfAssertions(
+        guid.int).call()
 
     assertions = []
     for i in range(num_assertions):
@@ -357,9 +357,8 @@ def get_bounties_guid_assertions(guid):
 @bounties.route('/<uuid:guid>/assertions/<int:id_>', methods=['GET'])
 @chain
 def get_bounties_guid_assertions_id(guid, id_):
-    try:
-        bounty = bounty_to_dict(g.bounty_registry.functions.bountiesByGuid(guid.int).call())
-    except:
+    bounty = bounty_to_dict(g.bounty_registry.functions.bountiesByGuid(guid.int).call())
+    if bounty['author'] == zero_address:
         return failure('Bounty not found', 404)
 
     try:
