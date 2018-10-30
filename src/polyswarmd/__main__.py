@@ -13,6 +13,7 @@ from polyswarmd import app
 @click.option('--host', default='', help='Host to listen on')
 @click.option('--port', default=31337, help='Port to listen on')
 def main(log, host, port):
+    sys.exit(1)
     # todo change this
     loglevel = getattr(logging, log.upper(), None)
     if not isinstance(loglevel, int):
