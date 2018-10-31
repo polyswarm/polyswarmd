@@ -22,5 +22,5 @@ engines:
 #    enabled: true
 #  fixme:  # highlight FIXME, TODO, HACK, etc omments
 #    enabled: true
-  git-legal:  # discount lawyering
-    enabled: true
+#  git-legal:  # discount lawyering
+#    enabled: true
