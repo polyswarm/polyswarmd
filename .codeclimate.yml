@@ -16,5 +16,7 @@ engines:
         enabled: false
   bandit:  # security issues
     enabled: true
+  sonar-python:  # security issues
+    enabled: true
   radon:   # cyclomatic complexity
     enabled: true
