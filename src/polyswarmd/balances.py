@@ -5,6 +5,8 @@ from flask import Blueprint, request, g
 from polyswarmd.chains import chain
 from polyswarmd.response import success, failure
 
+this should be an error
+
 logger = logging.getLogger(__name__)  # Init logger
 balances = Blueprint('balances', __name__)
 
