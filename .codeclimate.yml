@@ -2,7 +2,17 @@ engines:
   pep8:
     enabled: true
     checks:
-      E402:
+      E402:  # module imports not at top of file
+        enabled: false
+      E501:  # line too long
+        enabled: false
+      E302:  # blank line expectations
+        enabled: false
+      E261:  # at least two spaces before inline comment
+        enabled: false
+      E262:  # inline comment should start with a #
+        enabled: false
+      E251:  # unexpected spaces around keyword / parameter equals
         enabled: false
   bandit:
     enabled: true
