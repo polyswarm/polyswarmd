@@ -7,6 +7,7 @@ from polyswarmd.response import success, failure
 
 this should be an error
 except derp
+foo = bar
 
 logger = logging.getLogger(__name__)  # Init logger
 balances = Blueprint('balances', __name__)
