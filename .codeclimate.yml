@@ -20,3 +20,5 @@ engines:
     enabled: true
   radon:   # cyclomatic complexity
     enabled: true
+  fixme:  # highlight FIXME, TODO, HACK, etc omments
+    enabled: true
