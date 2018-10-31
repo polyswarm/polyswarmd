@@ -18,9 +18,9 @@ engines:
     enabled: true
   sonar-python:  # security issues
     enabled: true
-  radon:   # cyclomatic complexity
-    enabled: true
-  fixme:  # highlight FIXME, TODO, HACK, etc omments
-    enabled: true
+#  radon:   # cyclomatic complexity
+#    enabled: true
+#  fixme:  # highlight FIXME, TODO, HACK, etc omments
+#    enabled: true
   git-legal:  # discount lawyering
     enabled: true
