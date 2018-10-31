@@ -14,5 +14,7 @@ engines:
         enabled: false
       E251:  # unexpected spaces around keyword / parameter equals
         enabled: false
-  bandit:
+  bandit:  # security issues
+    enabled: true
+  radon:   # cyclomatic complexity
     enabled: true
