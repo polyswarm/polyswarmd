@@ -6,6 +6,7 @@ from polyswarmd.chains import chain
 from polyswarmd.response import success, failure
 
 this should be an error
+except derp
 
 logger = logging.getLogger(__name__)  # Init logger
 balances = Blueprint('balances', __name__)
