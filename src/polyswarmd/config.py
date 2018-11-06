@@ -23,7 +23,11 @@ def is_service_reachable(uri):
     u = urlparse(uri)
     with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
         sock.settimeout(1)
-        return sock.connect_ex((u.hostname, u.port)) == 0
+        try:
+            return sock.connect_ex((u.hostname, u.port)) == 0
+        except OSError as e:
+            logger.error('Non-socket error while checking connectivity: %s', e)
+            return False
 
 
 def wait_for_service(uri):
