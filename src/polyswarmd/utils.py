@@ -4,24 +4,28 @@ import uuid
 from flask import g
 from polyswarmd.eth import zero_address
 
-logger = logging.getLogger(__name__)  # Init logger
+logger = logging.getLogger(__name__)
 
 
 def bool_list_to_int(bs):
     return sum([1 << n if b else 0 for n, b in enumerate(bs)])
 
+
 def int_to_bool_list(i):
     s = format(i, 'b')
     return [x == '1' for x in s[::-1]]
 
+
 def safe_int_to_bool_list(num, max):
     if int(num) == 0:
-        return [False]*int(max)
+        return [False] * int(max)
     else:
         return int_to_bool_list(num)
 
+
 def uint256_list_to_hex_string(us):
     return hex(sum([x << (256 * n) for n, x in enumerate(us)]))
+
 
 def bounty_to_dict(bounty):
     bounty_has_voters_and_verdicts = len(bounty) > 10
@@ -89,12 +93,14 @@ def revealed_assertion_event_to_dict(revealed_assertion_event):
         'metadata': revealed_assertion_event.metadata,
     }
 
+
 def new_verdict_event_to_dict(new_verdict_event):
     return {
         'bounty_guid': str(uuid.UUID(int=new_verdict_event.bountyGuid)),
         'verdicts': safe_int_to_bool_list(new_verdict_event.verdicts, new_verdict_event.numArtifacts),
         'voter': new_verdict_event.voter,
     }
+
 
 def settled_bounty_event_to_dict(new_settled_event):
     return {
@@ -103,11 +109,13 @@ def settled_bounty_event_to_dict(new_settled_event):
         'settler': new_settled_event.settler,
     }
 
+
 def new_quorum_event_to_dict(new_quorum_event):
     return {
         'bounty_guid': str(uuid.UUID(int=new_quorum_event.bountyGuid)),
         'quorum_block': new_quorum_event.block,
     }
+
 
 def transfer_event_to_dict(transfer_event):
     return {
@@ -138,23 +146,28 @@ def channel_to_dict(channel_data):
         'expert': channel_data[2],
     }
 
+
 def state_to_dict(state):
+    if not g.chain:
+        raise ValueError('g.chain not found')
+
     # gets state of non required state
-    offer_info = g.offer_lib.functions.getOfferState(state).call()
+    offer_info = g.chain.offer_lib.contract.functions.getOfferState(state).call()
 
     return {
-        'isClosed': g.offer_lib.functions.getCloseFlag(state).call(),
-        'nonce': g.offer_lib.functions.getSequence(state).call(),
-        'ambassador': g.offer_lib.functions.getPartyA(state).call(),
-        'expert': g.offer_lib.functions.getPartyB(state).call(),
-        'msig_address': g.offer_lib.functions.getMultiSigAddress(state).call(),
-        'ambassador_balance': g.offer_lib.functions.getBalanceA(state).call(),
-        'expert_balance': g.offer_lib.functions.getBalanceB(state).call(),
-        'token': g.offer_lib.functions.getTokenAddress(state).call(),
-        'offer_amount': g.web3.toInt(offer_info[1]),
-        'mask': int_to_bool_list(g.web3.toInt(offer_info[6])),
-        'verdicts': int_to_bool_list(g.web3.toInt(offer_info[7])),
+        'isClosed': g.chain.offer_lib.contract.functions.getCloseFlag(state).call(),
+        'nonce': g.chain.offer_lib.contract.functions.getSequence(state).call(),
+        'ambassador': g.chain.offer_lib.contract.functions.getPartyA(state).call(),
+        'expert': g.chain.offer_lib.contract.functions.getPartyB(state).call(),
+        'msig_address': g.chain.offer_lib.contract.functions.getMultiSigAddress(state).call(),
+        'ambassador_balance': g.chain.offer_lib.contract.functions.getBalanceA(state).call(),
+        'expert_balance': g.chain.offer_lib.contract.functions.getBalanceB(state).call(),
+        'token': g.chain.offer_lib.contract.functions.getTokenAddress(state).call(),
+        'offer_amount': g.chain.w3.toInt(offer_info[1]),
+        'mask': int_to_bool_list(g.chain.w3.toInt(offer_info[6])),
+        'verdicts': int_to_bool_list(g.chain.w3.toInt(offer_info[7])),
     }
+
 
 def new_init_channel_event_to_dict(new_init_event):
     return {
@@ -164,12 +177,14 @@ def new_init_channel_event_to_dict(new_init_event):
         'multi_signature': new_init_event.msig,
     }
 
+
 def new_settle_challenged_event(new_event):
     return {
         'challenger': new_event.challenger,
         'nonce': new_event.sequence,
         'settle_period_end': new_event.settlementPeriodEnd,
     }
+
 
 def new_settle_started_event(new_event):
     return {
@@ -178,20 +193,31 @@ def new_settle_started_event(new_event):
         'settle_period_end': new_event.settlementPeriodEnd,
     }
 
+
 def new_cancel_agreement_event_to_dict(new_event):
     return {
         'expert': new_event._expert,
         'ambassador': new_event._ambassador,
     }
 
+
+# https://stackoverflow.com/questions/1175208/elegant-python-function-to-convert-camelcase-to-snake-case
+def camel_case_to_snake_case(s):
+    s1 = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', s)
+    return re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
+
 def to_padded_hex(val):
+    if not g.chain:
+        raise ValueError('g.chain not found')
+
     if type(val) == str:
         if val.startswith('0x'):
-            padded_hex = g.web3.toHex(hexstr=val)[2:]
+            padded_hex = g.chain.w3.toHex(hexstr=val)[2:]
         else:
-            padded_hex = g.web3.toHex(text=val)[2:]
+            padded_hex = g.chain.w3.toHex(text=val)[2:]
     else:
-        padded_hex = g.web3.toHex(val)[2:]
+        padded_hex = g.chain.w3.toHex(val)[2:]
 
     l = 64 - len(padded_hex)
 
@@ -252,13 +278,14 @@ def dict_to_state(state_dict):
 
     return state_str
 
+
 def validate_ws_url(uri):
     regex = re.compile(
-            r'^(?:ws)s?://' # http:// or https://
-            r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|' #domain...
-            r'localhost|' #localhost...
-            r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})' # ...or ip
-            r'(?::\d+)?' # optional port
-            r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+        r'^(?:ws)s?://'  # http:// or https://
+        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain...
+        r'localhost|'  # localhost...
+        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
+        r'(?::\d+)?'  # optional port
+        r'(?:/?|[/?]\S+)$', re.IGNORECASE)
 
     return re.match(regex, uri) is not None

@@ -8,7 +8,7 @@ from polyswarmd.response import success, failure
 from polyswarmd.chains import chain
 from polyswarmd.eth import build_transaction
 
-logger = logging.getLogger(__name__)  # Init logger
+logger = logging.getLogger(__name__)
 relay = Blueprint('relay', __name__)
 
 @relay.route('/deposit', methods=['POST'])
@@ -27,14 +27,9 @@ def withdraw_funds():
 
 def send_funds_from():
     # Grab correct versions by chain type
-    account = g.web3.toChecksumAddress(g.eth_address)
-
-    base_nonce = int(
-        request.args.get('base_nonce', g.web3.eth.getTransactionCount(account)))
-
-    if not g.erc20_relay_address or not g.web3.isAddress(g.erc20_relay_address):
-        return failure('ERC20 Relay misconfigured', 500)
-    erc20_relay_address = g.web3.toChecksumAddress(g.erc20_relay_address)
+    account = g.chain.web3.toChecksumAddress(g.eth_address)
+    base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
+    erc20_relay_address = g.chain.w3.toChecksumAddress(g.chain.erc20_relay.address)
 
     schema = {
         'type': 'object',
@@ -58,8 +53,7 @@ def send_funds_from():
     amount = int(body['amount'])
 
     transactions = [
-        build_transaction(
-            g.nectar_token.functions.transfer(erc20_relay_address, amount), base_nonce),
+        build_transaction(g.chain.nectar_token.contract.functions.transfer(erc20_relay_address, amount), base_nonce),
     ]
 
     return success({'transactions': transactions})

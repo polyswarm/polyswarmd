@@ -2,20 +2,18 @@ import gevent
 import json
 import jsonschema
 import logging
-import sys
 import time
 
 from jsonschema.exceptions import ValidationError
-from flask import request, g
+from flask import g
 from flask_sockets import Sockets
 from geventwebsocket import WebSocketError
 from requests.exceptions import ConnectionError
 
 from polyswarmd.chains import chain
-from polyswarmd.eth import offer_msig_artifact, bind_contract
 from polyswarmd.utils import channel_to_dict, new_cancel_agreement_event_to_dict, new_settle_started_event, new_settle_challenged_event, new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict, state_to_dict, new_init_channel_event_to_dict, new_quorum_event_to_dict, settled_bounty_event_to_dict, revealed_assertion_event_to_dict
 
-logger = logging.getLogger(__name__)  # Init logger
+logger = logging.getLogger(__name__)
 
 
 def init_websockets(app):
@@ -38,16 +36,16 @@ def init_websockets(app):
         while not ws.closed:
             try:
                 if not filters_initialized:
-                    block_filter = g.web3.eth.filter('latest')
-                    bounty_filter = g.bounty_registry.eventFilter('NewBounty')
-                    assertion_filter = g.bounty_registry.eventFilter('NewAssertion')
-                    verdict_filter = g.bounty_registry.eventFilter('NewVerdict')
-                    quorum_filiter = g.bounty_registry.eventFilter('QuorumReached')
-                    settled_filter = g.bounty_registry.eventFilter('BountySettled')
-                    reveal_filter = g.bounty_registry.eventFilter('RevealedAssertion')
+                    block_filter = g.chain.w3.eth.filter('latest')
+                    bounty_filter = g.chain.bounty_registry.contract.eventFilter('NewBounty')
+                    assertion_filter = g.chain.bounty_registry.contract.eventFilter('NewAssertion')
+                    verdict_filter = g.chain.bounty_registry.contract.eventFilter('NewVerdict')
+                    quorum_filiter = g.chain.bounty_registry.contract.eventFilter('QuorumReached')
+                    settled_filter = g.chain.bounty_registry.contract.eventFilter('BountySettled')
+                    reveal_filter = g.chain.bounty_registry.contract.eventFilter('RevealedAssertion')
                     init_filter = None
-                    if g.offer_registry is not None:
-                        init_filter = g.offer_registry.eventFilter('InitializedChannel')
+                    if g.chain.offer_registry.contract is not None:
+                        init_filter = g.chain.offer_registry.contract.eventFilter('InitializedChannel')
 
                     filters_initialized = True
 
@@ -56,7 +54,7 @@ def init_websockets(app):
                         json.dumps({
                             'event': 'block',
                             'data': {
-                                'number': g.web3.eth.blockNumber,
+                                'number': g.chain.w3.eth.blockNumber,
                             },
                         }))
 
@@ -138,13 +136,11 @@ def init_websockets(app):
                 continue
 
     @sockets.route('/events/<uuid:guid>')
-    @chain
+    @chain(chain_name='home')
     def channel_events(ws, guid):
-
-        offer_channel = channel_to_dict(
-            g.offer_registry.functions.guidToChannel(guid.int).call())
+        offer_channel = channel_to_dict(g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
         msig_address = offer_channel['msig_address']
-        offer_msig = bind_contract(g.web3, msig_address, offer_msig_artifact)
+        offer_msig = g.chain.offer_multisig.bind(msig_address)
 
         filters_initialized = False
         while not ws.closed:

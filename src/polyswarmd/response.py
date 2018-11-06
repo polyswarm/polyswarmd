@@ -2,7 +2,7 @@ import logging
 from flask import jsonify
 from werkzeug.exceptions import default_exceptions, HTTPException
 
-logger = logging.getLogger(__name__)  # Init logger
+logger = logging.getLogger(__name__)
 
 
 def install_error_handlers(app):
