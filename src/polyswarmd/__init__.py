@@ -19,11 +19,6 @@ app.config['POLYSWARMD'] = Config.auto()
 
 install_error_handlers(app)
 
-if app.config['POLYSWARMD'].require_api_key:
-    from polyswarmd.db import init_db, lookup_api_key
-
-    init_db()
-
 from polyswarmd.eth import misc
 from polyswarmd.utils import bool_list_to_int, int_to_bool_list
 from polyswarmd.artifacts import artifacts, MAX_ARTIFACT_SIZE
@@ -46,6 +41,7 @@ app.register_blueprint(staking, url_prefix='/staking')
 init_websockets(app)
 
 AUTH_WHITELIST = {'/status'}
+
 
 @app.route('/status')
 def status():
@@ -73,6 +69,13 @@ def status():
     return success(ret)
 
 
+@app.before_first_request
+def before_first_request():
+    if app.config['POLYSWARMD'].require_api_key:
+        from polyswarmd.db import init_db
+        init_db()
+
+
 @app.before_request
 def before_request():
     g.user = None
@@ -94,6 +97,7 @@ def before_request():
             return failure('API key required', 401)
 
         if api_key:
+            from polyswarmd.db import lookup_api_key
             api_key_obj = lookup_api_key(api_key)
             if api_key_obj:
                 g.user = api_key_obj.eth_address.user
