@@ -6,7 +6,7 @@ import os
 
 from flask import Flask, g, request
 
-from polyswarmd.config import Config
+from polyswarmd.config import Config, is_service_reachable
 from polyswarmd.logger import init_logging
 from polyswarmd.response import success, failure, install_error_handlers
 
@@ -45,11 +45,42 @@ app.register_blueprint(offers, url_prefix='/offers')
 app.register_blueprint(staking, url_prefix='/staking')
 init_websockets(app)
 
+AUTH_WHITELIST = {'/status'}
+
+@app.route('/status')
+def status():
+    config = app.config['POLYSWARMD']
+    ret = {}
+
+    ret['ipfs'] = {
+        'reachable': is_service_reachable(config.ipfs_uri),
+    }
+
+    if config.db_uri:
+        ret['db'] = {
+            'reachable': is_service_reachable(config.db_uri),
+        }
+
+    for name, chain in config.chains.items():
+        ret[name] = {
+            'reachable': is_service_reachable(chain.eth_uri),
+        }
+
+        if ret[name]['reachable']:
+            ret[name]['syncing'] = chain.w3.eth.syncing
+            ret[name]['block'] = chain.w3.eth.blockNumber
+
+    return success(ret)
+
 
 @app.before_request
 def before_request():
     g.user = None
     g.eth_address = None
+
+    # Want to be able to whitelist unauthenticated routes, everything requires auth by default
+    if request.path in AUTH_WHITELIST:
+        return
 
     if not app.config['POLYSWARMD'].require_api_key:
         g.eth_address = request.args.get('account')
