@@ -4,13 +4,16 @@ import re
 
 import base58
 import requests
-from flask import Blueprint, request
+from flask import current_app as app, Blueprint, request
 
-from polyswarmd.config import ipfs_uri, MAX_ARTIFACT_SIZE
 from polyswarmd.response import success, failure
 
-logger = logging.getLogger(__name__)  # Init logger
+logger = logging.getLogger(__name__)
 artifacts = Blueprint('artifacts', __name__)
+
+# 100MB limit
+# TODO: Should this be configurable in config file?
+MAX_ARTIFACT_SIZE = 100 * 1024 * 1024
 
 
 def is_valid_ipfshash(ipfshash):
@@ -22,15 +25,13 @@ def is_valid_ipfshash(ipfshash):
     try:
         return len(ipfshash) < 100 and base58.b58decode(ipfshash)
     except Exception:
-        pass
-
-    return False
+        return False
 
 
 def list_artifacts(ipfshash):
     try:
-        r = requests.get(
-            ipfs_uri + '/api/v0/ls', params={'arg': ipfshash}, timeout=1)
+        ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
+        r = requests.get(ipfs_uri + '/api/v0/ls', params={'arg': ipfshash}, timeout=1)
         r.raise_for_status()
         j = r.json()
     except Exception:
@@ -47,6 +48,7 @@ def list_artifacts(ipfshash):
 @artifacts.route('/status', methods=['GET'])
 def get_artifacts_status():
     try:
+        ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
         r = requests.get(ipfs_uri + '/api/v0/diag/sys', timeout=1)
         r.raise_for_status()
     except Exception:
@@ -65,6 +67,7 @@ def post_artifacts():
         return failure('Too many artifacts', 400)
 
     try:
+        ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
         r = requests.post(
             ipfs_uri + '/api/v0/add',
             files=files,
@@ -109,8 +112,8 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
         return failure('Artifact size greater than maximum allowed')
 
     try:
-        r = requests.get(
-            ipfs_uri + '/api/v0/cat', params={'arg': artifact}, timeout=1)
+        ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
+        r = requests.get(ipfs_uri + '/api/v0/cat', params={'arg': artifact}, timeout=1)
         r.raise_for_status()
     except Exception:
         logger.exception('Received error retrieving files from IPFS')
@@ -134,8 +137,8 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
     artifact = arts[id_][1]
 
     try:
-        r = requests.get(
-            ipfs_uri + '/api/v0/object/stat', params={'arg': artifact})
+        ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
+        r = requests.get(ipfs_uri + '/api/v0/object/stat', params={'arg': artifact})
         r.raise_for_status()
     except Exception:
         logger.exception('Received error stating files from IPFS')

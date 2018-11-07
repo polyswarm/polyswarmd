@@ -1,65 +1,48 @@
 import gevent
-import json
 import jsonschema
 import logging
-import os
 import rlp
-import functools
 
 from collections import defaultdict
 from ethereum.transactions import Transaction
 from flask import Blueprint, g, request
 from hexbytes import HexBytes
 from jsonschema.exceptions import ValidationError
-from web3 import Web3, HTTPProvider
 
 from polyswarmd.artifacts import is_valid_ipfshash
-from polyswarmd.config import config_location, whereami
+from polyswarmd.chains import chain
 from polyswarmd.response import success, failure
 
-logger = logging.getLogger(__name__)  # Init logger
+logger = logging.getLogger(__name__)
+
 misc = Blueprint('misc', __name__)
 
-
-def bind_contract(web3_, address, artifact):
-    with open(os.path.abspath(os.path.join(whereami(), artifact)), 'r') as f:
-        abi = json.load(f)['abi']
-
-    return web3_.eth.contract(
-        address=web3_.toChecksumAddress(address), abi=abi)
-
-
-gas_limit = 5000000  # TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to settle bounty
-
+# TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to settle bounty
+gas_limit = 5000000
 zero_address = '0x0000000000000000000000000000000000000000'
-
-offer_msig_artifact = os.path.join(config_location, 'contracts',
-                                   'OfferMultiSig.json')
-
-from polyswarmd.chains import chain
 
 
 @misc.route('/syncing', methods=['GET'])
 @chain
 def get_syncing():
-    if not g.web3.eth.syncing:
+    if not g.chain.w3.eth.syncing:
         return success(False)
 
-    return success(dict(g.web3.eth.syncing))
+    return success(dict(g.chain.w3.eth.syncing))
 
 
 @misc.route('/nonce', methods=['GET'])
 @chain
 def get_nonce():
-    account = g.web3.toChecksumAddress(g.eth_address)
+    account = g.chain.w3.toChecksumAddress(g.eth_address)
 
-    return success(g.web3.eth.getTransactionCount(account))
+    return success(g.chain.w3.eth.getTransactionCount(account))
 
 
 @misc.route('/transactions', methods=['POST'])
 @chain
 def post_transactions():
-    account = g.web3.toChecksumAddress(g.eth_address)
+    account = g.chain.w3.toChecksumAddress(g.eth_address)
 
     schema = {
         'type': 'object',
@@ -88,17 +71,22 @@ def post_transactions():
     for raw_tx in body['transactions']:
         try:
             tx = rlp.decode(bytes.fromhex(raw_tx), Transaction)
-        except:
+        except ValueError as e:
+            logger.error('Invalid transaction: %s', e)
+            continue
+        except Exception:
+            logger.exception('Unexpected exception while parsing transaction')
             continue
 
-        sender = g.web3.toChecksumAddress(tx.sender.hex())
+        sender = g.chain.w3.toChecksumAddress(tx.sender.hex())
         if sender != account:
-            errors.append('Invalid transaction sender for tx {0}: expected {1} got {2}'.format(tx.hash.hex(), account, sender))
+            errors.append(
+                'Invalid transaction sender for tx {0}: expected {1} got {2}'.format(tx.hash.hex(), account, sender))
             continue
 
         # TODO: Additional validation (addresses, methods, etc)
         try:
-            txhashes.append(g.web3.eth.sendRawTransaction(HexBytes(raw_tx)))
+            txhashes.append(g.chain.w3.eth.sendRawTransaction(HexBytes(raw_tx)))
         except ValueError as e:
             errors.append('Invalid transaction error for tx {0}: {1}'.format(tx.hash.hex(), e))
 
@@ -119,10 +107,10 @@ def post_transactions():
 def build_transaction(call, nonce):
     options = {
         'nonce': nonce,
-        'chainId': int(g.chain_id),
+        'chainId': int(g.chain.chain_id),
         'gas': gas_limit,
     }
-    if g.free:
+    if g.chain.free:
         options["gasPrice"] = 0
 
     return call.buildTransaction(options)
@@ -140,7 +128,7 @@ def events_from_transaction(txhash):
 
     try:
         while True:
-            receipt = g.web3.eth.getTransactionReceipt(txhash)
+            receipt = g.chain.w3.eth.getTransactionReceipt(txhash)
             if receipt is not None:
                 break
             gevent.sleep(0.1)
@@ -181,13 +169,13 @@ def events_from_transaction(txhash):
     ret = {}
 
     # Transfers
-    processed = g.nectar_token.events.Transfer().processReceipt(receipt)
+    processed = g.chain.nectar_token.contract.events.Transfer().processReceipt(receipt)
     if processed:
         transfer = transfer_event_to_dict(processed[0]['args'])
         ret['transfers'] = ret.get('transfers', []) + [transfer]
 
     # Bounties
-    processed = g.bounty_registry.events.NewBounty().processReceipt(
+    processed = g.chain.bounty_registry.contract.events.NewBounty().processReceipt(
         receipt)
     if processed:
         bounty = new_bounty_event_to_dict(processed[0]['args'])
@@ -195,31 +183,31 @@ def events_from_transaction(txhash):
         if is_valid_ipfshash(bounty['uri']):
             ret['bounties'] = ret.get('bounties', []) + [bounty]
 
-    processed = g.bounty_registry.events.NewAssertion().processReceipt(
+    processed = g.chain.bounty_registry.contract.events.NewAssertion().processReceipt(
         receipt)
     if processed:
         assertion = new_assertion_event_to_dict(processed[0]['args'])
         ret['assertions'] = ret.get('assertions', []) + [assertion]
 
-    processed = g.bounty_registry.events.NewVerdict().processReceipt(
+    processed = g.chain.bounty_registry.contract.events.NewVerdict().processReceipt(
         receipt)
     if processed:
         verdict = new_verdict_event_to_dict(processed[0]['args'])
         ret['verdicts'] = ret.get('verdicts', []) + [verdict]
 
-    processed = g.bounty_registry.events.RevealedAssertion().processReceipt(receipt)
+    processed = g.chain.bounty_registry.contract.events.RevealedAssertion().processReceipt(receipt)
     if processed:
         reveal = revealed_assertion_event_to_dict(processed[0]['args'])
         ret['reveals'] = ret.get('reveals', []) + [reveal]
 
     # Arbiter
-    processed = g.arbiter_staking.events.NewWithdrawal().processReceipt(
+    processed = g.chain.arbiter_staking.contract.events.NewWithdrawal().processReceipt(
         receipt)
     if processed:
         withdrawal = new_withdrawal_event_to_dict(processed[0]['args'])
         ret['withdrawals'] = ret.get('withdrawals', []) + [withdrawal]
 
-    processed = g.arbiter_staking.events.NewDeposit().processReceipt(
+    processed = g.chain.arbiter_staking.contract.events.NewDeposit().processReceipt(
         receipt)
     if processed:
         deposit = new_deposit_event_to_dict(processed[0]['args'])
@@ -227,16 +215,14 @@ def events_from_transaction(txhash):
 
     # Offers
     # TODO: no conversion functions for most of these, do we want those?
-    if g.offer_registry is None:
+    if g.chain.offer_registry.contract is None:
         return ret
 
-    offer_msig = bind_contract(g.web3, zero_address, offer_msig_artifact)
-    processed = g.offer_registry.events.InitializedChannel().processReceipt(
-        receipt)
+    offer_msig = g.chain.offer_multisig.bind(zero_address)
+    processed = g.chain.offer_registry.contract.events.InitializedChannel().processReceipt(receipt)
     if processed:
         initialized = dict(processed[0]['args'])
-        ret['offers_initialized'] = ret.get('offers_initialized',
-                                            []) + [initialized]
+        ret['offers_initialized'] = ret.get('offers_initialized', []) + [initialized]
 
     processed = offer_msig.events.OpenedAgreement().processReceipt(receipt)
     if processed:

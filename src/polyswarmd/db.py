@@ -1,15 +1,13 @@
 import logging
 
+from flask import current_app as app
 from sqlalchemy import create_engine, Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship, scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
-from polyswarmd.config import db_uri
-
-logger = logging.getLogger(__name__)  # Init logger
-engine = create_engine(db_uri, convert_unicode=True)
-db_session = scoped_session(
-    sessionmaker(autocommit=False, autoflush=False, bind=engine))
+logger = logging.getLogger(__name__)
+engine = create_engine(app.config['POLYSWARMD'].db_uri, convert_unicode=True)
+db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
 
 Base = declarative_base()
 Base.query = db_session.query_property()
@@ -87,3 +85,8 @@ def add_api_key(email, eth_address, api_key):
     except Exception:
         logger.exception('Error inserting new API key into DB')
         db_session.rollback()
+
+
+@app.teardown_appcontext
+def teardown_appcontext(exception=None):
+    db_session.remove()
