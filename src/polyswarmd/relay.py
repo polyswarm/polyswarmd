@@ -27,7 +27,7 @@ def withdraw_funds():
 
 def send_funds_from():
     # Grab correct versions by chain type
-    account = g.chain.web3.toChecksumAddress(g.eth_address)
+    account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
     erc20_relay_address = g.chain.w3.toChecksumAddress(g.chain.erc20_relay.address)
 
