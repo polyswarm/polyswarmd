@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import socket
+import threading
 import time
 from urllib.parse import urlparse
 
@@ -62,11 +63,22 @@ def fetch_from_consul_or_wait(client, key, recurse=False, index=0):
             logger.info('Consul up but key %s not available, retrying...', key)
             continue
 
+def wait_for_consul_key_deletion(client, key, recurse=False, index=0):
+    logger.info('Watching key: %s', key)
+    while True:
+        try:
+            index, data = client.kv.get(key, recurse=recurse, index=index, wait='2m')
+            if data is None:
+                return
+        except Timeout:
+            logger.info('Consul key %s still valid', key)
+            continue
+
 
 class ContractConfig(object):
-    def __init__(self, web3_, name, abi, address=None):
+    def __init__(self, w3, name, abi, address=None):
         self.name = name
-        self.web3_ = web3_
+        self.w3 = w3
         self.abi = abi
         self.address = address
 
@@ -86,7 +98,7 @@ class ContractConfig(object):
         if not address:
             raise ValueError('No address provided to bind to')
 
-        ret = self.web3_.eth.contract(address=self.web3_.toChecksumAddress(address), abi=self.abi)
+        ret = self.w3.eth.contract(address=self.w3.toChecksumAddress(address), abi=self.abi)
 
         supported_versions = SUPPORTED_CONTRACT_VERSIONS.get(self.name)
         if supported_versions is not None and address != ZERO_ADDRESS:
@@ -327,8 +339,21 @@ class Config(object):
         require_api_key = auth_uri is not None
         trace_transactions = config.get('trace_transactions', True)
         profiler_enabled = config.get('profiler_enabled', False)
-        return cls(community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
+        ret = cls(community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
                    trace_transactions, profiler_enabled)
+
+        # Watch for key deletion, if config is deleted die and restart with new config
+        def watch_for_config_deletion(consul_client, key):
+            wait_for_consul_key_deletion(consul_client, key, recurse=True)
+            logger.fatal('Config change detected, exiting')
+
+            # sys.exit is caught by flask, we want to tear down immediately though
+            os._exit(0)
+
+        t = threading.Thread(target=watch_for_config_deletion, args=(consul_client, base_key))
+        t.start()
+
+        return ret
 
     @classmethod
     def auto(cls):
