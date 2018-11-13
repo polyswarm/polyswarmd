@@ -123,7 +123,7 @@ def events_from_transaction(txhash):
 
     # TODO: Check for out of gas, other
     # TODO: Report contract errors
-    timeout = gevent.Timeout(60)
+    timeout = gevent.Timeout(300)
     timeout.start()
 
     try:
