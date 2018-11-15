@@ -152,22 +152,21 @@ def state_to_dict(state):
         raise ValueError('g.chain not found')
 
     # gets state of non required state
-    offer_info = g.chain.offer_lib.contract.functions.getOfferState(state).call()
+    offer_info = g.chain.offer_registry.contract.functions.getOfferState(state).call()
 
     return {
-        'isClosed': g.chain.offer_lib.contract.functions.getCloseFlag(state).call(),
-        'nonce': g.chain.offer_lib.contract.functions.getSequence(state).call(),
-        'ambassador': g.chain.offer_lib.contract.functions.getPartyA(state).call(),
-        'expert': g.chain.offer_lib.contract.functions.getPartyB(state).call(),
-        'msig_address': g.chain.offer_lib.contract.functions.getMultiSigAddress(state).call(),
-        'ambassador_balance': g.chain.offer_lib.contract.functions.getBalanceA(state).call(),
-        'expert_balance': g.chain.offer_lib.contract.functions.getBalanceB(state).call(),
-        'token': g.chain.offer_lib.contract.functions.getTokenAddress(state).call(),
-        'offer_amount': g.chain.w3.toInt(offer_info[1]),
-        'mask': int_to_bool_list(g.chain.w3.toInt(offer_info[6])),
-        'verdicts': int_to_bool_list(g.chain.w3.toInt(offer_info[7])),
+        'nonce': g.chain.w3.toInt(offer_info[1]),
+        'offer_amount': g.chain.w3.toInt(offer_info[2]),
+        'msig_address': offer_info[3],
+        'ambassador_balance': g.chain.w3.toInt(offer_info[4]),
+        'expert_balance': g.chain.w3.toInt(offer_info[5]),
+        'ambassador': offer_info[6],
+        'expert': offer_info[7],
+        'isClosed': offer_info[8],
+        'token': offer_info[9],
+        'mask': int_to_bool_list(g.chain.w3.toInt(offer_info[10])),
+        'verdicts': int_to_bool_list(g.chain.w3.toInt(offer_info[11])),
     }
-
 
 def new_init_channel_event_to_dict(new_init_event):
     return {

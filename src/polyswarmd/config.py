@@ -100,7 +100,7 @@ class ContractConfig(object):
 
 class ChainConfig(object):
     def __init__(self, name, eth_uri, chain_id, w3, nectar_token, bounty_registry, arbiter_staking, erc20_relay,
-                 offer_registry, offer_lib, offer_multisig, free):
+                 offer_registry, offer_multisig, free):
         self.name = name
         self.eth_uri = eth_uri
         self.chain_id = chain_id
@@ -110,7 +110,6 @@ class ChainConfig(object):
         self.arbiter_staking = arbiter_staking
         self.erc20_relay = erc20_relay
         self.offer_registry = offer_registry
-        self.offer_lib = offer_lib
         self.offer_multisig = offer_multisig
 
         self.free = free
@@ -124,7 +123,7 @@ class ChainConfig(object):
         return cls(name, eth_uri, chain_id, w3, contract_configs.get('NectarToken'),
                    contract_configs.get('BountyRegistry'), contract_configs.get('ArbiterStaking'),
                    contract_configs.get('ERC20Relay'), contract_configs.get('OfferRegistry'),
-                   contract_configs.get('OfferLib'), contract_configs.get('OfferMultiSig'), free)
+                   contract_configs.get('OfferMultiSig'), free)
 
     @classmethod
     def from_config_file(cls, name, filename):
@@ -173,7 +172,7 @@ class ChainConfig(object):
 
         # TODO schema check json
         expected_contracts = ['NectarToken', 'BountyRegistry', 'ArbiterStaking', 'ERC20Relay', 'OfferRegistry',
-                              'OfferLib', 'OfferMultiSig']
+                              'OfferMultiSig']
         contract_configs = {}
 
         base_key = key.rsplit('/', 1)[0] + '/'
@@ -225,18 +224,11 @@ class ChainConfig(object):
             if not self.offer_registry or not self.offer_registry.contract:
                 raise ValueError('Invalid OfferRegistry contract or address')
 
-            if not self.offer_lib:
-                raise ValueError('Invalid OfferLib contract')
-
             if not self.offer_multisig:
                 raise ValueError('Invalid OfferMultiSig contract')
 
     def __bind_child_contracts(self):
         self.arbiter_staking.bind(address=self.bounty_registry.contract.functions.staking().call(), persistent=True)
-
-        if self.offer_registry.contract is not None:
-            self.offer_lib.bind(address=self.offer_registry.contract.functions.offerLib().call(), persistent=True)
-
 
 class Config(object):
     def __init__(self, ipfs_uri, db_uri, require_api_key, homechain_config, sidechain_config):
