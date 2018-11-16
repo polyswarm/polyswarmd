@@ -347,7 +347,7 @@ def get_bounties_guid_assertions_id(guid, id_):
 
     try:
         assertion = assertion_to_dict(g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, id_).call(),
-                                          bounty['num_artifacts'])
+                                      bounty['num_artifacts'])
         return success(assertion)
     except:
         return failure('Assertion not found', 404)
