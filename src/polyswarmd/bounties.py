@@ -26,7 +26,7 @@ def calculate_bloom(artifacts):
 
     v = int(bf)
     ret = []
-    d = (1 << 256) - 1
+    d = (1 << 256)
     for _ in range(FILTER_BITS // 256):
         ret.insert(0, v % d)
         v //= d
