@@ -44,8 +44,6 @@ def bounty_to_dict(bounty):
     }
     if bounty_has_voters_and_verdicts:
         retval['bloom'] = uint256_list_to_hex_string(bounty[10])
-        retval['voters'] = bounty[11]
-        retval['verdicts'] = [safe_int_to_bool_list(b, retval['num_artifacts']) for b in bounty[12]]
         retval['bloom_votes'] = bounty[13]
     return retval
 
@@ -93,6 +91,12 @@ def revealed_assertion_event_to_dict(revealed_assertion_event):
         'metadata': revealed_assertion_event.metadata,
     }
 
+def verdict_to_dict(vote, num_artifacts):
+    return {
+        'arbiter': vote[0],
+        'verdicts': safe_int_to_bool_list(vote[1], num_artifacts),
+        'valid_bloom': vote[2],
+    }
 
 def new_verdict_event_to_dict(new_verdict_event):
     return {

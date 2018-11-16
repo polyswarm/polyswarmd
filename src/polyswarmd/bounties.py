@@ -13,7 +13,7 @@ from polyswarmd.chains import chain
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
 from polyswarmd.eth import build_transaction, zero_address
 from polyswarmd.response import success, failure
-from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict
+from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, verdict_to_dict
 
 logger = logging.getLogger(__name__)
 bounties = Blueprint('bounties', __name__)
@@ -351,3 +351,41 @@ def get_bounties_guid_assertions_id(guid, id_):
         return success(assertion)
     except:
         return failure('Assertion not found', 404)
+
+
+@bounties.route('/<uuid:guid>/votes', methods=['GET'])
+@chain
+def get_bounties_guid_votes(guid):
+    bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
+    if bounty['author'] == zero_address:
+        return failure('Bounty not found', 404)
+
+    num_verdicts = g.chain.bounty_registry.contract.functions.getVerdictCount(guid.int).call()
+
+    verdicts = []
+    for i in range(num_verdicts):
+        try:
+            verdict = verdict_to_dict(
+                g.chain.bounty_registry.contract.functions.verdictsByGuid(guid.int, i).call(),
+                bounty['num_artifacts'])
+            verdicts.append(verdict)
+        except Exception:
+            logger.exception('Could not retrieve verdict')
+            continue
+
+    return success(verdicts)
+
+
+@bounties.route('/<uuid:guid>/votes/<int:id_>', methods=['GET'])
+@chain
+def get_bounties_guid_votes_id(guid, id_):
+    bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
+    if bounty['author'] == zero_address:
+        return failure('Bounty not found', 404)
+
+    try:
+        verdict = verdict_to_dict(g.chain.bounty_registry.contract.functions.verdictsByGuid(guid.int, id_).call(),
+                                      bounty['num_artifacts'])
+        return success(verdict)
+    except:
+        return failure('Verdict not found', 404)
