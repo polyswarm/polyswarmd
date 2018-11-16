@@ -13,7 +13,7 @@ from polyswarmd.chains import chain
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
 from polyswarmd.eth import build_transaction, zero_address
 from polyswarmd.response import success, failure
-from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, verdict_to_dict
+from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, verdict_to_dict, bloom_to_dict
 
 logger = logging.getLogger(__name__)
 bounties = Blueprint('bounties', __name__)
@@ -389,3 +389,20 @@ def get_bounties_guid_votes_id(guid, id_):
         return success(verdict)
     except:
         return failure('Verdict not found', 404)
+
+@bounties.route('/<uuid:guid>/bloom', methods=['GET'])
+@chain
+def get_bounties_guid_bloom(guid):
+    bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
+    if bounty['author'] == zero_address:
+        return failure('Bounty not found', 404)
+
+    try:
+        bloom_parts = []
+        for i in range(0, 8):
+            bloom_parts.append(g.chain.bounty_registry.contract.functions.bloomByGuid(guid.int, i).call())
+        bloom = bloom_to_dict(bloom_parts)
+        return success(bloom)
+    except:
+        logger.exception('Bloom not found')
+        return failure('Bloom not found', 404)
