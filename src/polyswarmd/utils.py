@@ -94,7 +94,7 @@ def revealed_assertion_event_to_dict(revealed_assertion_event):
 
 def verdict_to_dict(vote, num_artifacts):
     return {
-        'arbiter': vote[0],
+        'voter': vote[0],
         'verdicts': safe_int_to_bool_list(vote[1], num_artifacts),
         'valid_bloom': vote[2],
     }
