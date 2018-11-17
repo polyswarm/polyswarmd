@@ -162,7 +162,7 @@ def state_to_dict(state):
         'expert_balance': g.chain.w3.toInt(offer_info[5]),
         'ambassador': offer_info[6],
         'expert': offer_info[7],
-        'isClosed': offer_info[8],
+        'is_closed': offer_info[8],
         'token': offer_info[9],
         'mask': int_to_bool_list(g.chain.w3.toInt(offer_info[10])),
         'verdicts': int_to_bool_list(g.chain.w3.toInt(offer_info[11])),
@@ -240,8 +240,9 @@ def dict_to_state(state_dict):
     state_str = state_str + to_padded_hex(int(state_dict['guid']))
     state_str = state_str + to_padded_hex(state_dict['offer_amount'])
 
-    # no longer storing in contract state
     if 'artifact_hash' in state_dict:
+        state_str = state_str + to_padded_hex(state_dict['ipfs_hash'])
+    else:
         state_str = state_str + to_padded_hex('')
 
     if 'ipfs_hash' in state_dict:

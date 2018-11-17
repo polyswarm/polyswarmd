@@ -468,7 +468,7 @@ def create_state():
             }
         },
         'required': [
-            'close_flag', 'nonce', 'expert', 'msig_address',
+            'close_flag', 'nonce', 'ambassador', 'expert', 'msig_address',
             'ambassador_balance', 'expert_balance', 'guid', 'offer_amount'
         ],
     }

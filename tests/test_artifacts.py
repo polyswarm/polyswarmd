@@ -1,10 +1,10 @@
 import io
 
 import requests_mock
+from polyswarmd import app
+from tests import client, test_account
 
-from polyswarmd.config import ipfs_uri
-from tests import client
-test_account='0x4b1867c484871926109e3c47668d5c0938ca3527'
+ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
 
 def setup_mocks(mock):
     mock.post(
