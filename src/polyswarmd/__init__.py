@@ -63,7 +63,7 @@ def status():
         }
 
         if ret[name]['reachable']:
-            ret[name]['syncing'] = chain.w3.eth.syncing
+            ret[name]['syncing'] = chain.w3.eth.syncing is not False
             ret[name]['block'] = chain.w3.eth.blockNumber
 
     return success(ret)
