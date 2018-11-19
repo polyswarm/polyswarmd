@@ -241,7 +241,7 @@ def dict_to_state(state_dict):
     state_str = state_str + to_padded_hex(state_dict['offer_amount'])
 
     if 'artifact_hash' in state_dict:
-        state_str = state_str + to_padded_hex(state_dict['ipfs_hash'])
+        state_str = state_str + to_padded_hex(state_dict['artifact_hash'])
     else:
         state_str = state_str + to_padded_hex('')
 
