@@ -28,9 +28,7 @@ def uint256_list_to_hex_string(us):
 
 
 def bounty_to_dict(bounty):
-    bounty_has_voters_and_verdicts = len(bounty) > 10
-
-    retval = {
+    return {
         'guid': str(uuid.UUID(int=bounty[0])),
         'author': bounty[1],
         'amount': str(bounty[2]),
@@ -42,12 +40,12 @@ def bounty_to_dict(bounty):
         'quorum_reached_block': bounty[8],
         'quorum_mask': safe_int_to_bool_list(bounty[9], bounty[4]),
     }
-    if bounty_has_voters_and_verdicts:
-        retval['bloom'] = uint256_list_to_hex_string(bounty[10])
-        retval['voters'] = bounty[11]
-        retval['verdicts'] = [safe_int_to_bool_list(b, retval['num_artifacts']) for b in bounty[12]]
-        retval['bloom_votes'] = bounty[13]
-    return retval
+
+
+def bloom_to_dict(bloom):
+    return {
+        'bloom': bloom,
+    }
 
 
 def new_bounty_event_to_dict(new_bounty_event):
@@ -91,6 +89,14 @@ def revealed_assertion_event_to_dict(revealed_assertion_event):
         'nonce': str(revealed_assertion_event.nonce),
         'verdicts': safe_int_to_bool_list(revealed_assertion_event.verdicts, revealed_assertion_event.numArtifacts),
         'metadata': revealed_assertion_event.metadata,
+    }
+
+
+def verdict_to_dict(vote, num_artifacts):
+    return {
+        'voter': vote[0],
+        'verdicts': safe_int_to_bool_list(vote[1], num_artifacts),
+        'valid_bloom': vote[2],
     }
 
 
