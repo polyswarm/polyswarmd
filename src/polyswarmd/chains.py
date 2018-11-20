@@ -22,7 +22,7 @@ def chain(_func=None, chain_name=None):
         def wrapper(*args, **kwargs):
             c = chain_name
             if c is None:
-                c = request.args.get('chain', 'home')
+                c = request.args.get('chain', 'side')
 
             logger.info("Chain: %s", c)
 
