@@ -10,10 +10,11 @@ Flask-Sockets==0.2.1
 Flask-SQLAlchemy==2.3.2
 psycopg2-binary==2.7.5
 PyYaml==3.12
-pytest==3.5.1
+pytest== 4.0.0
 python-json-logger==0.1.9
 requests==2.20.0
 requests-mock==1.5.0
 web3==4.8.1
 websocket-client==0.48.0
 Werkzeug==0.14.1
+rlp==1.0.3

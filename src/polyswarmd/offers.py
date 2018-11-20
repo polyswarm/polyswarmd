@@ -6,7 +6,7 @@ from flask import Blueprint, g, request
 from polyswarmd.chains import chain
 from polyswarmd.eth import build_transaction
 from polyswarmd.response import success, failure
-from polyswarmd.utils import channel_to_dict, validate_ws_url, dict_to_state, to_padded_hex, bool_list_to_int
+from polyswarmd.utils import channel_to_dict, validate_ws_url, dict_to_state, state_to_dict, to_padded_hex, bool_list_to_int
 
 logger = logging.getLogger(__name__)
 offers = Blueprint('offers', __name__)
@@ -141,7 +141,8 @@ def post_open(guid):
     r = body['r']
     s = body['s']
 
-    approve_amount = g.chain.offer_lib.contract.functions.getBalanceA(state).call()
+    offer_info = state_to_dict(state)
+    approve_amount = offer_info['ambassador_balance']
 
     transactions = [
         build_transaction(g.chain.nectar_token.contract.functions.approve(msig_address, approve_amount), base_nonce),
@@ -467,7 +468,7 @@ def create_state():
             }
         },
         'required': [
-            'close_flag', 'nonce', 'expert', 'msig_address',
+            'close_flag', 'nonce', 'ambassador', 'expert', 'msig_address',
             'ambassador_balance', 'expert_balance', 'guid', 'offer_amount'
         ],
     }

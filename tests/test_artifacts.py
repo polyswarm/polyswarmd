@@ -1,10 +1,10 @@
 import io
 
 import requests_mock
+from polyswarmd import app
+from tests import client, test_account
 
-from polyswarmd.config import ipfs_uri
-from tests import client
-
+ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
 
 def setup_mocks(mock):
     mock.post(
@@ -45,12 +45,13 @@ def test_post_artifacts(client):
     with requests_mock.Mocker() as mock:
         setup_mocks(mock)
         rv = client.post(
-            '/artifacts',
+            '/artifacts?account={0}'.format(test_account),
             content_type='multipart/form-data',
             data={
                 'bar': io.BytesIO(b'bar'),
                 'foo': io.BytesIO(b'foo'),
             })
+
         assert rv.data == expected
 
 
@@ -59,7 +60,7 @@ def test_get_artifacts_ipfshash(client):
     with requests_mock.Mocker() as mock:
         setup_mocks(mock)
         rv = client.get(
-            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU')
+            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU?account={0}'.format(test_account))
         assert rv.data == expected
 
 
@@ -68,10 +69,10 @@ def test_get_artifacts_ipfshash_id(client):
     with requests_mock.Mocker() as mock:
         setup_mocks(mock)
         rv = client.get(
-            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/0')
+            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/0?account={0}'.format(test_account))
         assert rv.data == expected[0]
         rv = client.get(
-            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/1')
+            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/1?account={0}'.format(test_account))
         assert rv.data == expected[1]
 
 
@@ -84,8 +85,8 @@ def test_get_artifacts_ipfshash_id_stat(client):
     with requests_mock.Mocker() as mock:
         setup_mocks(mock)
         rv = client.get(
-            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/0/stat')
+            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/0/stat?account={0}'.format(test_account))
         assert rv.data == expected[0]
         rv = client.get(
-            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/1/stat')
+            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/1/stat?account={0}'.format(test_account))
         assert rv.data == expected[1]
