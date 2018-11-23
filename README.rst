@@ -32,7 +32,7 @@ There are several components of each bounty posted:
 -  Artifact IPFS URI to fetch
 -  Deadline
 -  Bounty GUID
--  Arbiter verdicts
+-  Arbiter votes
 PolySwarm
 =========
 
@@ -67,7 +67,7 @@ There are several components of each bounty posted:
 -  Artifact IPFS URI to fetch
 -  Deadline
 -  Bounty GUID
--  Arbiter verdicts
+-  Arbiter votes
 
 Enterprises can leverage the HTTP API as an interface for posting
 suspect artifacts to PolySwarm.
@@ -88,7 +88,7 @@ Assertions against posted bounties consist of:
 -  Optional metadata (such as e.g. malware family) which provides
    value-add to the bounty poster
 
-Verdicts
+Votes
 ~~~~~~~~
 
 Arbiters may settle bounties to trigger payment based on their
@@ -127,7 +127,7 @@ Docker
 Signing Transactions
 --------------------
 In the latest verions of Polyswarmd it moved away from unlocking the account in
-geth. Now, all transactions are sent over a websocket where they can be individually signed. 
+geth. Now, all transactions are sent over a websocket where they can be individually signed.
 
 To add transaction signing to your polyswarmd dependent project you need to to
 write/use something that follows the steps below..
@@ -137,7 +137,7 @@ write/use something that follows the steps below..
 2) Sign the Transaction data with your private key
 3) Return a JSON object containing the id, chainID, and signed data as data.
 
-There is a javascript example embedded below, though you can use any 
+There is a javascript example embedded below, though you can use any
 other language.
 
 .. code:: javascript
@@ -173,7 +173,7 @@ gas required exceeds allowance or always failing transaction
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **When posting an assertion**
-The assertion targets an expired bounty. 
+The assertion targets an expired bounty.
 
 **Other times**
 The wallet does not have any Nectar, or maybe not enough ETH for gas.

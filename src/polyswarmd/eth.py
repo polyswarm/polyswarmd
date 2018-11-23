@@ -118,7 +118,7 @@ def build_transaction(call, nonce):
 
 def events_from_transaction(txhash):
     from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, \
-        new_verdict_event_to_dict, revealed_assertion_event_to_dict, \
+        new_vote_event_to_dict, revealed_assertion_event_to_dict, \
         transfer_event_to_dict, new_withdrawal_event_to_dict, new_deposit_event_to_dict
 
     # TODO: Check for out of gas, other
@@ -189,11 +189,11 @@ def events_from_transaction(txhash):
         assertion = new_assertion_event_to_dict(processed[0]['args'])
         ret['assertions'] = ret.get('assertions', []) + [assertion]
 
-    processed = g.chain.bounty_registry.contract.events.NewVerdict().processReceipt(
+    processed = g.chain.bounty_registry.contract.events.NewVote().processReceipt(
         receipt)
     if processed:
-        verdict = new_verdict_event_to_dict(processed[0]['args'])
-        ret['verdicts'] = ret.get('verdicts', []) + [verdict]
+        vote = new_vote_event_to_dict(processed[0]['args'])
+        ret['votes'] = ret.get('votes', []) + [vote]
 
     processed = g.chain.bounty_registry.contract.events.RevealedAssertion().processReceipt(receipt)
     if processed:

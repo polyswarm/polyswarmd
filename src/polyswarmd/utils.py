@@ -92,19 +92,19 @@ def revealed_assertion_event_to_dict(revealed_assertion_event):
     }
 
 
-def verdict_to_dict(vote, num_artifacts):
+def vote_to_dict(vote, num_artifacts):
     return {
         'voter': vote[0],
-        'verdicts': safe_int_to_bool_list(vote[1], num_artifacts),
+        'votes': safe_int_to_bool_list(vote[1], num_artifacts),
         'valid_bloom': vote[2],
     }
 
 
-def new_verdict_event_to_dict(new_verdict_event):
+def new_vote_event_to_dict(new_vote_event):
     return {
-        'bounty_guid': str(uuid.UUID(int=new_verdict_event.bountyGuid)),
-        'verdicts': safe_int_to_bool_list(new_verdict_event.verdicts, new_verdict_event.numArtifacts),
-        'voter': new_verdict_event.voter,
+        'bounty_guid': str(uuid.UUID(int=new_vote_event.bountyGuid)),
+        'votes': safe_int_to_bool_list(new_vote_event.votes, new_vote_event.numArtifacts),
+        'voter': new_vote_event.voter,
     }
 
 
