@@ -11,7 +11,7 @@ from geventwebsocket import WebSocketError
 from requests.exceptions import ConnectionError
 
 from polyswarmd.chains import chain
-from polyswarmd.utils import channel_to_dict, new_cancel_agreement_event_to_dict, new_settle_started_event, new_settle_challenged_event, new_bounty_event_to_dict, new_assertion_event_to_dict, new_verdict_event_to_dict, state_to_dict, new_init_channel_event_to_dict, new_quorum_event_to_dict, settled_bounty_event_to_dict, revealed_assertion_event_to_dict
+from polyswarmd.utils import channel_to_dict, new_cancel_agreement_event_to_dict, new_settle_started_event, new_settle_challenged_event, new_bounty_event_to_dict, new_assertion_event_to_dict, new_vote_event_to_dict, state_to_dict, new_init_channel_event_to_dict, new_quorum_event_to_dict, settled_bounty_event_to_dict, revealed_assertion_event_to_dict
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ def init_websockets(app):
                     block_filter = g.chain.w3.eth.filter('latest')
                     bounty_filter = g.chain.bounty_registry.contract.eventFilter('NewBounty')
                     assertion_filter = g.chain.bounty_registry.contract.eventFilter('NewAssertion')
-                    verdict_filter = g.chain.bounty_registry.contract.eventFilter('NewVerdict')
+                    vote_filter = g.chain.bounty_registry.contract.eventFilter('NewVote')
                     quorum_filiter = g.chain.bounty_registry.contract.eventFilter('QuorumReached')
                     settled_filter = g.chain.bounty_registry.contract.eventFilter('BountySettled')
                     reveal_filter = g.chain.bounty_registry.contract.eventFilter('RevealedAssertion')
@@ -85,13 +85,13 @@ def init_websockets(app):
                             revealed_assertion_event_to_dict(event.args),
                         }))
 
-                for event in verdict_filter.get_new_entries():
+                for event in vote_filter.get_new_entries():
                     ws.send(
                         json.dumps({
                             'event':
-                            'verdict',
+                            'vote',
                             'data':
-                            new_verdict_event_to_dict(event.args),
+                            new_vote_event_to_dict(event.args),
                         }))
 
                 for event in quorum_filiter.get_new_entries():

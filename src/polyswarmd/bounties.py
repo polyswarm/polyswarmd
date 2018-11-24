@@ -13,7 +13,7 @@ from polyswarmd.chains import chain
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
 from polyswarmd.eth import build_transaction, zero_address
 from polyswarmd.response import success, failure
-from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, verdict_to_dict, bloom_to_dict
+from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, vote_to_dict, bloom_to_dict
 
 logger = logging.getLogger(__name__)
 bounties = Blueprint('bounties', __name__)
@@ -163,7 +163,7 @@ def post_bounties_guid_vote(guid):
     schema = {
         'type': 'object',
         'properties': {
-            'verdicts': {
+            'votes': {
                 'type': 'array',
                 'maxItems': 256,
                 'items': {
@@ -174,7 +174,7 @@ def post_bounties_guid_vote(guid):
                 'type': 'boolean',
             },
         },
-        'required': ['verdicts', 'valid_bloom'],
+        'required': ['votes', 'valid_bloom'],
     }
 
     body = request.get_json()
@@ -183,11 +183,11 @@ def post_bounties_guid_vote(guid):
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
-    verdicts = bool_list_to_int(body['verdicts'])
+    votes = bool_list_to_int(body['votes'])
     valid_bloom = bool(body['valid_bloom'])
 
     transactions = [
-        build_transaction(g.chain.bounty_registry.contract.functions.voteOnBounty(guid.int, verdicts, valid_bloom),
+        build_transaction(g.chain.bounty_registry.contract.functions.voteOnBounty(guid.int, votes, valid_bloom),
                           base_nonce),
     ]
     return success({'transactions': transactions})
@@ -360,20 +360,20 @@ def get_bounties_guid_votes(guid):
     if bounty['author'] == zero_address:
         return failure('Bounty not found', 404)
 
-    num_verdicts = g.chain.bounty_registry.contract.functions.getVerdictCount(guid.int).call()
+    num_votes = g.chain.bounty_registry.contract.functions.getNumberOfVotes(guid.int).call()
 
-    verdicts = []
-    for i in range(num_verdicts):
+    votes = []
+    for i in range(num_votes):
         try:
-            verdict = verdict_to_dict(
-                g.chain.bounty_registry.contract.functions.verdictsByGuid(guid.int, i).call(),
+            vote = vote_to_dict(
+                g.chain.bounty_registry.contract.functions.votesByGuid(guid.int, i).call(),
                 bounty['num_artifacts'])
-            verdicts.append(verdict)
+            votes.append(vote)
         except Exception:
-            logger.exception('Could not retrieve verdict')
+            logger.exception('Could not retrieve vote')
             continue
 
-    return success(verdicts)
+    return success(votes)
 
 
 @bounties.route('/<uuid:guid>/votes/<int:id_>', methods=['GET'])
@@ -384,10 +384,10 @@ def get_bounties_guid_votes_id(guid, id_):
         return failure('Bounty not found', 404)
 
     try:
-        verdict = verdict_to_dict(g.chain.bounty_registry.contract.functions.verdictsByGuid(guid.int, id_).call(), bounty['num_artifacts'])
-        return success(verdict)
+        vote = vote_to_dict(g.chain.bounty_registry.contract.functions.votesByGuid(guid.int, id_).call(), bounty['num_artifacts'])
+        return success(vote)
     except:
-        return failure('Verdict not found', 404)
+        return failure('Vote not found', 404)
 
 @bounties.route('/<uuid:guid>/bloom', methods=['GET'])
 @chain
