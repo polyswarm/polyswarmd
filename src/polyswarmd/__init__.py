@@ -79,32 +79,25 @@ def before_first_request():
 @app.before_request
 def before_request():
     g.user = None
-    g.eth_address = None
 
     # Want to be able to whitelist unauthenticated routes, everything requires auth by default
-    if request.path in AUTH_WHITELIST:
+    if not app.config['POLYSWARMD'].require_api_key or request.path in AUTH_WHITELIST:
         return
 
-    if not app.config['POLYSWARMD'].require_api_key:
-        g.eth_address = request.args.get('account')
-        if not g.eth_address:
-            return failure('Account must be provided', 400)
-    else:
-        # Ignore prefix if present
-        try:
-            api_key = request.headers.get('Authorization').split()[-1]
-        except:
-            return failure('API key required', 401)
+    # Ignore prefix if present
+    try:
+        api_key = request.headers.get('Authorization').split()[-1]
+    except:
+        return failure('API key required', 401)
 
-        if api_key:
-            from polyswarmd.db import lookup_api_key
-            api_key_obj = lookup_api_key(api_key)
-            if api_key_obj:
-                g.user = api_key_obj.eth_address.user
-                g.eth_address = api_key_obj.eth_address.eth_address
+    if api_key:
+        from polyswarmd.db import lookup_api_key
+        api_key_obj = lookup_api_key(api_key)
+        if api_key_obj:
+            g.user = api_key_obj.user
 
-        if not g.user or not g.eth_address:
-            return failure('API key required', 401)
+    if not g.user:
+        return failure('API key required', 401)
 
 
 @app.after_request

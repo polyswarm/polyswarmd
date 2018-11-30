@@ -20,6 +20,10 @@ def chain(_func=None, chain_name=None):
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            g.eth_address = request.args.get('account')
+            if not g.eth_address:
+                return failure('Account must be provided', 400)
+
             c = chain_name
             if c is None:
                 c = request.args.get('chain', 'side')
