@@ -102,10 +102,11 @@ def before_request():
 
 @app.after_request
 def after_request(response):
+    eth_address = getattr(g, 'eth_address', None)
     if response.status_code == 200:
         logger.info('%s %s %s %s %s', datetime.datetime.now(), request.method,
-                    response.status_code, request.path, g.eth_address)
+                    response.status_code, request.path, eth_address)
     else:
         logger.error('%s %s %s %s %s: %s', datetime.datetime.now(), request.method,
-                     response.status_code, request.path, g.eth_address, response.get_data())
+                     response.status_code, request.path, eth_address, response.get_data())
     return response

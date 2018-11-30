@@ -7,7 +7,7 @@ from polyswarmd.response import failure
 
 logger = logging.getLogger(__name__)
 
-def chain(_func=None, chain_name=None):
+def chain(_func=None, chain_name=None, account_required=True):
     """This decorator takes the chain passed as a request arg and modifies a set of globals.
        There are a few guarantees made by this function.
 
@@ -21,7 +21,7 @@ def chain(_func=None, chain_name=None):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             g.eth_address = request.args.get('account')
-            if not g.eth_address:
+            if not g.eth_address and account_required:
                 return failure('Account must be provided', 400)
 
             c = chain_name
