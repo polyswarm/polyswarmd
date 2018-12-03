@@ -22,7 +22,7 @@ def init_websockets(app):
     message_sockets = dict()
 
     @sockets.route('/events')
-    @chain
+    @chain(account_required=False)
     def events(ws):
         ws.send(
             json.dumps({
@@ -136,7 +136,7 @@ def init_websockets(app):
                 continue
 
     @sockets.route('/events/<uuid:guid>')
-    @chain(chain_name='home')
+    @chain(chain_name='home', account_required=False)
     def channel_events(ws, guid):
         offer_channel = channel_to_dict(g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
         msig_address = offer_channel['msig_address']
@@ -194,7 +194,7 @@ def init_websockets(app):
 
     # for receiving messages about offers that might need to be signed
     @sockets.route('/messages/<uuid:guid>')
-    @chain(chain_name='home')
+    @chain(chain_name='home', account_required=False)
     def messages(ws, guid):
 
         if guid not in message_sockets:

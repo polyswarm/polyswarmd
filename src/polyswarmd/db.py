@@ -1,7 +1,7 @@
 import logging
 
 from flask import current_app as app
-from sqlalchemy import create_engine, Column, ForeignKey, Integer, String
+from sqlalchemy import create_engine, Column, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import relationship, scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -12,37 +12,46 @@ db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind
 Base = declarative_base()
 Base.query = db_session.query_property()
 
+community_user = Table('community_user', Base.metadata,
+                       Column('community_id', Integer, ForeignKey('communities.id')),
+                       Column('user_id', Integer, ForeignKey('users.id'))
+                       )
+
+community_api_key = Table('community_api_key', Base.metadata,
+                          Column('community_id', Integer, ForeignKey('communities.id')),
+                          Column('api_key_id', Integer, ForeignKey('api_keys.id'))
+                          )
+
+
+class Community(Base):
+    __tablename__ = 'communities'
+    id = Column(Integer, primary_key=True)
+    name = Column(String, index=True, unique=True)
+
+    users = relationship('User', secondary=community_user, back_populates='communities')
+    api_keys = relationship('ApiKey', secondary=community_api_key, back_populates='communities')
+
+    def __init__(self, name=None):
+        self.name = name
+
+    def __repr(self):
+        return '<Community {0}>'.format(self.name)
+
 
 class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
     email = Column(String, index=True, unique=True)
 
-    eth_addresses = relationship(
-        'EthAddress', backref='user', cascade='all, delete-orphan')
+    communities = relationship('Community', secondary=community_user, back_populates='users')
+    api_keys = relationship('ApiKey', backref='user', cascade='all, delete-orphan')
 
-    def __init__(self, email=None):
+    def __init__(self, email=None, communities=None):
         self.email = email
+        self.communities = communities
 
     def __repr__(self):
         return '<User {0}>'.format(self.email)
-
-
-class EthAddress(Base):
-    __tablename__ = 'eth_addresses'
-    id = Column(Integer, primary_key=True)
-    eth_address = Column(String, index=True)
-
-    user_id = Column(Integer, ForeignKey('users.id'))
-
-    api_keys = relationship(
-        'ApiKey', backref='eth_address', cascade='all, delete-orphan')
-
-    def __init__(self, eth_address=None):
-        self.eth_address = eth_address
-
-    def __repr__(self):
-        return '<EthAddress {0}>'.format(self.eth_address)
 
 
 class ApiKey(Base):
@@ -50,10 +59,12 @@ class ApiKey(Base):
     id = Column(Integer, primary_key=True)
     api_key = Column(String, index=True, unique=True)
 
-    eth_address_id = Column(Integer, ForeignKey('eth_addresses.id'))
+    communities = relationship('Community', secondary=community_api_key, back_populates='api_keys')
+    user_id = Column(Integer, ForeignKey('users.id'))
 
-    def __init__(self, api_key=None):
+    def __init__(self, api_key=None, communities=None):
         self.api_key = api_key
+        self.communities = communities
 
     def __repr__(self):
         return '<ApiKey {0}>'.format(self.api_key)
@@ -74,11 +85,9 @@ def lookup_api_key(api_key):
 def add_api_key(email, eth_address, api_key):
     try:
         user_obj = User(email)
-        eth_address_obj = EthAddress(eth_address)
         api_key_obj = ApiKey(api_key)
 
-        eth_address_obj.api_keys.append(api_key_obj)
-        user_obj.eth_addresses.append(eth_address_obj)
+        user_obj.api_keys.append(api_key_obj)
 
         db_session.add(user_obj)
         db_session.commit()
