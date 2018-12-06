@@ -11,7 +11,7 @@ from geventwebsocket import WebSocketError
 from requests.exceptions import ConnectionError
 
 from polyswarmd.chains import chain
-from polyswarmd.utils import channel_to_dict, new_cancel_agreement_event_to_dict, new_settle_started_event, new_settle_challenged_event, new_bounty_event_to_dict, new_assertion_event_to_dict, new_vote_event_to_dict, state_to_dict, new_init_channel_event_to_dict, new_quorum_event_to_dict, settled_bounty_event_to_dict, revealed_assertion_event_to_dict
+from polyswarmd.utils import *
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ def init_websockets(app):
                     assertion_filter = g.chain.bounty_registry.contract.eventFilter('NewAssertion')
                     vote_filter = g.chain.bounty_registry.contract.eventFilter('NewVote')
                     quorum_filiter = g.chain.bounty_registry.contract.eventFilter('QuorumReached')
-                    settled_filter = g.chain.bounty_registry.contract.eventFilter('BountySettled')
+                    settled_filter = g.chain.bounty_registry.contract.eventFilter('SettledBounty')
                     reveal_filter = g.chain.bounty_registry.contract.eventFilter('RevealedAssertion')
                     init_filter = None
                     if g.chain.offer_registry.contract is not None:
@@ -61,65 +61,65 @@ def init_websockets(app):
                 for event in bounty_filter.get_new_entries():
                     ws.send(
                         json.dumps({
-                            'event':
-                            'bounty',
-                            'data':
-                            new_bounty_event_to_dict(event.args),
+                            'event': 'bounty',
+                            'data': new_bounty_event_to_dict(event.args),
+                            'block_number': event.blockNumber,
+                            'txhash': event.transactionHash.hex(),
                         }))
 
                 for event in assertion_filter.get_new_entries():
                     ws.send(
                         json.dumps({
-                            'event':
-                            'assertion',
-                            'data':
-                            new_assertion_event_to_dict(event.args),
+                            'event': 'assertion',
+                            'data': new_assertion_event_to_dict(event.args),
+                            'block_number': event.blockNumber,
+                            'txhash': event.transactionHash.hex(),
                         }))
 
                 for event in reveal_filter.get_new_entries():
                     ws.send(
                         json.dumps({
-                            'event':
-                            'reveal',
-                            'data':
-                            revealed_assertion_event_to_dict(event.args),
+                            'event': 'reveal',
+                            'data': revealed_assertion_event_to_dict(event.args),
+                            'block_number': event.blockNumber,
+                            'txhash': event.transactionHash.hex(),
                         }))
 
                 for event in vote_filter.get_new_entries():
                     ws.send(
                         json.dumps({
-                            'event':
-                            'vote',
-                            'data':
-                            new_vote_event_to_dict(event.args),
+                            'event': 'vote',
+                            'data': new_vote_event_to_dict(event.args),
+                            'block_number': event.blockNumber,
+                            'txhash': event.transactionHash.hex(),
                         }))
 
                 for event in quorum_filiter.get_new_entries():
                     ws.send(
                         json.dumps({
-                            'event':
-                            'quorum',
-                            'data':
-                            new_quorum_event_to_dict(event.args),
+                            'event': 'quorum',
+                            'data': new_quorum_event_to_dict(event.args),
+                            'block_number': event.blockNumber,
+                            'txhash': event.transactionHash.hex(),
                         }))
 
                 for event in settled_filter.get_new_entries():
                     ws.send(
                         json.dumps({
-                            'event':
-                            'settled_bounty',
-                            'data':
-                            settled_bounty_event_to_dict(event.args),
+                            'event': 'settled_bounty',
+                            'data': settled_bounty_event_to_dict(event.args),
+                            'block_number': event.blockNumber,
+                            'txhash': event.transactionHash.hex(),
                         }))
 
                 if init_filter is not None:
                     for event in init_filter.get_new_entries():
                         ws.send(
                             json.dumps({
-                                'event':
-                                'initialized_channel',
-                                'data':
-                                new_init_channel_event_to_dict(event.args),
+                                'event': 'initialized_channel',
+                                'data': new_init_channel_event_to_dict(event.args),
+                                'block_number': event.blockNumber,
+                                'txhash': event.transactionHash.hex(),
                             }))
 
                 gevent.sleep(1)
@@ -155,28 +155,28 @@ def init_websockets(app):
                 for event in closed_agreement_filter.get_new_entries():
                     ws.send(
                         json.dumps({
-                            'event':
-                            'closed_agreement',
-                            'data':
-                            new_cancel_agreement_event_to_dict(event.args),
+                            'event': 'closed_agreement',
+                            'data': new_cancel_agreement_event_to_dict(event.args),
+                            'block_number': event.blockNumber,
+                            'txhash': event.transactionHash.hex(),
                         }))
 
                 for event in settle_started_filter.get_new_entries():
                     ws.send(
                         json.dumps({
-                            'event':
-                            'settle_started',
-                            'data':
-                            new_settle_started_event(event.args),
+                            'event': 'settle_started',
+                            'data': new_settle_started_event(event.args),
+                            'block_number': event.blockNumber,
+                            'txhash': event.transactionHash.hex(),
                         }))
 
                 for event in settle_challenged_filter.get_new_entries():
                     ws.send(
                         json.dumps({
-                            'event':
-                            'settle_challenged',
-                            'data':
-                            new_settle_challenged_event(event.args),
+                            'event': 'settle_challenged',
+                            'data': new_settle_challenged_event(event.args),
+                            'block_number': event.blockNumber,
+                            'txhash': event.transactionHash.hex(),
                         }))
 
                 gevent.sleep(1)
