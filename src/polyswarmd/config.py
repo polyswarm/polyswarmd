@@ -231,7 +231,7 @@ class ChainConfig(object):
         self.arbiter_staking.bind(address=self.bounty_registry.contract.functions.staking().call(), persistent=True)
 
 class Config(object):
-    def __init__(self, ipfs_uri, db_uri, require_api_key, homechain_config, sidechain_config):
+    def __init__(self, ipfs_uri, db_uri, require_api_key, homechain_config, sidechain_config, trace_transactions):
         self.ipfs_uri = ipfs_uri
         self.db_uri = db_uri
         self.require_api_key = require_api_key
@@ -240,6 +240,7 @@ class Config(object):
             'side': sidechain_config,
         }
         self.config_filename = ''
+        self.trace_transactions = trace_transactions
 
         self.__validate()
 
@@ -254,7 +255,8 @@ class Config(object):
         ipfs_uri = config.get('ipfs_uri')
         db_uri = config.get('db_uri', os.getenv('DB_URI'))
         require_api_key = db_uri is not None
-        return cls(ipfs_uri, db_uri, require_api_key, homechain_config, sidechain_config)
+        trace_transactions = config.get('trace_transactions', True)
+        return cls(ipfs_uri, db_uri, require_api_key, homechain_config, sidechain_config, trace_transactions)
 
     @classmethod
     def from_config_file_search(cls):
@@ -288,7 +290,8 @@ class Config(object):
         ipfs_uri = config.get('ipfs_uri')
         db_uri = config.get('db_uri', os.getenv('DB_URI'))
         require_api_key = db_uri is not None
-        return cls(ipfs_uri, db_uri, require_api_key, homechain_config, sidechain_config)
+        trace_transactions = config.get('trace_transactions', True)
+        return cls(ipfs_uri, db_uri, require_api_key, homechain_config, sidechain_config, trace_transactions)
 
     @classmethod
     def auto(cls):
