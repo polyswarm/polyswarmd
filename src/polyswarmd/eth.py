@@ -4,14 +4,17 @@ import logging
 import rlp
 
 from collections import defaultdict
+from eth_abi import decode_abi
 from ethereum.transactions import Transaction
-from flask import Blueprint, g, request
+from flask import current_app as app, Blueprint, g, request
 from hexbytes import HexBytes
 from jsonschema.exceptions import ValidationError
 
 from polyswarmd.artifacts import is_valid_ipfshash
 from polyswarmd.chains import chain
 from polyswarmd.response import success, failure
+
+from web3.module import Module
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +23,38 @@ misc = Blueprint('misc', __name__)
 # TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to settle bounty
 gas_limit = 5000000
 zero_address = '0x0000000000000000000000000000000000000000'
+
+
+class Debug(Module):
+    ERROR_SELECTOR = '08c379a0'
+
+    def getTransactionError(self, txhash):
+        if not txhash.startswith('0x'):
+            txhash = '0x' + txhash
+
+        trace = self.web3.manager.request_blocking('debug_traceTransaction', [txhash, {
+            'disableStorage': True,
+            'disableMemory': True,
+            'disableStack': True,
+        }])
+
+        if not trace.get('failed'):
+            logger.error('Transaction receipt indicates failure but trace succeeded')
+            return 'Transaction receipt indicates failure but trace succeeded'
+
+        # Parse out the revert error code if it exists
+        # See https://solidity.readthedocs.io/en/v0.4.24/control-structures.html#error-handling-assert-require-revert-and-exceptions
+        # Encode as if a function call to `Error(string)`
+        rv = HexBytes(trace.get('returnValue'))
+
+        # Trim off function selector for "Error"
+        if not rv.startswith(HexBytes(Debug.ERROR_SELECTOR)):
+            logger.error('Expected revert encoding to begin with %s, actual is %s', Debug.ERROR_SELECTOR, rv[:4].hex())
+            return 'Invalid revert encoding'
+        rv = rv[4:]
+
+        error = decode_abi(['string'], rv)[0]
+        return error.decode('utf-8')
 
 
 @misc.route('/syncing', methods=['GET'])
@@ -121,6 +156,14 @@ def events_from_transaction(txhash):
         new_vote_event_to_dict, revealed_assertion_event_to_dict, \
         transfer_event_to_dict, new_withdrawal_event_to_dict, new_deposit_event_to_dict
 
+    trace_transactions = app.config['POLYSWARMD'].trace_transactions
+    if trace_transactions:
+        try:
+            Debug.attach(g.chain.w3, 'debug')
+        except AttributeError:
+            # We've already attached, just continue
+            pass
+
     # TODO: Check for out of gas, other
     # TODO: Report contract errors
     timeout = gevent.Timeout(300)
@@ -159,12 +202,22 @@ def events_from_transaction(txhash):
     if receipt.gasUsed == gas_limit:
         return {'errors': ['transaction {0}: out of gas'.format(txhash)]}
     if receipt.status != 1:
-        return {
-            'errors': [
-                'transaction {0}: transaction failed at block {1}, check parameters'.format(
-                    txhash, receipt.blockNumber)
-            ]
-        }
+        if trace_transactions:
+            error = g.chain.w3.debug.getTransactionError(txhash)
+            logger.error('Transaction %s failed with error message: %s', txhash, error)
+            return {
+                'errors': [
+                    'transaction {0}: transaction failed at block {1}, error: {2}'.format(
+                        txhash, receipt.blockNumber, error)
+                ]
+            }
+        else:
+            return {
+                'errors': [
+                    'transaction {0}: transaction failed at block {1}, check parameters'.format(
+                        txhash, receipt.blockNumber)
+                ]
+            }
 
     ret = {}
 
