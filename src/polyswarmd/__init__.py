@@ -40,7 +40,7 @@ app.register_blueprint(offers, url_prefix='/offers')
 app.register_blueprint(staking, url_prefix='/staking')
 init_websockets(app)
 
-AUTH_WHITELIST = {'/status'}
+AUTH_WHITELIST = {'/status', '/relay/withdrawal'}
 
 
 @app.route('/status')
@@ -81,7 +81,7 @@ def before_request():
     g.user = None
 
     # Want to be able to whitelist unauthenticated routes, everything requires auth by default
-    if not app.config['POLYSWARMD'].require_api_key or request.path in AUTH_WHITELIST:
+    if not app.config['POLYSWARMD'].require_api_key:
         return
 
     # Ignore prefix if present
@@ -96,7 +96,10 @@ def before_request():
         if api_key_obj:
             g.user = api_key_obj.user
 
-    if not g.user:
+    # Want to pass api-key even to whitelisted routes.
+    if request.path in AUTH_WHITELIST:
+        return
+    elif not g.user:
         return failure('API key required', 401)
 
 
