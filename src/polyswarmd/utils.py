@@ -111,15 +111,14 @@ def new_vote_event_to_dict(new_vote_event):
 def settled_bounty_event_to_dict(new_settled_event):
     return {
         'bounty_guid': str(uuid.UUID(int=new_settled_event.bountyGuid)),
-        'settled_block': new_settled_event.block,
         'settler': new_settled_event.settler,
+        'payout': new_settled_event.payout,
     }
 
 
 def new_quorum_event_to_dict(new_quorum_event):
     return {
         'bounty_guid': str(uuid.UUID(int=new_quorum_event.bountyGuid)),
-        'quorum_block': new_quorum_event.block,
     }
 
 

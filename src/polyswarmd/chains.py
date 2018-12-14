@@ -28,8 +28,6 @@ def chain(_func=None, chain_name=None, account_required=True):
             if c is None:
                 c = request.args.get('chain', 'side')
 
-            logger.info("Chain: %s", c)
-
             chain = app.config['POLYSWARMD'].chains.get(c)
             if not chain:
                 chain_options = ", ".join(app.config['POLYSWARMD'].chains)
