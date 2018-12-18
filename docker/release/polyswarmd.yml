@@ -1,3 +1,4 @@
+community: default
 ipfs_uri: http://localhost:5001
 homechain:
   chain_id: 1
