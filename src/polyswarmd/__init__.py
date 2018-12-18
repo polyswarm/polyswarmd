@@ -1,7 +1,3 @@
-from polyswarmd.monkey import patch_all
-
-patch_all()
-
 import datetime
 import logging
 import os
