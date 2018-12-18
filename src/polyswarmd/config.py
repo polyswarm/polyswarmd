@@ -230,10 +230,13 @@ class ChainConfig(object):
     def __bind_child_contracts(self):
         self.arbiter_staking.bind(address=self.bounty_registry.contract.functions.staking().call(), persistent=True)
 
+
 class Config(object):
-    def __init__(self, ipfs_uri, db_uri, require_api_key, homechain_config, sidechain_config, trace_transactions):
+    def __init__(self, community, ipfs_uri, auth_uri, require_api_key, homechain_config, sidechain_config,
+                 trace_transactions):
+        self.community = community
         self.ipfs_uri = ipfs_uri
-        self.db_uri = db_uri
+        self.auth_uri = auth_uri
         self.require_api_key = require_api_key
         self.chains = {
             'home': homechain_config,
@@ -252,11 +255,13 @@ class Config(object):
         with open(filename, 'r') as f:
             config = yaml.safe_load(f)
 
+        commmunity = config.get('community')
         ipfs_uri = config.get('ipfs_uri')
-        db_uri = config.get('db_uri', os.getenv('DB_URI'))
-        require_api_key = db_uri is not None
+        auth_uri = config.get('auth_uri', os.getenv('AUTH_URI'))
+        require_api_key = auth_uri is not None
         trace_transactions = config.get('trace_transactions', True)
-        return cls(ipfs_uri, db_uri, require_api_key, homechain_config, sidechain_config, trace_transactions)
+        return cls(commmunity, ipfs_uri, auth_uri, require_api_key, homechain_config, sidechain_config,
+                   trace_transactions)
 
     @classmethod
     def from_config_file_search(cls):
@@ -276,22 +281,22 @@ class Config(object):
         u = urlparse(consul_uri)
         consul_client = Consul(host=u.hostname, port=u.port, scheme=u.scheme, token=consul_token)
 
-        # TODO document env variable that controls sidechain
-        sidechain_name = os.environ['POLY_SIDECHAIN_NAME']
-        homechain_config = ChainConfig.from_consul(consul_client, 'home', 'chain/{0}/homechain'.format(sidechain_name))
-        sidechain_config = ChainConfig.from_consul(consul_client, 'side', 'chain/{0}/sidechain'.format(sidechain_name))
+        community = os.environ['POLY_COMMUNITY_NAME']
+        homechain_config = ChainConfig.from_consul(consul_client, 'home', 'chain/{0}/homechain'.format(community))
+        sidechain_config = ChainConfig.from_consul(consul_client, 'side', 'chain/{0}/sidechain'.format(community))
 
-        config = fetch_from_consul_or_wait(consul_client, 'chain/{0}/config'.format(sidechain_name)).get('Value')
+        config = fetch_from_consul_or_wait(consul_client, 'chain/{0}/config'.format(community)).get('Value')
         if config is None:
             raise ValueError('Invalid global config')
 
         config = json.loads(config.decode('utf-8'))
 
         ipfs_uri = config.get('ipfs_uri')
-        db_uri = config.get('db_uri', os.getenv('DB_URI'))
-        require_api_key = db_uri is not None
+        auth_uri = config.get('auth_uri', os.getenv('AUTH_URI'))
+        require_api_key = auth_uri is not None
         trace_transactions = config.get('trace_transactions', True)
-        return cls(ipfs_uri, db_uri, require_api_key, homechain_config, sidechain_config, trace_transactions)
+        return cls(community, ipfs_uri, auth_uri, require_api_key, homechain_config, sidechain_config,
+                   trace_transactions)
 
     @classmethod
     def auto(cls):
@@ -301,12 +306,15 @@ class Config(object):
             return cls.from_config_file_search()
 
     def __validate(self):
-        # We expect IPFS and DB to be up already
+        # We expect IPFS and API key service to be up already
         if not is_service_reachable(self.ipfs_uri):
             raise ValueError('IPFS not reachable, is correct URI specified?')
 
-        if self.db_uri and not is_service_reachable(self.db_uri):
-            raise ValueError('DB not reachable, is correct URI specified?')
+        if self.auth_uri and not is_service_reachable(self.auth_uri):
+            raise ValueError('API key service not reachable, is correct URI specified?')
 
-        if self.require_api_key and not self.db_uri:
-            raise ValueError('API keys required but no DB specified')
+        if self.require_api_key and not self.auth_uri:
+            raise ValueError('API keys required but no API key service URI specified')
+
+        if not self.community:
+            raise ValueError('No community specified')
