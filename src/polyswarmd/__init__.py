@@ -88,6 +88,8 @@ def before_request():
     try:
         api_key = request.headers.get('Authorization').split()[-1]
     except:
+        if request.path in AUTH_WHITELIST:
+            return
         return failure('API key required', 401)
 
     if api_key:

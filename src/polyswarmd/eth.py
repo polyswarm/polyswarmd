@@ -103,7 +103,7 @@ def post_transactions():
 
     withdrawal_only = not g.user and app.config['POLYSWARMD'].require_api_key
     # If we don't have a user key, and they are required, start checking the transaction
-    if withdrawal_only and len(transactions) != 1:
+    if withdrawal_only and len(body['transactions']) != 1:
         return failure('multiple transactions requires an api-key', 403)
 
     errors = []
@@ -119,7 +119,7 @@ def post_transactions():
             continue
 
         if withdrawal_only:
-            if check_withdrawal(raw_tx):
+            if check_withdrawal(tx):
                 errors.append('Cannot send tx {0}: only withdrawals allowed without api-key'.format(tx.hash.hex()))
                 continue
 
