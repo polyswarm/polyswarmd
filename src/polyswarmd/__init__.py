@@ -42,7 +42,7 @@ app.register_blueprint(offers, url_prefix='/offers')
 app.register_blueprint(staking, url_prefix='/staking')
 init_websockets(app)
 
-AUTH_WHITELIST = {'/status'}
+AUTH_WHITELIST = {'/status', '/relay/withdrawal', '/transactions'}
 
 
 @app.route('/status')
@@ -80,29 +80,29 @@ def before_request():
     config = app.config['POLYSWARMD']
 
     # Want to be able to whitelist unauthenticated routes, everything requires auth by default
-    if not config.require_api_key or request.path in AUTH_WHITELIST:
+    if not config.require_api_key:
         return
 
     # Ignore prefix if present
     try:
         api_key = request.headers.get('Authorization').split()[-1]
     except:
-        return failure('Unauthorized', 401)
+        return whitelist_check(request.path)
 
     if api_key:
         r = requests.get(config.auth_uri, headers={'Authorization': api_key})
         if r is None or r.status_code != 200:
-            return failure('Unauthorized', 401)
+            return whitelist_check(request.path)
 
         j = {}
         try:
             j = r.json()
         except ValueError:
             logger.exception('Invalid response from API key management service, received: %s', r.content)
-            return failure('Unauthorized', 401)
+            return whitelist_check(request.path)
 
         g.user = j.get('user_id')
-        if config.community not in j.get('communities', []):
+        if request.path not in AUTH_WHITELIST and config.community not in j.get('communities', []):
             logger.error('API key for user %s not authorized for community %s', g.user, config.community)
             return failure('Unauthorized', 401)
 
@@ -120,3 +120,7 @@ def after_request(response):
                      request.path, eth_address, user, response.get_data())
 
     return response
+
+
+def whitelist_check(path):
+    return None if path in AUTH_WHITELIST else failure('Unauthorized', 401)

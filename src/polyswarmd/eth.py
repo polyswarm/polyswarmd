@@ -5,6 +5,7 @@ import rlp
 
 from collections import defaultdict
 from eth_abi import decode_abi
+from eth_abi.exceptions import InsufficientDataBytes
 from ethereum.transactions import Transaction
 from flask import current_app as app, Blueprint, g, request
 from hexbytes import HexBytes
@@ -23,7 +24,7 @@ misc = Blueprint('misc', __name__)
 # TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to settle bounty
 gas_limit = 5000000
 zero_address = '0x0000000000000000000000000000000000000000'
-
+transfer_signature_hash = 'a9059cbb'
 
 class Debug(Module):
     ERROR_SELECTOR = '08c379a0'
@@ -101,6 +102,11 @@ def post_transactions():
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
+    withdrawal_only = not g.user and app.config['POLYSWARMD'].require_api_key
+    # If we don't have a user key, and they are required, start checking the transaction
+    if withdrawal_only and len(body['transactions']) != 1:
+        return failure('Posting multiple transactions requires an API key', 403)
+
     errors = []
     txhashes = []
     for raw_tx in body['transactions']:
@@ -111,6 +117,10 @@ def post_transactions():
             continue
         except Exception:
             logger.exception('Unexpected exception while parsing transaction')
+            continue
+
+        if withdrawal_only and not is_withdrawal(tx):
+            errors.append('Invalid transaction for tx {0}: only withdrawals allowed without an API key'.format(tx.hash.hex()))
             continue
 
         sender = g.chain.w3.toChecksumAddress(tx.sender.hex())
@@ -149,6 +159,36 @@ def build_transaction(call, nonce):
         options["gasPrice"] = 0
 
     return call.buildTransaction(options)
+
+
+def is_withdrawal(tx):
+    """
+    Take a transaction and return True if that transaction is a withdrawal
+    """
+    data = tx.data[4:]
+    to = g.chain.w3.toChecksumAddress(tx.to.hex())
+    sender = g.chain.w3.toChecksumAddress(tx.sender.hex())
+
+    try:
+        target, amount = decode_abi(['address', 'uint256'], data)
+    except InsufficientDataBytes:
+        logger.warning('Transaction by %s to %s is not a withdrawal', sender, to)
+        return False
+
+    target = g.chain.w3.toChecksumAddress(target)
+    if (
+         tx.data.startswith(HexBytes(transfer_signature_hash))
+         and g.chain.nectar_token.address == to
+         and tx.value == 0
+         and tx.network_id == app.config["POLYSWARMD"].chains['side'].chain_id
+         and target == g.chain.erc20_relay.address
+         and amount > 0):
+
+        logger.info('Transaction is a withdrawal by %s for %d NCT', sender, amount)
+        return True
+
+    logger.warning('Transaction by %s to %s is not a withdrawal', sender, to)
+    return False
 
 
 def events_from_transaction(txhash):
