@@ -87,19 +87,19 @@ def before_request():
     try:
         api_key = request.headers.get('Authorization').split()[-1]
     except:
-        return None if request.path in AUTH_WHITELIST else failure('Unauthorized', 401)
+        return whitelist_check(request.path)
 
     if api_key:
         r = requests.get(config.auth_uri, headers={'Authorization': api_key})
         if r is None or r.status_code != 200:
-            return None if request.path in AUTH_WHITELIST else failure('Unauthorized', 401)
+            return whitelist_check(request.path)
 
         j = {}
         try:
             j = r.json()
         except ValueError:
             logger.exception('Invalid response from API key management service, received: %s', r.content)
-            return None if request.path in AUTH_WHITELIST else failure('Unauthorized', 401)
+            return whitelist_check(request.path)
 
         g.user = j.get('user_id')
         if request not in AUTH_WHITELIST and config.community not in j.get('communities', []):
@@ -120,3 +120,8 @@ def after_request(response):
                      request.path, eth_address, user, response.get_data())
 
     return response
+
+
+
+def whitelist_check(path):
+    return None if path in AUTH_WHITELIST else failure('Unauthorized', 401)
