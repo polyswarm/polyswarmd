@@ -118,7 +118,7 @@ def post_transactions():
             logger.exception('Unexpected exception while parsing transaction')
             continue
 
-        if withdrawal_only and check_withdrawal(tx):
+        if withdrawal_only and check_for_withdrawal(tx):
             errors.append('Invalid transaction tx {0}: only withdrawals allowed without api-key'.format(tx.hash.hex()))
             continue
 
@@ -160,7 +160,7 @@ def build_transaction(call, nonce):
     return call.buildTransaction(options)
 
 
-def check_withdrawal(tx):
+def check_for_withdrawal(tx):
     """
     Take a transaction and return an error message if that transaction is not a withdrawal
     """
