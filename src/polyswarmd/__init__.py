@@ -40,7 +40,7 @@ app.register_blueprint(offers, url_prefix='/offers')
 app.register_blueprint(staking, url_prefix='/staking')
 init_websockets(app)
 
-AUTH_WHITELIST = {'/status', '/relay/withdrawal'}
+AUTH_WHITELIST = {'/status', '/relay/withdrawal', '/transactions'}
 
 
 @app.route('/status')

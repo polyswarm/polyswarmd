@@ -23,7 +23,7 @@ misc = Blueprint('misc', __name__)
 # TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to settle bounty
 gas_limit = 5000000
 zero_address = '0x0000000000000000000000000000000000000000'
-
+transfer_signature_hash = '0xa9059cbb'
 
 class Debug(Module):
     ERROR_SELECTOR = '08c379a0'
@@ -100,6 +100,33 @@ def post_transactions():
         jsonschema.validate(body, schema)
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message, 400)
+
+    # If we don't have a user key, and they are required, start checking the transaction
+    if not g.user and app.config['POLYSWARMD'].require_api_key:
+        logger.info('Comparing transactions against withdrawal signature')
+        transactions = body['transactions']
+        if len(transactions) != 1:
+            logger.error('Too many transactions to be a withdrawl')
+            return failure('Must have api key for multiple transactions.', 403)
+
+        tx = rlp.decode(bytes.fromhex(transactions[0]), Transaction)
+        to = g.chain.w3.toChecksumAddress(tx.to.hex())
+        sender = g.chain.w3.toChecksumAddress(tx.sender.hex())
+        side_chain_id = app.config["POLYSWARMD"].chains['side'].chain_id
+        if g.chain.nectar_token.address != to or tx.value != 0:
+            return failure('Must have api key to transact with a contract other than nectar tokens', 403)
+        elif tx.network_id != side_chain_id:
+            return failure('Must have api key to transact with the home chain', 403)
+        elif len(tx.data) != 68:
+            return failure('Must have api key to call a function other than transfer.', 403)
+        else:
+            amount = int.from_bytes(tx.data[36:], byteorder='big')
+            target = g.chain.w3.toChecksumAddress(g.chain.w3.toHex(tx.data[16:36]))
+            function_hash = g.chain.w3.toHex(tx.data[:4])
+            if target == g.chain.erc20_relay.address and amount > 0 and function_hash == transfer_signature_hash:
+                logger.info('We think we had a good tx %s', tx)
+            else:
+                return failure('Must have api key transfer to any address other than the erc20relay ', 403)
 
     errors = []
     txhashes = []
