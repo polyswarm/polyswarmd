@@ -11,8 +11,9 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt ./
 
 RUN set -x && pip install --no-cache-dir -r requirements.txt
+RUN set -x && pip install gunicorn
 
 COPY . .
 RUN set -x && pip install .
 
-CMD ["polyswarmd"]
+CMD ["gunicorn", "--bind", "0.0.0.0:31337", "-k", "flask_sockets.worker", "-t", "600", "-w", "4", "polyswarmd.wsgi"]

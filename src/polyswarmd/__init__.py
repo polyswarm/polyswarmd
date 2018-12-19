@@ -1,6 +1,10 @@
+from gevent import monkey
+monkey.patch_all()
+
 import datetime
 import logging
 import os
+import requests
 
 from flask import Flask, g, request
 
@@ -8,7 +12,7 @@ from polyswarmd.config import Config, is_service_reachable
 from polyswarmd.logger import init_logging
 from polyswarmd.response import success, failure, install_error_handlers
 
-init_logging(os.environ.get('LOG_FORMAT'))
+init_logging(os.environ.get('LOG_FORMAT'), logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Set up our app object
@@ -46,13 +50,15 @@ def status():
     config = app.config['POLYSWARMD']
     ret = {}
 
+    ret['community'] = config.community
+
     ret['ipfs'] = {
         'reachable': is_service_reachable(config.ipfs_uri),
     }
 
-    if config.db_uri:
-        ret['db'] = {
-            'reachable': is_service_reachable(config.db_uri),
+    if config.auth_uri:
+        ret['auth'] = {
+            'reachable': is_service_reachable(config.auth_uri),
         }
 
     for name, chain in config.chains.items():
@@ -67,44 +73,50 @@ def status():
     return success(ret)
 
 
-@app.before_first_request
-def before_first_request():
-    if app.config['POLYSWARMD'].require_api_key:
-        from polyswarmd.db import init_db
-        init_db()
-
-
 @app.before_request
 def before_request():
     g.user = None
 
+    config = app.config['POLYSWARMD']
+
     # Want to be able to whitelist unauthenticated routes, everything requires auth by default
-    if not app.config['POLYSWARMD'].require_api_key or request.path in AUTH_WHITELIST:
+    if not config.require_api_key or request.path in AUTH_WHITELIST:
         return
 
     # Ignore prefix if present
     try:
         api_key = request.headers.get('Authorization').split()[-1]
     except:
-        return failure('API key required', 401)
+        return failure('Unauthorized', 401)
 
     if api_key:
-        from polyswarmd.db import lookup_api_key
-        api_key_obj = lookup_api_key(api_key)
-        if api_key_obj:
-            g.user = api_key_obj.user
+        r = requests.get(config.auth_uri, headers={'Authorization': api_key})
+        if r is None or r.status_code != 200:
+            return failure('Unauthorized', 401)
 
-    if not g.user:
-        return failure('API key required', 401)
+        j = {}
+        try:
+            j = r.json()
+        except ValueError:
+            logger.exception('Invalid response from API key management service, received: %s', r.content)
+            return failure('Unauthorized', 401)
+
+        g.user = j.get('user_id')
+        if config.community not in j.get('communities', []):
+            logger.error('API key for user %s not authorized for community %s', g.user, config.community)
+            return failure('Unauthorized', 401)
 
 
 @app.after_request
 def after_request(response):
     eth_address = getattr(g, 'eth_address', None)
+    user = getattr(g, 'user', None)
+
     if response.status_code == 200:
-        logger.info('%s %s %s %s %s', datetime.datetime.now(), request.method,
-                    response.status_code, request.path, eth_address)
+        logger.info('%s %s %s %s %s %s', datetime.datetime.now(), request.method, response.status_code, request.path,
+                    eth_address, user)
     else:
-        logger.error('%s %s %s %s %s: %s', datetime.datetime.now(), request.method,
-                     response.status_code, request.path, eth_address, response.get_data())
+        logger.error('%s %s %s %s %s %s: %s', datetime.datetime.now(), request.method, response.status_code,
+                     request.path, eth_address, user, response.get_data())
+
     return response

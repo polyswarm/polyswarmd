@@ -7,8 +7,6 @@ gevent-websocket==0.10.1
 jsonschema==2.6.0
 Flask==1.0.2
 Flask-Sockets==0.2.1
-Flask-SQLAlchemy==2.3.2
-psycopg2-binary==2.7.5
 PyYaml==3.12
 pytest== 4.0.0
 python-json-logger==0.1.9

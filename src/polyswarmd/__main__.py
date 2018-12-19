@@ -19,8 +19,7 @@ def main(log, host, port):
         logging.error('invalid log level')
         sys.exit(-1)
 
-    server = pywsgi.WSGIServer(
-        (host, port), app, handler_class=WebSocketHandler)
+    server = pywsgi.WSGIServer((host, port), app, handler_class=WebSocketHandler)
     server.serve_forever()
 
 

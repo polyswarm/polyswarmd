@@ -4,7 +4,7 @@ from datetime import datetime
 from pythonjsonlogger import jsonlogger
 
 
-def init_logging(log_format):
+def init_logging(log_format, log_level):
     """
     Logic to support JSON logging.
     """
@@ -14,10 +14,10 @@ def init_logging(log_format):
         formatter = PolyswarmdJsonFormatter('(timestamp) (level) (name) (message)')
         logHandler.setFormatter(formatter)
         logger.addHandler(logHandler)
-        logger.setLevel(logging.INFO)
+        logger.setLevel(log_level)
         logger.info("Logging in JSON format.")
     else:
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(level=log_level)
         logger.info("Logging in text format.")
 
 

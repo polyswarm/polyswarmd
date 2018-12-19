@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 balances = Blueprint('balances', __name__)
 
 @balances.route('/<address>/eth', methods=['GET'])
-@chain
+@chain(account_required=False)
 def get_balance_address_eth(address):
     if not g.chain.w3.isAddress(address):
         return failure('Invalid address', 400)
@@ -22,7 +22,7 @@ def get_balance_address_eth(address):
         return failure("Could not retrieve balance")
 
 @balances.route('/<address>/staking/total', methods=['GET'])
-@chain
+@chain(account_required=False)
 def get_balance_total_stake(address):
     if not g.chain.w3.isAddress(address):
         return failure('Invalid address', 400)
@@ -35,7 +35,7 @@ def get_balance_total_stake(address):
 
 
 @balances.route('/<address>/staking/withdrawable', methods=['GET'])
-@chain
+@chain(account_required=False)
 def get_balance_withdrawable_stake(address):
     if not g.chain.w3.isAddress(address):
         return failure('Invalid address', 400)
@@ -49,7 +49,7 @@ def get_balance_withdrawable_stake(address):
 
 
 @balances.route('/<address>/nct', methods=['GET'])
-@chain
+@chain(account_required=False)
 def get_balance_address_nct(address):
     if not g.chain.w3.isAddress(address):
         return failure('Invalid address', 400)
