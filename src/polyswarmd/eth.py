@@ -5,6 +5,7 @@ import rlp
 
 from collections import defaultdict
 from eth_abi import decode_abi
+from eth_abi.exceptions import InsufficientDataBytes
 from ethereum.transactions import Transaction
 from flask import current_app as app, Blueprint, g, request
 from hexbytes import HexBytes
@@ -23,7 +24,7 @@ misc = Blueprint('misc', __name__)
 # TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to settle bounty
 gas_limit = 5000000
 zero_address = '0x0000000000000000000000000000000000000000'
-transfer_signature_hash = '0xa9059cbb'
+transfer_signature_hash = 'a9059cbb'
 
 class Debug(Module):
     ERROR_SELECTOR = '08c379a0'
@@ -164,27 +165,30 @@ def is_withdrawal(tx):
     """
     Take a transaction and return True if that transaction is a withdrawal
     """
-    error = True
-    function_hash = HexBytes(tx.data[:4])
-    if len(tx.data) != 68 or function_hash != transfer_signature_hash:
-        logger.error('Transaction is not a withdrawal: %s', tx.as_dict())
+    data = tx.data[4:]
+    to = g.chain.w3.toChecksumAddress(tx.to.hex())
+    sender = g.chain.w3.toChecksumAddress(tx.sender.hex())
+
+    try:
+        target, amount = decode_abi(['address', 'uint256'], data)
+    except InsufficientDataBytes:
+        logger.warning('Transaction by %s to %s is not a withdrawal', sender, to)
         return False
 
-    to = g.chain.w3.toChecksumAddress(tx.to.hex())
-    amount = int.from_bytes(tx.data[36:], byteorder='big')
-    target = g.chain.w3.toChecksumAddress(HexBytes(tx.data[16:36]))
-
+    target = g.chain.w3.toChecksumAddress(target)
     if (
-         g.chain.nectar_token.address != to
-         or tx.value != 0
-         or tx.network_id != app.config["POLYSWARMD"].chains['side'].chain_id
-         or target != g.chain.erc20_relay.address
-         or amount <= 0):
-        logger.error('Transaction is not a withdrawal: %s', tx.as_dict())
-        error = False
+         tx.data.startswith(HexBytes(transfer_signature_hash))
+         and g.chain.nectar_token.address == to
+         and tx.value == 0
+         and tx.network_id == app.config["POLYSWARMD"].chains['side'].chain_id
+         and target == g.chain.erc20_relay.address
+         and amount > 0):
 
-    logger.info('Transaction is a withdrawal %s', tx.as_dict())
-    return error
+        logger.info('Transaction is a withdrawal by %s for %d NCT', sender, amount)
+        return True
+
+    logger.warning('Transaction by %s to %s is not a withdrawal', sender, to)
+    return False
 
 
 def events_from_transaction(txhash):
