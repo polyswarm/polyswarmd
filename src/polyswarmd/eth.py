@@ -159,28 +159,30 @@ def build_transaction(call, nonce):
 
 
 def check_withdrawal(transactions):
+    error = None
     if len(transactions) != 1:
         logger.error('Too many transactions to be a withdrawl')
-        return 'Must have api key for multiple transactions'
+        error = 'Must have api key for multiple transactions'
 
     tx = rlp.decode(bytes.fromhex(transactions[0]), Transaction)
     to = g.chain.w3.toChecksumAddress(tx.to.hex())
     sender = g.chain.w3.toChecksumAddress(tx.sender.hex())
     side_chain_id = app.config["POLYSWARMD"].chains['side'].chain_id
     if g.chain.nectar_token.address != to or tx.value != 0:
-        return 'Must have api key to transact with a contract other than nectar tokens'
+        error = 'Must have api key to transact with a contract other than nectar tokens'
     elif tx.network_id != side_chain_id:
-        return 'Must have api key to transact with the home chain'
+        error = 'Must have api key to transact with the home chain'
     elif len(tx.data) != 68:
-        return 'Must have api key to call a function other than transfer'
+        error = 'Must have api key to call a function other than transfer'
     else:
         amount = int.from_bytes(tx.data[36:], byteorder='big')
         target = g.chain.w3.toChecksumAddress(g.chain.w3.toHex(tx.data[16:36]))
         function_hash = g.chain.w3.toHex(tx.data[:4])
         if target != g.chain.erc20_relay.address or amount <= 0 or function_hash != transfer_signature_hash:
-            return 'Must have api key transfer to any address other than the erc20relay'
+            error = 'Must have api key transfer to any address other than the erc20relay'
 
-    logger.info('We think we had a good tx %s', tx)
+    logger.info('Api-less transaction was a withdrawal %s', tx)
+    return error
 
 
 def events_from_transaction(txhash):
