@@ -118,7 +118,7 @@ def post_transactions():
             logger.exception('Unexpected exception while parsing transaction')
             continue
 
-        if withdrawal_only and check_for_withdrawal(tx):
+        if withdrawal_only and not is_withdrawal(tx):
             errors.append('Invalid transaction tx {0}: only withdrawals allowed without api-key'.format(tx.hash.hex()))
             continue
 
@@ -160,15 +160,15 @@ def build_transaction(call, nonce):
     return call.buildTransaction(options)
 
 
-def check_for_withdrawal(tx):
+def is_withdrawal(tx):
     """
-    Take a transaction and return an error message if that transaction is not a withdrawal
+    Take a transaction and return True if that transaction is a withdrawal
     """
-    error = False
+    error = True
     function_hash = g.chain.w3.toHex(tx.data[:4])
     if len(tx.data) != 68 or function_hash != transfer_signature_hash:
         logger.error('transaction is not a withdrawal: %s', tx.as_dict())
-        error = True
+        error = False
 
     to = g.chain.w3.toChecksumAddress(tx.to.hex())
     amount = int.from_bytes(tx.data[36:], byteorder='big')
@@ -181,7 +181,7 @@ def check_for_withdrawal(tx):
          or target != g.chain.erc20_relay.address
          or amount <= 0):
         logger.error('transaction is not a withdrawal: %s', tx.as_dict())
-        error = True
+        error = False
 
     logger.info('transaction is a withdrawal %s', tx.as_dict())
     return error
