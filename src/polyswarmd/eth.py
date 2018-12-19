@@ -104,7 +104,7 @@ def post_transactions():
     withdrawal_only = not g.user and app.config['POLYSWARMD'].require_api_key
     # If we don't have a user key, and they are required, start checking the transaction
     if withdrawal_only and len(body['transactions']) != 1:
-        return failure('multiple transactions requires an api-key', 403)
+        return failure('Posting multiple transactions requires an API key', 403)
 
     errors = []
     txhashes = []
@@ -119,7 +119,7 @@ def post_transactions():
             continue
 
         if withdrawal_only and not is_withdrawal(tx):
-            errors.append('Invalid transaction tx {0}: only withdrawals allowed without api-key'.format(tx.hash.hex()))
+            errors.append('Invalid transaction for tx {0}: only withdrawals allowed without an API key'.format(tx.hash.hex()))
             continue
 
         sender = g.chain.w3.toChecksumAddress(tx.sender.hex())
@@ -165,14 +165,14 @@ def is_withdrawal(tx):
     Take a transaction and return True if that transaction is a withdrawal
     """
     error = True
-    function_hash = g.chain.w3.toHex(tx.data[:4])
+    function_hash = HexBytes(tx.data[:4])
     if len(tx.data) != 68 or function_hash != transfer_signature_hash:
-        logger.error('transaction is not a withdrawal: %s', tx.as_dict())
+        logger.error('Transaction is not a withdrawal: %s', tx.as_dict())
         return False
 
     to = g.chain.w3.toChecksumAddress(tx.to.hex())
     amount = int.from_bytes(tx.data[36:], byteorder='big')
-    target = g.chain.w3.toChecksumAddress(g.chain.w3.toHex(tx.data[16:36]))
+    target = g.chain.w3.toChecksumAddress(HexBytes(tx.data[16:36]))
 
     if (
          g.chain.nectar_token.address != to
@@ -180,10 +180,10 @@ def is_withdrawal(tx):
          or tx.network_id != app.config["POLYSWARMD"].chains['side'].chain_id
          or target != g.chain.erc20_relay.address
          or amount <= 0):
-        logger.error('transaction is not a withdrawal: %s', tx.as_dict())
+        logger.error('Transaction is not a withdrawal: %s', tx.as_dict())
         error = False
 
-    logger.info('transaction is a withdrawal %s', tx.as_dict())
+    logger.info('Transaction is a withdrawal %s', tx.as_dict())
     return error
 
 

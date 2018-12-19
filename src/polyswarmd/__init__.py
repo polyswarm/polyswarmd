@@ -102,7 +102,7 @@ def before_request():
             return whitelist_check(request.path)
 
         g.user = j.get('user_id')
-        if request not in AUTH_WHITELIST and config.community not in j.get('communities', []):
+        if request.path not in AUTH_WHITELIST and config.community not in j.get('communities', []):
             logger.error('API key for user %s not authorized for community %s', g.user, config.community)
             return failure('Unauthorized', 401)
 
