@@ -122,6 +122,5 @@ def after_request(response):
     return response
 
 
-
 def whitelist_check(path):
     return None if path in AUTH_WHITELIST else failure('Unauthorized', 401)
