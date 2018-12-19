@@ -179,9 +179,7 @@ def check_withdrawal(transactions):
     amount = int.from_bytes(tx.data[36:], byteorder='big')
     target = g.chain.w3.toChecksumAddress(g.chain.w3.toHex(tx.data[16:36]))
 
-    if tx.value != 0:
-        error = 'sending eth requires an api-key'
-    if g.chain.nectar_token.address != to:
+    if g.chain.nectar_token.address != to or tx.value != 0:
         error = 'sending a transaction to a contract other than nectar token requires an api-key'
     elif tx.network_id != side_chain_id:
         error = 'sending a transaction on the homechain requires an api-key'
