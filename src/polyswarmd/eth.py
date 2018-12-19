@@ -174,11 +174,12 @@ def check_withdrawal(tx):
     amount = int.from_bytes(tx.data[36:], byteorder='big')
     target = g.chain.w3.toChecksumAddress(g.chain.w3.toHex(tx.data[16:36]))
 
-    if (g.chain.nectar_token.address != to
-        or tx.value != 0
-        or tx.network_id != app.config["POLYSWARMD"].chains['side'].chain_id
-        or target != g.chain.erc20_relay.address
-        or amount <= 0):
+    if (
+         g.chain.nectar_token.address != to
+         or tx.value != 0
+         or tx.network_id != app.config["POLYSWARMD"].chains['side'].chain_id
+         or target != g.chain.erc20_relay.address
+         or amount <= 0):
         logger.error('transaction is not a withdrawal: %s', tx.as_dict())
         error = True
 
