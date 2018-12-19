@@ -1,3 +1,6 @@
+from gevent import monkey
+monkey.patch_all()
+
 import datetime
 import logging
 import os
@@ -9,7 +12,7 @@ from polyswarmd.config import Config, is_service_reachable
 from polyswarmd.logger import init_logging
 from polyswarmd.response import success, failure, install_error_handlers
 
-init_logging(os.environ.get('LOG_FORMAT'))
+init_logging(os.environ.get('LOG_FORMAT'), logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Set up our app object

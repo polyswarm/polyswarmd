@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import find_packages, setup
 
 def parse_requirements():
     with open('requirements.txt', 'r') as f:
@@ -12,13 +12,9 @@ setup(name='polyswarmd',
       url='https://github.com/polyswarm/polyswarmd',
       license='MIT',
       install_requires=parse_requirements(),
-      packages=['polyswarmd'],
-      package_dir={
-          'polyswarmd': 'src/polyswarmd',
-      },
-      package_data={
-          'polyswarmd': ['truffle/build/**/*'],
-      },
+      include_package_data=True,
+      packages=find_packages('src'),
+      package_dir={'': 'src/'},
       entry_points = {
           'console_scripts': ['polyswarmd=polyswarmd.__main__:main'],
       },

@@ -48,7 +48,6 @@ def fetch_from_consul_or_wait(client, key, recurse=False, index=0):
         try:
             index, data = client.kv.get(key, recurse=recurse, index=index, wait='2m')
             if data is not None:
-                logger.info('Got: %s', data)
                 return data
         except Timeout:
             logger.info('Consul up but key %s not available, retrying...', key)
