@@ -118,10 +118,9 @@ def post_transactions():
             logger.exception('Unexpected exception while parsing transaction')
             continue
 
-        if withdrawal_only:
-            if check_withdrawal(tx):
-                errors.append('Cannot send tx {0}: only withdrawals allowed without api-key'.format(tx.hash.hex()))
-                continue
+        if withdrawal_only and check_withdrawal(tx):
+            errors.append('Cannot send tx {0}: only withdrawals allowed without api-key'.format(tx.hash.hex()))
+            continue
 
         sender = g.chain.w3.toChecksumAddress(tx.sender.hex())
         if sender != account:
@@ -179,8 +178,7 @@ def check_withdrawal(tx):
         or tx.value != 0
         or tx.network_id != app.config["POLYSWARMD"].chains['side'].chain_id
         or target != g.chain.erc20_relay.address
-        or amount <= 0
-    ):
+        or amount <= 0):
         logger.error('transaction is not a withdrawal: %s', tx.as_dict())
         error = True
 
