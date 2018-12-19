@@ -88,9 +88,7 @@ def before_request():
     try:
         api_key = request.headers.get('Authorization').split()[-1]
     except:
-        if request.path in AUTH_WHITELIST:
-            return
-        return failure('API key required', 401)
+        return None if request.path in AUTH_WHITELIST else failure('API key required', 401)
 
     if api_key:
         from polyswarmd.db import lookup_api_key
@@ -99,9 +97,7 @@ def before_request():
             g.user = api_key_obj.user
 
     # Want to pass api-key even to whitelisted routes.
-    if request.path in AUTH_WHITELIST:
-        return
-    elif not g.user:
+    if request not in AUTH_WHITELIST and not g.user:
         return failure('API key required', 401)
 
 
