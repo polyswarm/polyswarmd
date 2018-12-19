@@ -119,7 +119,7 @@ def post_transactions():
             continue
 
         if withdrawal_only and check_withdrawal(tx):
-            errors.append('Cannot send tx {0}: only withdrawals allowed without api-key'.format(tx.hash.hex()))
+            errors.append('Invalid transaction tx {0}: only withdrawals allowed without api-key'.format(tx.hash.hex()))
             continue
 
         sender = g.chain.w3.toChecksumAddress(tx.sender.hex())
