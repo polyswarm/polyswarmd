@@ -163,6 +163,7 @@ def check_withdrawal(transactions):
     Take a list of transactions, and show the set consists of only
     withdrawals from the sidechain.
     """
+    error = None
     if len(transactions) != 1:
         logger.error('Too many transactions to be a withdrawl')
         return 'multiple transactions requires an api-key'
@@ -171,18 +172,13 @@ def check_withdrawal(transactions):
     if len(tx.data) != 68 or function_hash != transfer_signature_hash:
         return 'calling something other than transfer requires an api-key'
 
-    error = None
-    side_chain_id = app.config["POLYSWARMD"].chains['side'].chain_id
     tx = rlp.decode(bytes.fromhex(transactions[0]), Transaction)
     to = g.chain.w3.toChecksumAddress(tx.to.hex())
-    sender = g.chain.w3.toChecksumAddress(tx.sender.hex())
     amount = int.from_bytes(tx.data[36:], byteorder='big')
     target = g.chain.w3.toChecksumAddress(g.chain.w3.toHex(tx.data[16:36]))
 
-    if g.chain.nectar_token.address != to or tx.value != 0:
-        error = 'sending a transaction to a contract other than nectar token requires an api-key'
-    elif tx.network_id != side_chain_id:
-        error = 'sending a transaction on the homechain requires an api-key'
+    if g.chain.nectar_token.address != to or tx.value != 0 or tx.network_id != app.config["POLYSWARMD"].chains['side'].chain_id:
+        error = 'sending a transaction to a contract other than the side nectar token requires an api-key'
     elif target != g.chain.erc20_relay.address or amount <= 0:
         error = 'transfering NCT to an address other than erc20relay contract requires an api-key'
 
