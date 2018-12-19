@@ -168,7 +168,7 @@ def is_withdrawal(tx):
     function_hash = g.chain.w3.toHex(tx.data[:4])
     if len(tx.data) != 68 or function_hash != transfer_signature_hash:
         logger.error('transaction is not a withdrawal: %s', tx.as_dict())
-        error = False
+        return False
 
     to = g.chain.w3.toChecksumAddress(tx.to.hex())
     amount = int.from_bytes(tx.data[36:], byteorder='big')
