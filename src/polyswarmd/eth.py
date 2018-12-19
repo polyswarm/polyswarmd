@@ -101,12 +101,10 @@ def post_transactions():
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
+    withdrawal_only = not g.user and app.config['POLYSWARMD'].require_api_key
     # If we don't have a user key, and they are required, start checking the transaction
-    if not g.user and app.config['POLYSWARMD'].require_api_key:
-        logger.info('Comparing transactions against withdrawal signature')
-        error = check_withdrawal(body['transactions'])
-        if error:
-            return failure(error, 403)
+    if withdrawal_only and len(transactions) != 1:
+        return failure('multiple transactions requires an api-key', 403)
 
     errors = []
     txhashes = []
@@ -119,6 +117,11 @@ def post_transactions():
         except Exception:
             logger.exception('Unexpected exception while parsing transaction')
             continue
+
+        if withdrawal_only:
+            error = check_withdrawal(raw_tx)
+            if error:
+                return failure(error, 403)
 
         sender = g.chain.w3.toChecksumAddress(tx.sender.hex())
         if sender != account:
@@ -158,21 +161,15 @@ def build_transaction(call, nonce):
     return call.buildTransaction(options)
 
 
-def check_withdrawal(transactions):
+def check_withdrawal(tx):
     """
-    Take a list of transactions, and show the set consists of only
-    withdrawals from the sidechain.
+    Take a transaction and return an error message if that transaction is not a withdrawal
     """
     error = None
-    if len(transactions) != 1:
-        logger.error('Too many transactions to be a withdrawl')
-        return 'multiple transactions requires an api-key'
-
     function_hash = g.chain.w3.toHex(tx.data[:4])
     if len(tx.data) != 68 or function_hash != transfer_signature_hash:
         return 'calling something other than transfer requires an api-key'
 
-    tx = rlp.decode(bytes.fromhex(transactions[0]), Transaction)
     to = g.chain.w3.toChecksumAddress(tx.to.hex())
     amount = int.from_bytes(tx.data[36:], byteorder='big')
     target = g.chain.w3.toChecksumAddress(g.chain.w3.toHex(tx.data[16:36]))
