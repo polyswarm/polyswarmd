@@ -3,7 +3,7 @@ import logging
 import re
 
 import base58
-from flask import current_app as app, Blueprint, request
+from flask import current_app as app, g, Blueprint, request
 
 from polyswarmd.response import success, failure
 
@@ -12,7 +12,8 @@ artifacts = Blueprint('artifacts', __name__)
 
 # 100MB limit
 # TODO: Should this be configurable in config file?
-MAX_ARTIFACT_SIZE = 100 * 1024 * 1024
+MAX_ARTIFACT_SIZE_REGULAR = 100 * 1024 * 1024
+MAX_ARTIFACT_SIZE_ANONYMOUS = 100 * 1024 * 1024
 
 
 def is_valid_ipfshash(ipfshash):
@@ -86,8 +87,7 @@ def post_artifacts():
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
 
-    files = [('file', (f.filename, f, 'application/octet-stream'))
-             for f in request.files.getlist(key='file')]
+    files = [('file', (f.filename, f, 'application/octet-stream')) for f in request.files.getlist(key='file')]
     if len(files) > 256:
         return failure('Too many artifacts', 400)
 
@@ -137,7 +137,7 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
         return failure('Could not locate artifact ID', 404)
 
     _, artifact, size = arts[id_]
-    if size > MAX_ARTIFACT_SIZE:
+    if size > g.user.max_artifact_size:
         return failure('Artifact size greater than maximum allowed')
 
     r = None
