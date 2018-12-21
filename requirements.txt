@@ -10,7 +10,8 @@ Flask-Sockets==0.2.1
 PyYaml==3.12
 pytest== 4.0.0
 python-json-logger==0.1.9
-requests==2.20.0
+requests==2.20.1
+requests-futures==0.9.9
 requests-mock==1.5.0
 web3==4.8.1
 websocket-client==0.48.0

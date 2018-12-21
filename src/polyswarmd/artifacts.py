@@ -3,7 +3,6 @@ import logging
 import re
 
 import base58
-import requests
 from flask import current_app as app, Blueprint, request
 
 from polyswarmd.response import success, failure
@@ -29,30 +28,50 @@ def is_valid_ipfshash(ipfshash):
 
 
 def list_artifacts(ipfshash):
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
+
     r = None
     try:
-        ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
-        r = requests.get(ipfs_uri + '/api/v0/ls', params={'arg': ipfshash}, timeout=1)
+        stat_future = session.get(config.ipfs_uri + '/api/v0/object/stat', params={'arg': ipfshash})
+        ls_future = session.get(config.ipfs_uri + '/api/v0/ls', params={'arg': ipfshash}, timeout=1)
+
+        r = stat_future.result()
         r.raise_for_status()
-        j = r.json()
+        stats = r.json()
+
+        r = ls_future.result()
+        r.raise_for_status()
+        ls = r.json()
     except Exception:
-        logger.exception('Received error listing files on IPFS, got response: %s',
+        logger.exception('Received error listing files from IPFS, got response: %s',
                          r.content if r is not None else 'None')
-        return []
+        return failure('Could not locate IPFS resource', 400)
 
-    links = [(l['Name'], l['Hash'], l['Size']) for l in j['Objects'][0]['Links']]
-    if not links:
-        links = [('', j['Objects'][0]['Hash'], j['Objects'][0]['Size'])]
+    if stats.get('NumLinks', 0) == 0:
+        return [('', stats.get('Hash', ''), stats.get('DataSize'))]
 
-    return links
+    objects = ls.get('Objects', [])
+    if objects:
+        links = [(l.get('Name', ''), l.get('Hash', ''), l.get('Size', 0)) for l in objects[0].get('Links', [])]
+
+        if not links:
+            links = [('', stats.get('Hash', ''), stats.get('DataSize', 0))]
+
+        return links
+
+    return []
 
 
 @artifacts.route('/status', methods=['GET'])
 def get_artifacts_status():
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
+
     r = None
     try:
-        ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
-        r = requests.get(ipfs_uri + '/api/v0/diag/sys', timeout=1)
+        future = session.get(config.ipfs_uri + '/api/v0/diag/sys', timeout=1)
+        r = future.result()
         r.raise_for_status()
     except Exception:
         logger.exception('Received error connecting to IPFS, got response: %s', r.content if r is not None else 'None')
@@ -64,6 +83,9 @@ def get_artifacts_status():
 
 @artifacts.route('', methods=['POST'])
 def post_artifacts():
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
+
     files = [('file', (f.filename, f, 'application/octet-stream'))
              for f in request.files.getlist(key='file')]
     if len(files) > 256:
@@ -71,11 +93,11 @@ def post_artifacts():
 
     r = None
     try:
-        ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
-        r = requests.post(
-            ipfs_uri + '/api/v0/add',
+        future = session.post(
+            config.ipfs_uri + '/api/v0/add',
             files=files,
             params={'wrap-with-directory': True})
+        r = future.result()
         r.raise_for_status()
     except Exception:
         logger.exception('Received error posting to IPFS got response: %s', r.content if r is not None else 'None')
@@ -101,6 +123,9 @@ def get_artifacts_ipfshash(ipfshash):
 
 @artifacts.route('/<ipfshash>/<int:id_>', methods=['GET'])
 def get_artifacts_ipfshash_id(ipfshash, id_):
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
+
     if not is_valid_ipfshash(ipfshash):
         return failure('Invalid IPFS hash', 400)
 
@@ -117,8 +142,8 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
 
     r = None
     try:
-        ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
-        r = requests.get(ipfs_uri + '/api/v0/cat', params={'arg': artifact}, timeout=1)
+        future = session.get(config.ipfs_uri + '/api/v0/cat', params={'arg': artifact}, timeout=1)
+        r = future.result()
         r.raise_for_status()
     except Exception:
         logger.exception('Received error retrieving files from IPFS, got response: %s',
@@ -130,6 +155,9 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
 
 @artifacts.route('/<ipfshash>/<int:id_>/stat', methods=['GET'])
 def get_artifacts_ipfshash_id_stat(ipfshash, id_):
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
+
     if not is_valid_ipfshash(ipfshash):
         return failure('Invalid IPFS hash', 400)
 
@@ -144,9 +172,10 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
 
     r = None
     try:
-        ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
-        r = requests.get(ipfs_uri + '/api/v0/object/stat', params={'arg': artifact})
+        future = session.get(config.ipfs_uri + '/api/v0/object/stat', params={'arg': artifact})
+        r = future.result()
         r.raise_for_status()
+        j = r.json()
     except Exception:
         logger.exception('Received error stating files from IPFS, got response: %s',
                          r.content if r is not None else 'None')
@@ -155,7 +184,7 @@ def get_artifacts_ipfshash_id_stat(ipfshash, id_):
     # Convert stats to snake_case
     stats = {
         re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', k).lower(): v
-        for k, v in r.json().items()
+        for k, v in j.items()
     }
     stats['name'] = arts[id_][0]
 
