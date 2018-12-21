@@ -1,12 +1,12 @@
-from gevent import monkey
-monkey.patch_all()
+from polyswarmd.monkey import patch_all
+patch_all()
 
 import datetime
 import logging
 import os
-import requests
 
 from flask import Flask, g, request
+from requests_futures.sessions import FuturesSession
 
 from polyswarmd.config import Config, is_service_reachable
 from polyswarmd.logger import init_logging
@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 # Set up our app object
 app = Flask(__name__)
 app.config['POLYSWARMD'] = Config.auto()
+app.config['REQUESTS_SESSION'] = FuturesSession()
 
 install_error_handlers(app)
 
@@ -78,6 +79,7 @@ def before_request():
     g.user = None
 
     config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
 
     # Want to be able to whitelist unauthenticated routes, everything requires auth by default
     if not config.require_api_key:
@@ -90,7 +92,7 @@ def before_request():
         return whitelist_check(request.path)
 
     if api_key:
-        r = requests.get(config.auth_uri, headers={'Authorization': api_key})
+        r = session.get(config.auth_uri, headers={'Authorization': api_key})
         if r is None or r.status_code != 200:
             return whitelist_check(request.path)
 
