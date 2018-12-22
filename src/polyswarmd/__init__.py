@@ -92,7 +92,8 @@ def before_request():
         return whitelist_check(request.path)
 
     if api_key:
-        r = session.get(config.auth_uri, headers={'Authorization': api_key})
+        future = session.get(config.auth_uri, headers={'Authorization': api_key})
+        r = future.result()
         if r is None or r.status_code != 200:
             return whitelist_check(request.path)
 
