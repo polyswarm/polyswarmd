@@ -54,7 +54,7 @@ class User(object):
     @classmethod
     def from_api_key(cls, api_key):
         config = app.config['POLYSWARMD']
-        session = app.config['POLYSWARMD']
+        session = app.config['REQUESTS_SESSION']
 
         future = session.get(config.auth_uri, headers={'Authorization': api_key})
         r = future.result()
