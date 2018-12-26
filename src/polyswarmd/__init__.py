@@ -24,7 +24,7 @@ install_error_handlers(app)
 
 from polyswarmd.eth import misc
 from polyswarmd.utils import bool_list_to_int, int_to_bool_list
-from polyswarmd.artifacts import artifacts, MAX_ARTIFACT_SIZE
+from polyswarmd.artifacts import artifacts, MAX_ARTIFACT_SIZE_REGULAR, MAX_ARTIFACT_SIZE_ANONYMOUS
 from polyswarmd.balances import balances
 from polyswarmd.bounties import bounties
 from polyswarmd.relay import relay
@@ -32,7 +32,7 @@ from polyswarmd.offers import offers
 from polyswarmd.staking import staking
 from polyswarmd.websockets import init_websockets
 
-app.config['MAX_CONTENT_LENGTH'] = MAX_ARTIFACT_SIZE
+app.config['MAX_CONTENT_LENGTH'] = MAX_ARTIFACT_SIZE_REGULAR
 
 app.register_blueprint(misc, url_prefix='/')
 app.register_blueprint(artifacts, url_prefix='/artifacts')
@@ -44,6 +44,50 @@ app.register_blueprint(staking, url_prefix='/staking')
 init_websockets(app)
 
 AUTH_WHITELIST = {'/status', '/relay/withdrawal', '/transactions'}
+
+
+class User(object):
+    def __init__(self, authorized=False, user_id=None):
+        self.authorized = authorized
+        self.user_id = user_id if authorized else None
+
+    @classmethod
+    def from_api_key(cls, api_key):
+        config = app.config['POLYSWARMD']
+        session = app.config['POLYSWARMD']
+
+        future = session.get(config.auth_uri, headers={'Authorization': api_key})
+        r = future.result()
+        if r is None or r.status_code != 200:
+            return cls(authorized=False, user_id=None)
+
+        try:
+            j = r.json()
+        except ValueError:
+            logger.exception('Invalid response from API key management service, received: %s', r.content)
+            return cls(authorized=False, user_id=None)
+
+        anonymous = j.get('anonymous', True)
+        user_id = j.get('user_id') if not anonymous else None
+        communities = j.get('communities', [])
+
+        if config.community not in communities:
+            logger.error('API key for user %s not authorized for community %s', user_id, config.community)
+            return cls(authorized=False, user_id=None)
+
+        return cls(authorized=True, user_id=user_id)
+
+    @property
+    def anonymous(self):
+        return self.user_id is None
+
+    @property
+    def max_artifact_size(self):
+        return MAX_ARTIFACT_SIZE_ANONYMOUS if self.anonymous else MAX_ARTIFACT_SIZE_REGULAR
+
+    def __bool__(self):
+        config = app.config['POLYSWARMD']
+        return config.require_api_key and self.authorized
 
 
 @app.route('/status')
@@ -76,12 +120,10 @@ def status():
 
 @app.before_request
 def before_request():
-    g.user = None
+    g.user = User()
 
     config = app.config['POLYSWARMD']
-    session = app.config['REQUESTS_SESSION']
 
-    # Want to be able to whitelist unauthenticated routes, everything requires auth by default
     if not config.require_api_key:
         return
 
@@ -92,22 +134,18 @@ def before_request():
         return whitelist_check(request.path)
 
     if api_key:
-        future = session.get(config.auth_uri, headers={'Authorization': api_key})
-        r = future.result()
-        if r is None or r.status_code != 200:
+        g.user = User.from_api_key(api_key)
+        if not g.user:
             return whitelist_check(request.path)
 
-        j = {}
-        try:
-            j = r.json()
-        except ValueError:
-            logger.exception('Invalid response from API key management service, received: %s', r.content)
-            return whitelist_check(request.path)
+    size = request.content_length
+    if size is not None and size > g.user.max_artifact_size:
+        return failure('Payload too large', 413)
 
-        g.user = j.get('user_id')
-        if request.path not in AUTH_WHITELIST and config.community not in j.get('communities', []):
-            logger.error('API key for user %s not authorized for community %s', g.user, config.community)
-            return failure('Unauthorized', 401)
+
+def whitelist_check(path):
+    # Want to be able to whitelist unauthenticated routes, everything requires auth by default
+    return None if path in AUTH_WHITELIST else failure('Unauthorized', 401)
 
 
 @app.after_request
@@ -117,13 +155,9 @@ def after_request(response):
 
     if response.status_code == 200:
         logger.info('%s %s %s %s %s %s', datetime.datetime.now(), request.method, response.status_code, request.path,
-                    eth_address, user)
+                    eth_address, user.user_id)
     else:
         logger.error('%s %s %s %s %s %s: %s', datetime.datetime.now(), request.method, response.status_code,
-                     request.path, eth_address, user, response.get_data())
+                     request.path, eth_address, user.user_id, response.get_data())
 
     return response
-
-
-def whitelist_check(path):
-    return None if path in AUTH_WHITELIST else failure('Unauthorized', 401)
