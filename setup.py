@@ -5,7 +5,7 @@ def parse_requirements():
         return f.read().splitlines()
 
 setup(name='polyswarmd',
-      version='0.3',
+      version='1.0rc1',
       description='Daemon for interacting with the PolySwarm marketplace',
       author = 'PolySwarm Developers',
       author_email = 'info@polyswarm.io',
