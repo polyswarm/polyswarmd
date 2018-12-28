@@ -90,7 +90,7 @@ def post_artifacts():
     files = [('file', (f.filename, f, 'application/octet-stream')) for f in request.files.getlist(key='file')]
     if not files:
         return failure('No artifacts', 400)
-    if len(files) > 256:
+    if len(files) > config.artifact_limit:
         return failure('Too many artifacts', 400)
 
     r = None

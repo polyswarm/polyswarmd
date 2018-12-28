@@ -231,10 +231,11 @@ class ChainConfig(object):
 
 
 class Config(object):
-    def __init__(self, community, ipfs_uri, auth_uri, require_api_key, homechain_config, sidechain_config,
+    def __init__(self, community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
                  trace_transactions):
         self.community = community
         self.ipfs_uri = ipfs_uri
+        self.artifact_limit = artifact_limit
         self.auth_uri = auth_uri
         self.require_api_key = require_api_key
         self.chains = {
@@ -256,10 +257,11 @@ class Config(object):
 
         commmunity = config.get('community')
         ipfs_uri = config.get('ipfs_uri')
+        artifact_limit = config.get('artifact_limit', 256)
         auth_uri = config.get('auth_uri', os.getenv('AUTH_URI'))
         require_api_key = auth_uri is not None
         trace_transactions = config.get('trace_transactions', True)
-        return cls(commmunity, ipfs_uri, auth_uri, require_api_key, homechain_config, sidechain_config,
+        return cls(commmunity, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
                    trace_transactions)
 
     @classmethod
@@ -291,10 +293,11 @@ class Config(object):
         config = json.loads(config.decode('utf-8'))
 
         ipfs_uri = config.get('ipfs_uri')
+        artifact_limit = config.get('artifact_limit', 256)
         auth_uri = config.get('auth_uri', os.getenv('AUTH_URI'))
         require_api_key = auth_uri is not None
         trace_transactions = config.get('trace_transactions', True)
-        return cls(community, ipfs_uri, auth_uri, require_api_key, homechain_config, sidechain_config,
+        return cls(community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
                    trace_transactions)
 
     @classmethod
@@ -308,6 +311,9 @@ class Config(object):
         # We expect IPFS and API key service to be up already
         if not is_service_reachable(self.ipfs_uri):
             raise ValueError('IPFS not reachable, is correct URI specified?')
+
+        if self.artifact_limit < 1 or self.artifact_limit > 256:
+            raise ValueError('Artifact limit must be greater than 0 and cannot exceed contract limit of 256')
 
         if self.auth_uri and not is_service_reachable(self.auth_uri):
             raise ValueError('API key service not reachable, is correct URI specified?')

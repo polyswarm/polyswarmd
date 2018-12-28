@@ -1,5 +1,6 @@
 community: default
 ipfs_uri: http://localhost:5001
+artifact_limit: 1
 homechain:
   chain_id: 1
   eth_uri: http://localhost:8545
