@@ -26,6 +26,7 @@ gas_limit = 5000000
 zero_address = '0x0000000000000000000000000000000000000000'
 transfer_signature_hash = 'a9059cbb'
 
+
 class Debug(Module):
     ERROR_SELECTOR = '08c379a0'
 
@@ -80,11 +81,16 @@ def get_nonce():
 def post_transactions():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
 
+    # Does not include offer_multisig contracts, need to loosen validation for those
+    contract_addresses = {c.address for c in (g.chain.nectar_token, g.chain.bounty_registry, g.chain.arbiter_staking,
+                                              g.chain.erc20_relay, g.chain.offer_registry)}
+
     schema = {
         'type': 'object',
         'properties': {
             'transactions': {
                 'type': 'array',
+                'maxItems': 10,
                 'items': {
                     'type': 'string',
                     'minLength': 1,
@@ -120,13 +126,21 @@ def post_transactions():
             continue
 
         if withdrawal_only and not is_withdrawal(tx):
-            errors.append('Invalid transaction for tx {0}: only withdrawals allowed without an API key'.format(tx.hash.hex()))
+            errors.append(
+                'Invalid transaction for tx {0}: only withdrawals allowed without an API key'.format(tx.hash.hex()))
             continue
 
         sender = g.chain.w3.toChecksumAddress(tx.sender.hex())
         if sender != account:
             errors.append(
                 'Invalid transaction sender for tx {0}: expected {1} got {2}'.format(tx.hash.hex(), account, sender))
+            continue
+
+        to = g.chain.w3.toChecksumAddress(tx.to.hex())
+        # Redundant check, but explicitly guard against contract deploys via this route
+        if to == zero_address or to not in contract_addresses:
+            errors.append(
+                'Invalid transaction receipient for tx {0}: {1}'.format(tx.hash.hex(), to))
             continue
 
         # TODO: Additional validation (addresses, methods, etc)
@@ -176,14 +190,12 @@ def is_withdrawal(tx):
         return False
 
     target = g.chain.w3.toChecksumAddress(target)
-    if (
-         tx.data.startswith(HexBytes(transfer_signature_hash))
-         and g.chain.nectar_token.address == to
-         and tx.value == 0
-         and tx.network_id == app.config["POLYSWARMD"].chains['side'].chain_id
-         and target == g.chain.erc20_relay.address
-         and amount > 0):
-
+    if (tx.data.startswith(HexBytes(transfer_signature_hash))
+            and g.chain.nectar_token.address == to
+            and tx.value == 0
+            and tx.network_id == app.config["POLYSWARMD"].chains['side'].chain_id
+            and target == g.chain.erc20_relay.address
+            and amount > 0):
         logger.info('Transaction is a withdrawal by %s for %d NCT', sender, amount)
         return True
 
