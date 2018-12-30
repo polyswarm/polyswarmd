@@ -82,8 +82,10 @@ def post_transactions():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
 
     # Does not include offer_multisig contracts, need to loosen validation for those
-    contract_addresses = {c.address for c in (g.chain.nectar_token, g.chain.bounty_registry, g.chain.arbiter_staking,
-                                              g.chain.erc20_relay, g.chain.offer_registry)}
+    contract_addresses = {g.chain.w3.toChecksumAddress(c.address) for c in (
+        g.chain.nectar_token, g.chain.bounty_registry, g.chain.arbiter_staking, g.chain.erc20_relay,
+        g.chain.offer_registry
+    ) if c.address is not None}
 
     schema = {
         'type': 'object',
@@ -140,7 +142,7 @@ def post_transactions():
         # Redundant check, but explicitly guard against contract deploys via this route
         if to == zero_address or to not in contract_addresses:
             errors.append(
-                'Invalid transaction receipient for tx {0}: {1}'.format(tx.hash.hex(), to))
+                'Invalid transaction recipient for tx {0}: {1}'.format(tx.hash.hex(), to))
             continue
 
         # TODO: Additional validation (addresses, methods, etc)
