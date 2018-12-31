@@ -138,14 +138,15 @@ def post_transactions():
                 'Invalid transaction sender for tx {0}: expected {1} got {2}'.format(tx.hash.hex(), account, sender))
             continue
 
+        # Redundant check against zero address, but explicitly guard against contract deploys via this route
         to = g.chain.w3.toChecksumAddress(tx.to.hex())
-        # Redundant check, but explicitly guard against contract deploys via this route
         if to == zero_address or to not in contract_addresses:
             errors.append(
                 'Invalid transaction recipient for tx {0}: {1}'.format(tx.hash.hex(), to))
             continue
 
-        # TODO: Additional validation (addresses, methods, etc)
+        logger.info('Sending tx from %s to %s with nonce %s', sender, to, tx.nonce)
+
         try:
             txhashes.append(g.chain.w3.eth.sendRawTransaction(HexBytes(raw_tx)))
         except ValueError as e:
