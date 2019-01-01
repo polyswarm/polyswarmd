@@ -47,7 +47,7 @@ def list_artifacts(ipfshash):
     except Exception:
         logger.exception('Received error listing files from IPFS, got response: %s',
                          r.content if r is not None else 'None')
-        return failure('Could not locate IPFS resource', 400)
+        return []
 
     if stats.get('NumLinks', 0) == 0:
         return [('', stats.get('Hash', ''), stats.get('DataSize'))]
