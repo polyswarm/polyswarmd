@@ -2,7 +2,7 @@ import logging
 import re
 import uuid
 from flask import g
-from polyswarmd.eth import zero_address
+from polyswarmd.eth import ZERO_ADDRESS
 
 logger = logging.getLogger(__name__)
 

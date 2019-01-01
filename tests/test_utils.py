@@ -4,7 +4,7 @@ import polyswarmd
 import json
 
 from polyswarmd import utils, app
-from polyswarmd.eth import zero_address
+from polyswarmd.eth import ZERO_ADDRESS
 from tests import client, test_account
 
 def test_bool_list_to_int():
@@ -35,7 +35,7 @@ def test_state_to_dict(client):
             'expert_balance': 1234,
             'ambassador': test_account,
             'ambassador_balance': 1234,
-            'msig_address': zero_address,
+            'msig_address': ZERO_ADDRESS,
             'artifact_hash': 'null',
             'mask': [True],
             'verdicts': [True],
@@ -50,7 +50,7 @@ def test_state_to_dict(client):
         expected = {
             'nonce': 10,
             'offer_amount': 100,
-            'msig_address': zero_address,
+            'msig_address': ZERO_ADDRESS,
             'ambassador_balance': 1234,
             'expert_balance': 1234,
             'ambassador': test_account,
