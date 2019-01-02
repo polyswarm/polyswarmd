@@ -4,7 +4,7 @@ import polyswarmd
 import json
 
 from polyswarmd import utils, app
-from polyswarmd.eth import zero_address
+from polyswarmd.eth import ZERO_ADDRESS
 from tests import client, test_account 
 
 def test_post_to_state(client):
@@ -30,7 +30,7 @@ def test_post_to_state(client):
         'expert_balance': 5000,
         'ambassador': test_account,
         'ambassador_balance': 9000000,
-        'msig_address': zero_address,
+        'msig_address': ZERO_ADDRESS,
         'mask': [True, False],
         'verdicts': [True, True],
         'meta_data': 'test'

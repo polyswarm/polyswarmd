@@ -21,10 +21,10 @@ logger = logging.getLogger(__name__)
 
 misc = Blueprint('misc', __name__)
 
-# TODO: not sure if this should be hardcoded/fixed; min gas needed for POST to settle bounty
-gas_limit = 5000000
-zero_address = '0x0000000000000000000000000000000000000000'
-transfer_signature_hash = 'a9059cbb'
+MAX_GAS_LIMIT = 500000
+GAS_MULTIPLIER = 1.2
+ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+TRANSFER_SIGNATURE_HASH = 'a9059cbb'
 
 
 class Debug(Module):
@@ -138,14 +138,15 @@ def post_transactions():
                 'Invalid transaction sender for tx {0}: expected {1} got {2}'.format(tx.hash.hex(), account, sender))
             continue
 
+        # Redundant check against zero address, but explicitly guard against contract deploys via this route
         to = g.chain.w3.toChecksumAddress(tx.to.hex())
-        # Redundant check, but explicitly guard against contract deploys via this route
-        if to == zero_address or to not in contract_addresses:
+        if to == ZERO_ADDRESS or to not in contract_addresses:
             errors.append(
                 'Invalid transaction recipient for tx {0}: {1}'.format(tx.hash.hex(), to))
             continue
 
-        # TODO: Additional validation (addresses, methods, etc)
+        logger.info('Sending tx from %s to %s with nonce %s', sender, to, tx.nonce)
+
         try:
             txhashes.append(g.chain.w3.eth.sendRawTransaction(HexBytes(raw_tx)))
         except ValueError as e:
@@ -169,10 +170,19 @@ def build_transaction(call, nonce):
     options = {
         'nonce': nonce,
         'chainId': int(g.chain.chain_id),
-        'gas': gas_limit,
+        'gas': MAX_GAS_LIMIT,
     }
+
     if g.chain.free:
         options["gasPrice"] = 0
+
+    try:
+        gas = int(call.estimateGas({'from': g.eth_address, **options}) * GAS_MULTIPLIER)
+        options['gas'] = min(MAX_GAS_LIMIT, gas)
+    except ValueError as e:
+        logger.warning('Error estimating gas, using default: %s', e)
+
+    logger.info('options: %s', options)
 
     return call.buildTransaction(options)
 
@@ -192,7 +202,7 @@ def is_withdrawal(tx):
         return False
 
     target = g.chain.w3.toChecksumAddress(target)
-    if (tx.data.startswith(HexBytes(transfer_signature_hash))
+    if (tx.data.startswith(HexBytes(TRANSFER_SIGNATURE_HASH))
             and g.chain.nectar_token.address == to
             and tx.value == 0
             and tx.network_id == app.config["POLYSWARMD"].chains['side'].chain_id
@@ -220,7 +230,7 @@ def events_from_transaction(txhash):
 
     # TODO: Check for out of gas, other
     # TODO: Report contract errors
-    timeout = gevent.Timeout(300)
+    timeout = gevent.Timeout(60)
     timeout.start()
 
     try:
@@ -228,7 +238,7 @@ def events_from_transaction(txhash):
             receipt = g.chain.w3.eth.getTransactionReceipt(txhash)
             if receipt is not None:
                 break
-            gevent.sleep(0.1)
+            gevent.sleep(0.5)
 
     except gevent.Timeout as t:
         if t is not timeout:
@@ -236,7 +246,7 @@ def events_from_transaction(txhash):
         logging.exception('Transaction %s: timeout waiting for receipt', bytes(txhash).hex())
         return {
             'errors':
-                ['transaction {0}: exception occurred during wait for receipt'.format(bytes(txhash).hex())]
+                ['Invalid transaction error for {0}: timeout during wait for receipt'.format(bytes(txhash).hex())]
         }
     except Exception:
         logger.exception('Transaction %s: error while fetching transaction receipt', bytes(txhash).hex())
@@ -253,7 +263,7 @@ def events_from_transaction(txhash):
             'errors':
                 ['transaction {0}: receipt not available'.format(txhash)]
         }
-    if receipt.gasUsed == gas_limit:
+    if receipt.gasUsed == MAX_GAS_LIMIT:
         return {'errors': ['transaction {0}: out of gas'.format(txhash)]}
     if receipt.status != 1:
         if trace_transactions:
@@ -325,7 +335,7 @@ def events_from_transaction(txhash):
     if g.chain.offer_registry.contract is None:
         return ret
 
-    offer_msig = g.chain.offer_multisig.bind(zero_address)
+    offer_msig = g.chain.offer_multisig.bind(ZERO_ADDRESS)
     processed = g.chain.offer_registry.contract.events.InitializedChannel().processReceipt(receipt)
     if processed:
         initialized = dict(processed[0]['args'])

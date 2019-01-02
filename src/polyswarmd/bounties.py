@@ -11,7 +11,7 @@ from polyswarmd import eth
 from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts
 from polyswarmd.chains import chain
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
-from polyswarmd.eth import build_transaction, zero_address
+from polyswarmd.eth import build_transaction, ZERO_ADDRESS
 from polyswarmd.response import success, failure
 from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, vote_to_dict, bloom_to_dict
 
@@ -148,7 +148,7 @@ def get_bounties_guid(guid):
         g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
     if not is_valid_ipfshash(bounty['uri']):
         return failure('Invalid IPFS hash in URI', 400)
-    if bounty['author'] == zero_address:
+    if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
 
     return success(bounty)
@@ -319,7 +319,7 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 @chain
 def get_bounties_guid_assertions(guid):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
-    if bounty['author'] == zero_address:
+    if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
 
     num_assertions = g.chain.bounty_registry.contract.functions.getNumberOfAssertions(guid.int).call()
@@ -342,7 +342,7 @@ def get_bounties_guid_assertions(guid):
 @chain
 def get_bounties_guid_assertions_id(guid, id_):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
-    if bounty['author'] == zero_address:
+    if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
 
     try:
@@ -357,7 +357,7 @@ def get_bounties_guid_assertions_id(guid, id_):
 @chain
 def get_bounties_guid_votes(guid):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
-    if bounty['author'] == zero_address:
+    if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
 
     num_votes = g.chain.bounty_registry.contract.functions.getNumberOfVotes(guid.int).call()
@@ -380,7 +380,7 @@ def get_bounties_guid_votes(guid):
 @chain
 def get_bounties_guid_votes_id(guid, id_):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
-    if bounty['author'] == zero_address:
+    if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
 
     try:
@@ -393,7 +393,7 @@ def get_bounties_guid_votes_id(guid, id_):
 @chain
 def get_bounties_guid_bloom(guid):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
-    if bounty['author'] == zero_address:
+    if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
 
     try:
