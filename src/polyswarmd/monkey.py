@@ -2,7 +2,7 @@ import web3
 from gevent import monkey
 from requests_futures.sessions import FuturesSession
 
-session = FuturesSession()
+session = FuturesSession(adapter_kwargs={'max_retries': 5})
 
 
 def patch_all():

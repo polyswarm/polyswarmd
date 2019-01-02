@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # Set up our app object
 app = Flask(__name__)
 app.config['POLYSWARMD'] = Config.auto()
-app.config['REQUESTS_SESSION'] = FuturesSession()
+app.config['REQUESTS_SESSION'] = FuturesSession(adapter_kwargs={'max_retries': 5})
 
 install_error_handlers(app)
 
