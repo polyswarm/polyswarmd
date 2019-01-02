@@ -177,7 +177,7 @@ def build_transaction(call, nonce):
         options["gasPrice"] = 0
 
     try:
-        gas = int(call.estimateGas({'from': g.eth_address, **options}))
+        gas = int(call.estimateGas({'from': g.eth_address, **options}) * GAS_MULTIPLIER)
         options['gas'] = min(MAX_GAS_LIMIT, gas)
     except ValueError as e:
         logger.warning('Error estimating gas, using default: %s', e)
