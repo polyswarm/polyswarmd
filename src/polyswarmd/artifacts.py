@@ -12,8 +12,8 @@ artifacts = Blueprint('artifacts', __name__)
 
 # 100MB limit
 # TODO: Should this be configurable in config file?
-MAX_ARTIFACT_SIZE_REGULAR = 100 * 1024 * 1024
-MAX_ARTIFACT_SIZE_ANONYMOUS = 100 * 1024 * 1024
+MAX_ARTIFACT_SIZE_REGULAR = 32 * 1024 * 1024
+MAX_ARTIFACT_SIZE_ANONYMOUS = 2 * 1024 * 1024
 
 
 def is_valid_ipfshash(ipfshash):
