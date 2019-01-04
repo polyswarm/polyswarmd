@@ -72,8 +72,7 @@ def get_syncing():
 @chain
 def get_nonce():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
-
-    return success(g.chain.w3.eth.getTransactionCount(account))
+    return success(g.chain.w3.eth.getTransactionCount(account, 'pending'))
 
 
 @misc.route('/transactions', methods=['POST'])
