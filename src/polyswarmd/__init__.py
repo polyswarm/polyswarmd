@@ -1,4 +1,5 @@
 from polyswarmd.monkey import patch_all
+
 patch_all()
 
 import datetime
@@ -10,6 +11,7 @@ from requests_futures.sessions import FuturesSession
 
 from polyswarmd.config import Config, is_service_reachable
 from polyswarmd.logger import init_logging
+from polyswarmd.profiler import setup_profiler
 from polyswarmd.response import success, failure, install_error_handlers
 
 init_logging(os.environ.get('LOG_FORMAT'), logging.INFO)
@@ -41,7 +43,9 @@ app.register_blueprint(bounties, url_prefix='/bounties')
 app.register_blueprint(relay, url_prefix='/relay')
 app.register_blueprint(offers, url_prefix='/offers')
 app.register_blueprint(staking, url_prefix='/staking')
+
 init_websockets(app)
+setup_profiler(app)
 
 AUTH_WHITELIST = {'/status', '/relay/withdrawal', '/transactions'}
 
