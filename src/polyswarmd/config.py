@@ -231,8 +231,8 @@ class ChainConfig(object):
 
 
 class Config(object):
-    def __init__(self, community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
-                 trace_transactions):
+    def __init__(self, community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config,
+                 sidechain_config, trace_transactions, profiler_enabled):
         self.community = community
         self.ipfs_uri = ipfs_uri
         self.artifact_limit = artifact_limit
@@ -244,6 +244,7 @@ class Config(object):
         }
         self.config_filename = ''
         self.trace_transactions = trace_transactions
+        self.profiler_enabled = profiler_enabled
 
         self.__validate()
 
@@ -258,11 +259,12 @@ class Config(object):
         commmunity = config.get('community')
         ipfs_uri = config.get('ipfs_uri')
         artifact_limit = config.get('artifact_limit', 256)
-        auth_uri = config.get('auth_uri', os.getenv('AUTH_URI'))
+        auth_uri = config.get('auth_uri', os.environ.get('AUTH_URI'))
         require_api_key = auth_uri is not None
         trace_transactions = config.get('trace_transactions', True)
+        profiler_enabled = config.get('profiler_enabled', False)
         return cls(commmunity, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
-                   trace_transactions)
+                   trace_transactions, profiler_enabled)
 
     @classmethod
     def from_config_file_search(cls):
@@ -294,11 +296,12 @@ class Config(object):
 
         ipfs_uri = config.get('ipfs_uri')
         artifact_limit = config.get('artifact_limit', 256)
-        auth_uri = config.get('auth_uri', os.getenv('AUTH_URI'))
+        auth_uri = config.get('auth_uri', os.environ.get('AUTH_URI'))
         require_api_key = auth_uri is not None
         trace_transactions = config.get('trace_transactions', True)
+        profiler_enabled = config.get('profiler_enabled', False)
         return cls(community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
-                   trace_transactions)
+                   trace_transactions, profiler_enabled)
 
     @classmethod
     def auto(cls):
