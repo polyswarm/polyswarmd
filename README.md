@@ -9,5 +9,5 @@
 
 ## Usage
 
-New developers are encouraged to visit the [PolySwarm Documentation](https://docs.polyswarm.io) and build on top of [`polyswarm-client`](https://github.com/polyswarm/polyswarm-client) rather than directly writting code against the comparatively low-level `polyswarmd`.
+New developers are encouraged to visit the [PolySwarm Documentation](https://docs.polyswarm.io) and build on top of [`polyswarm-client`](https://github.com/polyswarm/polyswarm-client) rather than directly writing code against the comparatively low-level `polyswarmd`.
 
