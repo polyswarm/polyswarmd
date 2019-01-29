@@ -133,8 +133,8 @@ def before_request():
 
     # Ignore prefix if present
     try:
-        api_key = request.headers.get('Authorization', '').split()[-1]
-    except IndexError:
+        api_key = request.headers.get('Authorization').split()[-1]
+    except:
         return whitelist_check(request.path)
 
     if api_key:
