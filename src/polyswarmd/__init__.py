@@ -60,7 +60,9 @@ class User(object):
         config = app.config['POLYSWARMD']
         session = app.config['REQUESTS_SESSION']
 
-        future = session.get(config.auth_uri, headers={'Authorization': api_key})
+        auth_uri = '{}/communities/{}/auth'.format(config.auth_uri, config.community)
+
+        future = session.get(auth_uri, headers={'Authorization': api_key})
         r = future.result()
         if r is None or r.status_code != 200:
             return cls(authorized=False, user_id=None)
@@ -73,11 +75,6 @@ class User(object):
 
         anonymous = j.get('anonymous', True)
         user_id = j.get('user_id') if not anonymous else None
-        communities = j.get('communities', [])
-
-        if config.community not in communities:
-            logger.error('API key for user %s not authorized for community %s', user_id, config.community)
-            return cls(authorized=False, user_id=None)
 
         return cls(authorized=True, user_id=user_id)
 
