@@ -236,7 +236,7 @@ def post_bounties_guid_assertions(guid):
                 },
             },
         },
-        'required': ['bid', 'mask', 'verdicts'],
+        'required': ['bid', 'mask'],
     }
 
     body = request.get_json()
@@ -247,24 +247,35 @@ def post_bounties_guid_assertions(guid):
 
     bid = int(body['bid'])
     mask = bool_list_to_int(body['mask'])
-    verdicts = bool_list_to_int(body['verdicts'])
+
+    commitment = int(body.get('commitment'))
+    verdicts = body.get('verdicts')
+
+    if commitment is None and verdicts is None:
+        return failure('Require verdicts or a commitment', 400)
 
     if bid < eth.assertion_bid_min(g.chain.bounty_registry.contract):
         return failure('Invalid assertion bid', 400)
 
-    nonce, commitment = calculate_commitment(account, verdicts)
     approveAmount = bid + eth.assertion_fee(g.chain.bounty_registry.contract)
 
-    transactions = [
+    nonce = None
+    if commitment is None:
+        nonce, commitment = calculate_commitment(account, bool_list_to_int(verdicts))
+
+    ret = {'transactions': [
         build_transaction(
-            g.chain.nectar_token.contract.functions.approve(g.chain.bounty_registry.contract.address, approveAmount),
-            base_nonce),
+            g.chain.nectar_token.contract.functions.approve(g.chain.bounty_registry.contract.address,
+                                                            approveAmount), base_nonce),
         build_transaction(g.chain.bounty_registry.contract.functions.postAssertion(guid.int, bid, mask, commitment),
                           base_nonce + 1),
-    ]
+    ]}
 
-    # Pass generated nonce onto user in response, used for reveal
-    return success({'transactions': transactions, 'nonce': str(nonce)})
+    if nonce is not None:
+        # Pass generated nonce onto user in response, used for reveal
+        ret['nonce'] = nonce
+
+    return success(ret)
 
 
 @bounties.route('/<uuid:guid>/assertions/<int:id_>/reveal', methods=['POST'])
@@ -384,10 +395,12 @@ def get_bounties_guid_votes_id(guid, id_):
         return failure('Bounty not found', 404)
 
     try:
-        vote = vote_to_dict(g.chain.bounty_registry.contract.functions.votesByGuid(guid.int, id_).call(), bounty['num_artifacts'])
+        vote = vote_to_dict(g.chain.bounty_registry.contract.functions.votesByGuid(guid.int, id_).call(),
+                            bounty['num_artifacts'])
         return success(vote)
     except:
         return failure('Vote not found', 404)
+
 
 @bounties.route('/<uuid:guid>/bloom', methods=['GET'])
 @chain
