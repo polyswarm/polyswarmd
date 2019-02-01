@@ -74,6 +74,20 @@ def get_nonce():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     return success(g.chain.w3.eth.getTransactionCount(account, 'pending'))
 
+@misc.route('/transactions/<transaction_hash>', methods=['GET'])
+@chain
+def get_transaction(transaction_hash):
+    account = g.chain.w3.toChecksumAddress(g.eth_address)
+
+    ret = defaultdict(list)
+    event = events_from_transaction(HexBytes(transaction_hash))
+    for k, v in event.items():
+        ret[k].extend(v)
+
+    if ret['errors']:
+        logging.exception('Got transaction errors: %s', ret['errors'])
+        return failure(ret, 400)
+    return success(ret)
 
 @misc.route('/transactions', methods=['POST'])
 @chain
@@ -151,19 +165,7 @@ def post_transactions():
         except ValueError as e:
             errors.append('Invalid transaction error for tx {0}: {1}'.format(tx.hash.hex(), e))
 
-    ret = defaultdict(list)
-    ret['errors'].extend(errors)
-    for txhash in txhashes:
-        events = events_from_transaction(txhash)
-        for k, v in events.items():
-            ret[k].extend(v)
-
-    if ret['errors']:
-        logging.exception('Got transaction errors: %s', ret['errors'])
-        return failure(ret, 400)
-
-    return success(ret)
-
+    return success([txhash.hex() for txhash in txhashes])
 
 def build_transaction(call, nonce):
     options = {
