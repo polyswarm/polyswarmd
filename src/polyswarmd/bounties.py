@@ -248,7 +248,7 @@ def post_bounties_guid_assertions(guid):
     bid = int(body['bid'])
     mask = bool_list_to_int(body['mask'])
 
-    commitment = int(body.get('commitment'))
+    commitment = body.get('commitment')
     verdicts = body.get('verdicts')
 
     if commitment is None and verdicts is None:
@@ -262,6 +262,8 @@ def post_bounties_guid_assertions(guid):
     nonce = None
     if commitment is None:
         nonce, commitment = calculate_commitment(account, bool_list_to_int(verdicts))
+    else:
+        commitment = int(commitment)
 
     ret = {'transactions': [
         build_transaction(
