@@ -31,7 +31,7 @@ def chain(_func=None, chain_name=None, account_required=True):
             chain = app.config['POLYSWARMD'].chains.get(c)
             if not chain:
                 chain_options = ", ".join(app.config['POLYSWARMD'].chains)
-                return failure('Chain must one of {0}'.format(', '.join(chain_options)), 400)
+                return failure('Chain must one of {0}'.format(chain_options), 400)
 
             g.chain = chain
             return func(*args, **kwargs)

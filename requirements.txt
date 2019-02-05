@@ -8,15 +8,15 @@ jsonschema==2.6.0
 Flask==1.0.2
 Flask-Sockets==0.2.1
 psycopg2-binary==2.7.6.1
-PyYaml==3.13
+PyYaml==4.2b4
 pytest== 4.0.0
 python-json-logger==0.1.9
 requests==2.20.1
 requests-futures==0.9.9
 requests-mock==1.5.0
-sqlalchemy==1.2.15
+sqlalchemy==1.2.17
 web3==4.8.1
 websocket-client==0.48.0
 Werkzeug==0.14.1
-rlp==1.0.3
+rlp==1.1.0
 git+https://github.com/polyswarm/flask-profiler.git@profile-stats#egg=flask_profiler
