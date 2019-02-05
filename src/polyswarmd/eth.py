@@ -74,15 +74,39 @@ def get_nonce():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     return success(g.chain.w3.eth.getTransactionCount(account, 'pending'))
 
-@misc.route('/transactions/<transaction_hash>', methods=['GET'])
+@misc.route('/transactions', methods=['GET'])
 @chain
-def get_transaction(transaction_hash):
+def get_transactions():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
 
+    schema = {
+        'type': 'object',
+        'properties': {
+            'transactions': {
+                'type': 'array',
+                'maxItems': 10,
+                'items': {
+                    'type': 'string',
+                    'minLength': 2,
+                    'maxLength': 66,
+                    'pattern': r'^(0x)?[0-9a-fA-F]{64}$',
+                }
+            },
+        },
+        'required': ['transactions'],
+    }
+
+    body = request.get_json()
+    try:
+        jsonschema.validate(body, schema)
+    except ValidationError as e:
+        return failure('Invalid JSON: ' + e.message, 400)
+
     ret = defaultdict(list)
-    event = events_from_transaction(HexBytes(transaction_hash))
-    for k, v in event.items():
-        ret[k].extend(v)
+    for transaction in body['transactions']:
+        event = events_from_transaction(HexBytes(transaction))
+        for k, v in event.items():
+            ret[k].extend(v)
 
     if ret['errors']:
         logging.exception('Got transaction errors: %s', ret['errors'])
