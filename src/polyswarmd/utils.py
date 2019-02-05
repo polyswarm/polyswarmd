@@ -48,6 +48,13 @@ def bloom_to_dict(bloom):
     }
 
 
+def fee_update_event_to_dict(fee_update_event):
+    return {
+        'bounty_fee': fee_update_event.bountyFee,
+        'assertion_fee': fee_update_event.assertionFee,
+    }
+
+
 def new_bounty_event_to_dict(new_bounty_event):
     return {
         'guid': str(uuid.UUID(int=new_bounty_event.guid)),
@@ -172,6 +179,7 @@ def state_to_dict(state):
         'mask': int_to_bool_list(g.chain.w3.toInt(offer_info[10])),
         'verdicts': int_to_bool_list(g.chain.w3.toInt(offer_info[11])),
     }
+
 
 def new_init_channel_event_to_dict(new_init_event):
     return {

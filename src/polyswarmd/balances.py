@@ -18,7 +18,8 @@ def get_balance_address_eth(address):
     try:
         balance = g.chain.w3.eth.getBalance(address)
         return success(str(balance))
-    except:
+    except Exception:
+        logger.exception('Unexpected exception retrieving ETH balance')
         return failure("Could not retrieve balance")
 
 @balances.route('/<address>/staking/total', methods=['GET'])
@@ -30,7 +31,8 @@ def get_balance_total_stake(address):
     try:
         balance = g.chain.arbiter_staking.contract.functions.balanceOf(address).call()
         return success(str(balance))
-    except:
+    except Exception:
+        logger.exception('Unexpected exception retrieving total staking balance')
         return failure("Could not retrieve balance")
 
 
@@ -44,7 +46,8 @@ def get_balance_withdrawable_stake(address):
     try:
         balance = g.chain.arbiter_staking.contract.functions.withdrawableBalanceOf(address).call()
         return success(str(balance))
-    except:
+    except Exception:
+        logger.exception('Unexpected exception retrieving withdrawable staking balance')
         return failure("Could not retrieve balance")
 
 
@@ -58,5 +61,6 @@ def get_balance_address_nct(address):
     try:
         balance = g.chain.nectar_token.contract.functions.balanceOf(address).call()
         return success(str(balance))
-    except:
+    except Exception:
+        logger.exception('Unexpected exception retrieving NCT balance')
         return failure("Could not retrieve balance")
