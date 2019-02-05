@@ -9,7 +9,7 @@ from polyswarmd import app
 
 
 @click.command()
-@click.option('--log', default='INFO', help="Logging level")
+@click.option('--log', default='INFO', help='Logging level')
 @click.option('--host', default='', help='Host to listen on')
 @click.option('--port', default=31337, help='Port to listen on')
 def main(log, host, port):

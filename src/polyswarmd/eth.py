@@ -74,6 +74,44 @@ def get_nonce():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     return success(g.chain.w3.eth.getTransactionCount(account, 'pending'))
 
+@misc.route('/transactions', methods=['GET'])
+@chain
+def get_transactions():
+    account = g.chain.w3.toChecksumAddress(g.eth_address)
+
+    schema = {
+        'type': 'object',
+        'properties': {
+            'transactions': {
+                'type': 'array',
+                'maxItems': 10,
+                'items': {
+                    'type': 'string',
+                    'minLength': 2,
+                    'maxLength': 66,
+                    'pattern': r'^(0x)?[0-9a-fA-F]{64}$',
+                }
+            },
+        },
+        'required': ['transactions'],
+    }
+
+    body = request.get_json()
+    try:
+        jsonschema.validate(body, schema)
+    except ValidationError as e:
+        return failure('Invalid JSON: ' + e.message, 400)
+
+    ret = defaultdict(list)
+    for transaction in body['transactions']:
+        event = events_from_transaction(HexBytes(transaction))
+        for k, v in event.items():
+            ret[k].extend(v)
+
+    if ret['errors']:
+        logging.exception('Got transaction errors: %s', ret['errors'])
+        return failure(ret, 400)
+    return success(ret)
 
 @misc.route('/transactions', methods=['POST'])
 @chain
@@ -114,8 +152,8 @@ def post_transactions():
     if withdrawal_only and len(body['transactions']) != 1:
         return failure('Posting multiple transactions requires an API key', 403)
 
-    errors = []
-    txhashes = []
+    errors = False
+    results = []
     for raw_tx in body['transactions']:
         try:
             tx = rlp.decode(bytes.fromhex(raw_tx), Transaction)
@@ -127,43 +165,48 @@ def post_transactions():
             continue
 
         if withdrawal_only and not is_withdrawal(tx):
-            errors.append(
-                'Invalid transaction for tx {0}: only withdrawals allowed without an API key'.format(tx.hash.hex()))
+            errors = True
+            results.append({
+                'is_error': True,
+                'message': 'Invalid transaction for tx {0}: only withdrawals allowed without an API key'.format(tx.hash.hex())
+            })
             continue
 
         sender = g.chain.w3.toChecksumAddress(tx.sender.hex())
         if sender != account:
-            errors.append(
-                'Invalid transaction sender for tx {0}: expected {1} got {2}'.format(tx.hash.hex(), account, sender))
+            errors = True
+            results.append({
+                'is_error': True,
+                'message': 'Invalid transaction sender for tx {0}: expected {1} got {2}'.format(tx.hash.hex(), account, sender)
+            })
             continue
 
         # Redundant check against zero address, but explicitly guard against contract deploys via this route
         to = g.chain.w3.toChecksumAddress(tx.to.hex())
         if to == ZERO_ADDRESS or to not in contract_addresses:
-            errors.append(
-                'Invalid transaction recipient for tx {0}: {1}'.format(tx.hash.hex(), to))
+            errors = True
+            results.append({
+                'is_error': True,
+                'message':  'Invalid transaction recipient for tx {0}: {1}'.format(tx.hash.hex(), to)
+            })
             continue
 
         logger.info('Sending tx from %s to %s with nonce %s', sender, to, tx.nonce)
 
         try:
-            txhashes.append(g.chain.w3.eth.sendRawTransaction(HexBytes(raw_tx)))
+            results.append({
+                'is_error': False,
+                'message': g.chain.w3.eth.sendRawTransaction(HexBytes(raw_tx)).hex()})
         except ValueError as e:
-            errors.append('Invalid transaction error for tx {0}: {1}'.format(tx.hash.hex(), e))
+            errors = True
+            results.append({
+                'is_error': True,
+                'message': 'Invalid transaction error for tx {0}: {1}'.format(tx.hash.hex(), e)
+            })
+    if errors:
+        return failure(results, 400)
 
-    ret = defaultdict(list)
-    ret['errors'].extend(errors)
-    for txhash in txhashes:
-        events = events_from_transaction(txhash)
-        for k, v in events.items():
-            ret[k].extend(v)
-
-    if ret['errors']:
-        logging.exception('Got transaction errors: %s', ret['errors'])
-        return failure(ret, 400)
-
-    return success(ret)
-
+    return success(results)
 
 def build_transaction(call, nonce):
     options = {
