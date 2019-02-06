@@ -419,11 +419,11 @@ def events_from_transaction(txhash):
 
 
 def bounty_fee(bounty_registry):
-    return bounty_registry.functions.BOUNTY_FEE().call()
+    return bounty_registry.functions.bountyFee().call()
 
 
 def assertion_fee(bounty_registry):
-    return bounty_registry.functions.ASSERTION_FEE().call()
+    return bounty_registry.functions.assertionFee().call()
 
 
 def bounty_amount_min(bounty_registry):

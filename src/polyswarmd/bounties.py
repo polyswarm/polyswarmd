@@ -120,8 +120,8 @@ def post_bounties():
 @bounties.route('/parameters', methods=['GET'])
 @chain
 def get_bounty_parameters():
-    bounty_fee = g.chain.bounty_registry.contract.functions.BOUNTY_FEE().call()
-    assertion_fee = g.chain.bounty_registry.contract.functions.ASSERTION_FEE().call()
+    bounty_fee = g.chain.bounty_registry.contract.functions.bountyFee().call()
+    assertion_fee = g.chain.bounty_registry.contract.functions.assertionFee().call()
     bounty_amount_minimum = g.chain.bounty_registry.contract.functions.BOUNTY_AMOUNT_MINIMUM().call()
     assertion_bid_minimum = g.chain.bounty_registry.contract.functions.ASSERTION_BID_MINIMUM().call()
     arbiter_lookback_range = g.chain.bounty_registry.contract.functions.ARBITER_LOOKBACK_RANGE().call()

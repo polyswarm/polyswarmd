@@ -37,6 +37,7 @@ def init_websockets(app):
             try:
                 if not filters_initialized:
                     block_filter = g.chain.w3.eth.filter('latest')
+                    fee_filter = g.chain.bounty_registry.contract.eventFilter('FeesUpdated')
                     bounty_filter = g.chain.bounty_registry.contract.eventFilter('NewBounty')
                     assertion_filter = g.chain.bounty_registry.contract.eventFilter('NewAssertion')
                     vote_filter = g.chain.bounty_registry.contract.eventFilter('NewVote')
@@ -49,13 +50,22 @@ def init_websockets(app):
 
                     filters_initialized = True
 
-                for event in block_filter.get_new_entries():
+                for _ in block_filter.get_new_entries():
                     ws.send(
                         json.dumps({
                             'event': 'block',
                             'data': {
                                 'number': g.chain.w3.eth.blockNumber,
                             },
+                        }))
+
+                for event in fee_filter.get_new_entries():
+                    ws.send(
+                        json.dumps({
+                            'event': 'fee_update',
+                            'data': fee_update_event_to_dict(event.args),
+                            'block_number': event.blockNumber,
+                            'txhash': event.transactionHash.hex(),
                         }))
 
                 for event in bounty_filter.get_new_entries():
