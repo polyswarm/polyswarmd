@@ -235,6 +235,12 @@ def post_bounties_guid_assertions(guid):
                     'type': 'boolean',
                 },
             },
+            'commitment': {
+                'type': 'string',
+                'minLength': 1,
+                'maxLength': 100,
+                'pattern': r'^\d+$',
+            },
         },
         'required': ['bid', 'mask'],
     }

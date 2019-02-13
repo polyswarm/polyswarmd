@@ -269,7 +269,7 @@ def events_from_transaction(txhash):
             pass
 
     # TODO: Check for out of gas, other
-    timeout = gevent.Timeout(20)
+    timeout = gevent.Timeout(10)
     timeout.start()
 
     try:
