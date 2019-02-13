@@ -77,8 +77,6 @@ def get_nonce():
 @misc.route('/transactions', methods=['GET'])
 @chain
 def get_transactions():
-    account = g.chain.w3.toChecksumAddress(g.eth_address)
-
     schema = {
         'type': 'object',
         'properties': {
@@ -271,8 +269,7 @@ def events_from_transaction(txhash):
             pass
 
     # TODO: Check for out of gas, other
-    # TODO: Report contract errors
-    timeout = gevent.Timeout(60)
+    timeout = gevent.Timeout(20)
     timeout.start()
 
     try:
@@ -288,13 +285,13 @@ def events_from_transaction(txhash):
         logging.exception('Transaction %s: timeout waiting for receipt', bytes(txhash).hex())
         return {
             'errors':
-                ['Invalid transaction error for {0}: timeout during wait for receipt'.format(bytes(txhash).hex())]
+                ['transaction {0}: timeout during wait for receipt'.format(bytes(txhash).hex())]
         }
     except Exception:
         logger.exception('Transaction %s: error while fetching transaction receipt', bytes(txhash).hex())
         return {
             'errors':
-                ['transaction {0}: unhandled error while fetching transaction receipt'.format(bytes(txhash).hex())]
+                ['transaction {0}: unexpected error while fetching transaction receipt'.format(bytes(txhash).hex())]
         }
     finally:
         timeout.cancel()
