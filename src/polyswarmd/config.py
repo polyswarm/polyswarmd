@@ -10,13 +10,21 @@ import yaml
 from consul import Consul
 from consul.base import Timeout
 from web3 import Web3, HTTPProvider
+from web3.exceptions import MismatchedABI
 from web3.middleware import geth_poa_middleware
 
+from polyswarmd.eth import ZERO_ADDRESS
 from polyswarmd.utils import camel_case_to_snake_case
 
 logger = logging.getLogger(__name__)
 
 CONFIG_LOCATIONS = ['/etc/polyswarmd', '~/.config/polyswarmd']
+
+# Allow interfacing with contract versions in this range
+SUPPORTED_CONTRACT_VERSIONS = ((1, 1, 0), (2, 0, 0))
+
+# Skip version check for these contracts
+SKIP_VERSION_CHECK = {'NectarToken'}
 
 
 def is_service_reachable(uri):
@@ -78,6 +86,21 @@ class ContractConfig(object):
             raise ValueError('No address provided to bind to')
 
         ret = self.web3_.eth.contract(address=self.web3_.toChecksumAddress(address), abi=self.abi)
+
+        if address != ZERO_ADDRESS and self.name not in SKIP_VERSION_CHECK:
+            min_version, max_version = SUPPORTED_CONTRACT_VERSIONS
+            try:
+                version = tuple(int(s) for s in ret.functions.VERSION().call().split('.'))
+            except MismatchedABI:
+                logger.error('No version specified for contract %s, but not in SKIP_VERSION_CHECK', self.name)
+                raise ValueError('No contract version reported')
+            except ValueError:
+                logger.error('Invalid version specified for contract %s, require major.minor.patch as string',
+                             self.name)
+                raise ValueError('Invalid contract version reported')
+
+            if len(version) != 3 or not min_version <= version < max_version:
+                raise ValueError('Unsupported contract version')
 
         if persistent:
             self.contract = ret
