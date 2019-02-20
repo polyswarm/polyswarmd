@@ -87,8 +87,7 @@ def post_artifacts():
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
 
-    # Replace original filename with index in request
-    files = [('file', (str(i), f, 'application/octet-stream')) for i, f in enumerate(request.files.getlist(key='file'))]
+    files = [('file', (f.filename, f, 'application/octet-stream')) for f in request.files.getlist(key='file')]
     if not files:
         return failure('No artifacts', 400)
     if len(files) > config.artifact_limit:
