@@ -5,6 +5,7 @@ patch_all()
 import datetime
 import logging
 import os
+import random
 
 from flask import Flask, g, request
 from requests_futures.sessions import FuturesSession
@@ -122,6 +123,10 @@ def status():
 @app.before_request
 def before_request():
     g.user = User()
+
+    # Simulate rate limits being hit
+    if random.random() < 0.5:
+        return failure('Too many requests', 429)
 
     config = app.config['POLYSWARMD']
 
