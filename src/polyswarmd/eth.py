@@ -25,6 +25,8 @@ MAX_GAS_LIMIT = 500000
 GAS_MULTIPLIER = 1.5
 ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 TRANSFER_SIGNATURE_HASH = 'a9059cbb'
+HOME_TIMEOUT = 60
+SIDE_TIMEOUT = 10
 
 
 class Debug(Module):
@@ -102,7 +104,7 @@ def get_transactions():
 
     ret = defaultdict(list)
     for transaction in body['transactions']:
-        event = events_from_transaction(HexBytes(transaction))
+        event = events_from_transaction(HexBytes(transaction), g.chain.name)
         for k, v in event.items():
             ret[k].extend(v)
 
@@ -255,7 +257,7 @@ def is_withdrawal(tx):
     return False
 
 
-def events_from_transaction(txhash):
+def events_from_transaction(txhash, chain):
     from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, \
         new_vote_event_to_dict, revealed_assertion_event_to_dict, \
         transfer_event_to_dict, new_withdrawal_event_to_dict, new_deposit_event_to_dict
@@ -269,7 +271,7 @@ def events_from_transaction(txhash):
             pass
 
     # TODO: Check for out of gas, other
-    timeout = gevent.Timeout(10)
+    timeout = gevent.Timeout(HOME_TIMEOUT if chain == 'home' else SIDE_TIMEOUT)
     timeout.start()
 
     try:
