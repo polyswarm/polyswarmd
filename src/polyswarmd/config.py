@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 CONFIG_LOCATIONS = ['/etc/polyswarmd', '~/.config/polyswarmd']
 
 # Allow interfacing with contract versions in this range
-SUPPORTED_CONTRACT_VERSIONS = ((1, 1, 0), (2, 0, 0))
+SUPPORTED_CONTRACT_VERSIONS = ((1, 2, 0), (1, 3, 0))
 
 # Skip version check for these contracts
 SKIP_VERSION_CHECK = {'NectarToken'}
