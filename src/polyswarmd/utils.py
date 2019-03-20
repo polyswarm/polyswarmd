@@ -55,6 +55,13 @@ def fee_update_event_to_dict(fee_update_event):
     }
 
 
+def window_update_event_to_dict(window_update_event):
+    return {
+        'assertion_reveal_window': window_update_event.assertionRevealWindow,
+        'arbiter_vote_window': window_update_event.arbiterVoteWindow,
+    }
+
+
 def new_bounty_event_to_dict(new_bounty_event):
     return {
         'guid': str(uuid.UUID(int=new_bounty_event.guid)),
