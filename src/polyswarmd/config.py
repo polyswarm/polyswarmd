@@ -21,11 +21,12 @@ logger = logging.getLogger(__name__)
 CONFIG_LOCATIONS = ['/etc/polyswarmd', '~/.config/polyswarmd']
 
 # Allow interfacing with contract versions in this range
-SUPPORTED_CONTRACT_VERSIONS = ((1, 1, 0), (1, 3, 0))
-
-# Skip version check for these contracts
-SKIP_VERSION_CHECK = {'NectarToken'}
-
+SUPPORTED_CONTRACT_VERSIONS = {
+    'ArbiterStaking': ((1, 2, 0), (1, 3, 0)),
+    'BountyRegistry': ((1, 2, 0), (1, 3, 0)),
+    'ERC20Relay': ((1, 1, 0), (1, 3, 0)),
+    'OfferRegistry': ((1, 2, 0), (1, 3, 0)),
+}
 
 def is_service_reachable(uri):
     u = urlparse(uri)
@@ -87,12 +88,13 @@ class ContractConfig(object):
 
         ret = self.web3_.eth.contract(address=self.web3_.toChecksumAddress(address), abi=self.abi)
 
-        if address != ZERO_ADDRESS and self.name not in SKIP_VERSION_CHECK:
-            min_version, max_version = SUPPORTED_CONTRACT_VERSIONS
+        supported_versions = SUPPORTED_CONTRACT_VERSIONS.get(self.name)
+        if supported_versions is not None and address != ZERO_ADDRESS:
+            min_version, max_version = supported_versions
             try:
                 version = tuple(int(s) for s in ret.functions.VERSION().call().split('.'))
             except MismatchedABI:
-                logger.error('No version specified for contract %s, but not in SKIP_VERSION_CHECK', self.name)
+                logger.error('Expected version but no version reported for contract %s', self.name)
                 raise ValueError('No contract version reported')
             except ValueError:
                 logger.error('Invalid version specified for contract %s, require major.minor.patch as string',
