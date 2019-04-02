@@ -4,7 +4,6 @@ patch_all()
 
 import datetime
 import logging
-import os
 
 from flask import Flask, g, request
 from requests_futures.sessions import FuturesSession
@@ -14,7 +13,6 @@ from polyswarmd.logger import init_logging
 from polyswarmd.profiler import setup_profiler
 from polyswarmd.response import success, failure, install_error_handlers
 
-init_logging(os.environ.get('LOG_FORMAT'), logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Set up our app object

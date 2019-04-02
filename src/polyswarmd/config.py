@@ -299,6 +299,8 @@ class Config(object):
             if os.path.isfile(filename):
                 return Config.from_config_file(filename)
 
+        raise OSError('Config file not found')
+
     @classmethod
     def from_consul(cls):
         consul_uri = os.environ.get('CONSUL')

@@ -8,7 +8,7 @@ def init_logging(log_format, log_level):
     """
     Logic to support JSON logging.
     """
-    logger = logging.getLogger()  # Root logger
+    logger = logging.getLogger()
     if log_format and log_format in ['json', 'datadog']:
         logHandler = logging.StreamHandler()
         formatter = PolyswarmdJsonFormatter('(timestamp) (level) (name) (message)')
