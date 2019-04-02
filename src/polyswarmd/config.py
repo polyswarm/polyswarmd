@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import socket
+import threading
 import time
 from urllib.parse import urlparse
 
@@ -27,6 +28,7 @@ SUPPORTED_CONTRACT_VERSIONS = {
     'ERC20Relay': ((1, 1, 0), (1, 3, 0)),
     'OfferRegistry': ((1, 2, 0), (1, 3, 0)),
 }
+
 
 def is_service_reachable(uri):
     u = urlparse(uri)
@@ -63,10 +65,22 @@ def fetch_from_consul_or_wait(client, key, recurse=False, index=0):
             continue
 
 
+def wait_for_consul_key_deletion(client, key, recurse=False, index=0):
+    logger.info('Watching key: %s', key)
+    while True:
+        try:
+            index, data = client.kv.get(key, recurse=recurse, index=index, wait='2m')
+            if data is None:
+                return
+        except Timeout:
+            logger.info('Consul key %s still valid', key)
+            continue
+
+
 class ContractConfig(object):
-    def __init__(self, web3_, name, abi, address=None):
+    def __init__(self, w3, name, abi, address=None):
         self.name = name
-        self.web3_ = web3_
+        self.w3 = w3
         self.abi = abi
         self.address = address
 
@@ -86,7 +100,7 @@ class ContractConfig(object):
         if not address:
             raise ValueError('No address provided to bind to')
 
-        ret = self.web3_.eth.contract(address=self.web3_.toChecksumAddress(address), abi=self.abi)
+        ret = self.w3.eth.contract(address=self.w3.toChecksumAddress(address), abi=self.abi)
 
         supported_versions = SUPPORTED_CONTRACT_VERSIONS.get(self.name)
         if supported_versions is not None and address != ZERO_ADDRESS:
@@ -315,7 +329,8 @@ class Config(object):
         homechain_config = ChainConfig.from_consul(consul_client, 'home', 'chain/{0}/homechain'.format(community))
         sidechain_config = ChainConfig.from_consul(consul_client, 'side', 'chain/{0}/sidechain'.format(community))
 
-        config = fetch_from_consul_or_wait(consul_client, 'chain/{0}/config'.format(community)).get('Value')
+        base_key = 'chain/{0}'.format(community)
+        config = fetch_from_consul_or_wait(consul_client, base_key + '/config').get('Value')
         if config is None:
             raise ValueError('Invalid global config')
 
@@ -327,8 +342,21 @@ class Config(object):
         require_api_key = auth_uri is not None
         trace_transactions = config.get('trace_transactions', True)
         profiler_enabled = config.get('profiler_enabled', False)
-        return cls(community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
-                   trace_transactions, profiler_enabled)
+        ret = cls(community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
+                  trace_transactions, profiler_enabled)
+
+        # Watch for key deletion, if config is deleted die and restart with new config
+        def watch_for_config_deletion(consul_client, key):
+            wait_for_consul_key_deletion(consul_client, key, recurse=True)
+            logger.fatal('Config change detected, exiting')
+
+            # sys.exit is caught by flask, we want to tear down immediately though
+            os._exit(0)
+
+        t = threading.Thread(target=watch_for_config_deletion, args=(consul_client, base_key))
+        t.start()
+
+        return ret
 
     @classmethod
     def auto(cls):
