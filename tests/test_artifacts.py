@@ -2,9 +2,9 @@ import io
 
 import requests_mock
 from polyswarmd import app
-from tests import client, test_account
 
 ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
+
 
 def setup_mocks(mock):
     mock.post(
@@ -45,7 +45,7 @@ def test_post_artifacts(client):
     with requests_mock.Mocker() as mock:
         setup_mocks(mock)
         rv = client.post(
-            '/artifacts?account={0}'.format(test_account),
+            '/artifacts',
             content_type='multipart/form-data',
             data={
                 'bar': io.BytesIO(b'bar'),
@@ -59,8 +59,7 @@ def test_get_artifacts_ipfshash(client):
     expected = b'{"result":[{"hash":"QmTz3oc4gdpRMKP2sdGUPZTAGRngqjsi99BPoztyP53JMM","name":"bar"},{"hash":"QmYNmQKp6SuaVrpgWRsPTgCQCnpxUYGq76YEKBXuj2N4H6","name":"foo"}],"status":"OK"}\n'
     with requests_mock.Mocker() as mock:
         setup_mocks(mock)
-        rv = client.get(
-            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU?account={0}'.format(test_account))
+        rv = client.get('/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU?account={0}')
         assert rv.data == expected
 
 
@@ -68,13 +67,10 @@ def test_get_artifacts_ipfshash_id(client):
     expected = (b'bar', b'foo')
     with requests_mock.Mocker() as mock:
         setup_mocks(mock)
-        rv = client.get(
-            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/0?account={0}'.format(test_account))
+        rv = client.get('/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/0?account={0}')
         assert rv.data == expected[0]
-        rv = client.get(
-            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/1?account={0}'.format(test_account))
+        rv = client.get('/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/1?account={0}')
         assert rv.data == expected[1]
-
 
 
 def test_get_artifacts_ipfshash_id_stat(client):
@@ -84,9 +80,7 @@ def test_get_artifacts_ipfshash_id_stat(client):
     )
     with requests_mock.Mocker() as mock:
         setup_mocks(mock)
-        rv = client.get(
-            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/0/stat?account={0}'.format(test_account))
+        rv = client.get('/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/0/stat?account={0}')
         assert rv.data == expected[0]
-        rv = client.get(
-            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/1/stat?account={0}'.format(test_account))
+        rv = client.get('/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/1/stat?account={0}')
         assert rv.data == expected[1]

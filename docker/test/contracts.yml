@@ -1,0 +1,38 @@
+networks:
+  homechain:
+    eth_uri: http://homechain:8545
+    network_id: 1337
+    gas_limit: 7000000
+    gas_price: 0
+    timeout: 240
+
+  sidechain:
+    eth_uri: http://sidechain:8545
+    network_id: 1338
+    gas_limit: 7000000
+    gas_price: 0
+    timeout: 240
+
+contracts:
+  NectarToken:
+    users:
+      - "0x34E583cf9C1789c3141538EeC77D9F0B8F7E89f2"
+      - "0x085ba02C35555FeCB8147820135fDfEc10EeD85a"
+      - "0x2B813F079E7E3Cf24Eeb1aC5853bd6f9118a04eA"
+      - "0xf0243D9b2E332D7072dD4B143a881B3f135F380c"
+      - "0x4F10166CaFD7856ea946124927D4478fDD18d979"
+      - "0x4B1867c484871926109E3C47668d5C0938CA3527"
+      - "0x05328f171b8c1463eaFDACCA478D9EE6a1d923F8"
+      - "0xD87e4662653042C5Da11711542C11f2c8433612d"
+      - "0x1215242C8F0EfF0A4Ac06ea3d73Caa78279fB9BB"
+    arbiters:
+      - "0xF870491ea0F53F67846Eecb57855284D8270284D"
+  BountyRegistry:
+    arbiters:
+      - "0xF870491ea0F53F67846Eecb57855284D8270284D"
+  ERC20Relay:
+    fee_wallet: "0x34E583cf9C1789c3141538EeC77D9F0B8F7E89f2"
+    verifiers:
+      - "0xD87e4662653042C5Da11711542C11f2c8433612d"
+      - "0x4F10166CaFD7856ea946124927D4478fDD18d979"
+      - "0x085ba02C35555FeCB8147820135fDfEc10EeD85a"

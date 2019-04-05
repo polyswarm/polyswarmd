@@ -1,0 +1,47 @@
+version: '2'
+services:
+  consul:
+    image: 'consul'
+    logging:
+      driver: none
+  ipfs:
+    image: "ipfs/go-ipfs"
+    logging:
+      driver: none
+    environment:
+      - IPFS_BIND_IP=0.0.0.0
+    volumes:
+      - "ipfs-export:/export"
+      - "ipfs-data:/data/ipfs"
+  homechain:
+    image: 'trufflesuite/ganache-cli'
+    command: ['-m', 'glove man once beyond own sphere rare desert use ugly mystery total smoke actress cross',
+      '-i', '1337', '-p', '8545', '-g', '0', '-l', '70000000', '-b', '1', '--noVMErrorsOnRPCResponse']
+  sidechain:
+    image: 'trufflesuite/ganache-cli'
+    command: ['-m', 'glove man once beyond own sphere rare desert use ugly mystery total smoke actress cross',
+      '-i', '1338', '-p', '8545', '-g', '0', '-l', '70000000', '-b', '1', '--noVMErrorsOnRPCResponse']
+  contractor:
+    image: 'polyswarm/contractor'
+    environment:
+      - CONFIG=/config/contracts.yml
+      - COMMUNITY=test
+      - HOMECHAIN=homechain
+      - SIDECHAIN=sidechain
+      - HOMECHAIN_KEYFILE=/config/deploy_key
+      - SIDECHAIN_KEYFILE=/config/deploy_key
+      - PASSWORD=password
+      - IPFS_URI=http://ipfs:5001
+      - ARTIFACT_LIMIT=256
+      - CONSUL_URI=http://consul:8500
+    volumes:
+      - './test:/config'
+  polyswarmd:
+    image: 'polyswarm/polyswarmd'
+    environment:
+      - CONSUL=http://consul:8500
+      - POLY_COMMUNITY_NAME=test
+    command: ['pytest', '-v']
+volumes:
+  ipfs-export:
+  ipfs-data:

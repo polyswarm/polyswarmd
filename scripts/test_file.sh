@@ -4,8 +4,8 @@ echo foo > foo
 echo bar > bar
 
 curl --trace-ascii - \
+    -H "Authorization: $STAGE_KEY" \
     -F file=@foo \
-    -F file=@bar \
-    http://localhost:31337/artifacts?account=0x0000000000000000000000000000000000000000
+    https://gamma-polyswarmd.stage.polyswarm.network/artifacts?account=0x0000000000000000000000000000000000000000
 
 rm foo bar

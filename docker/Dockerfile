@@ -1,4 +1,4 @@
-FROM python:3.5-jessie
+FROM python:3.5-stretch
 LABEL maintainer="PolySwarm Developers <info@polyswarm.io>"
 
 WORKDIR /usr/src/app
