@@ -7,6 +7,12 @@ from polyswarmd import utils, app
 from polyswarmd.eth import ZERO_ADDRESS
 from tests import client, test_account
 
+def test_to_padded_hex():
+    assert utils.to_padded_hex("0xabcd").endswith("abcd")
+    assert utils.to_padded_hex(15).endswith("f")
+    assert utils.to_padded_hex("AAAA").endswith("41414141")
+    assert utils.to_padded_hex(b"AAAA").endswith("41414141")
+
 def test_bool_list_to_int():
     bool_list = utils.bool_list_to_int([True, True, False, True])
     expected = 11

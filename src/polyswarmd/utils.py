@@ -1,6 +1,8 @@
+import codecs
 import logging
 import re
 import uuid
+
 from flask import g
 from polyswarmd.eth import ZERO_ADDRESS
 
@@ -226,24 +228,26 @@ def camel_case_to_snake_case(s):
     return re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 
-def to_padded_hex(val):
-    if not g.chain:
-        raise ValueError('g.chain not found')
+def to_padded_hex(val) -> str:
+    encode_hex = lambda xs: codecs.encode(xs, "hex").decode("ascii")
 
-    if type(val) == str:
+    if isinstance(val, str):
         if val.startswith('0x'):
-            padded_hex = g.chain.w3.toHex(hexstr=val)[2:]
+            padded_hex = val[2:].lower()
         else:
-            padded_hex = g.chain.w3.toHex(text=val)[2:]
+            padded_hex = encode_hex(val.encode('utf-8'))
+    elif isinstance(val, bool):
+        padded_hex = int(val)
+    # do we need to check other types here?
+    elif isinstance(val, bytes):
+        padded_hex = encode_hex(val)
+    elif isinstance(val, int):
+        padded_hex = hex(val)[2:]
     else:
-        padded_hex = g.chain.w3.toHex(val)[2:]
+        raise TypeError("Cannot convert to padded hex value")
 
-    l = 64 - len(padded_hex)
-
-    for i in range(0, l):
-        padded_hex = '0' + padded_hex
-
-    return padded_hex
+    # This leaves open the possibility of returning len(result) > 64 chars.
+    return padded_hex.rjust(64, '0')
 
 
 def dict_to_state(state_dict):
