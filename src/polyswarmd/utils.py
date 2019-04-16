@@ -237,7 +237,7 @@ def to_padded_hex(val) -> str:
         else:
             padded_hex = encode_hex(val.encode('utf-8'))
     elif isinstance(val, bool):
-        padded_hex = int(val)
+        padded_hex = str(int(val))
     # do we need to check other types here?
     elif isinstance(val, bytes):
         padded_hex = encode_hex(val)
