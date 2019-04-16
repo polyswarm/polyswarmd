@@ -239,7 +239,8 @@ def to_padded_hex(val: Union[str, bool, int, bytes]) -> str:
         if val.startswith('0x'):
             hex_suffix = val[2:].lower()
             # verify we're passing back a hexadecimal value
-            assert all(c in string.hexdigits for c in hex_suffix)
+            if not all(c in string.hexdigits for c in hex_suffix):
+                raise ValueError("Invalid hexadecimal characters detected")
         else:
             hex_suffix = encode_hex(val.encode('utf-8'))
     elif isinstance(val, bool):
