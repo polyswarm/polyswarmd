@@ -229,7 +229,8 @@ def camel_case_to_snake_case(s):
 
 
 def to_padded_hex(val) -> str:
-    encode_hex = lambda xs: codecs.encode(xs, "hex").decode("ascii")
+    def encode_hex(xs: bytes) -> str:
+        return codecs.encode(xs, "hex").decode("ascii")
 
     if isinstance(val, str):
         if val.startswith('0x'):
