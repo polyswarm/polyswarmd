@@ -116,6 +116,7 @@ class ContractConfig(object):
                 raise ValueError('Invalid contract version reported')
 
             if len(version) != 3 or not min_version <= version < max_version:
+                logger.error("Received %s version %s.%s.%s, but expected version between %s.%s.%s and %s.%s.%s ", self.name, *version, *min_version, *max_version)
                 raise ValueError('Unsupported contract version')
 
         if persistent:
