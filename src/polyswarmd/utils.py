@@ -253,8 +253,13 @@ def to_padded_hex(val: Union[str, bool, int, bytes]) -> str:
     else:
         raise TypeError("Cannot convert to padded hex value")
 
+    # `rjust' pads out it's member string to 64 chars
+    result = hex_suffix.rjust(64, '0')
+    if len(result) > 64:
+        raise ValueError("Invalid string passed in. Too long.")
+        
     # This leaves open the possibility of returning len(result) > 64 chars.
-    return hex_suffix.rjust(64, '0')
+    return result
 
 
 def dict_to_state(state_dict):
