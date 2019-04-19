@@ -258,7 +258,6 @@ def to_padded_hex(val: Union[str, bool, int, bytes]) -> str:
     if len(result) > 64:
         raise ValueError("Invalid string passed in. Too long.")
         
-    # This leaves open the possibility of returning len(result) > 64 chars.
     return result
 
 
