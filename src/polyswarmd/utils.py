@@ -1,6 +1,10 @@
+import codecs
 import logging
+import string
 import re
 import uuid
+from typing import AnyStr, Union
+
 from flask import g
 from polyswarmd.eth import ZERO_ADDRESS
 
@@ -226,24 +230,35 @@ def camel_case_to_snake_case(s):
     return re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 
-def to_padded_hex(val):
-    if not g.chain:
-        raise ValueError('g.chain not found')
+def to_padded_hex(val: Union[str, bool, int, bytes]) -> str:
+    """Convert an argument to a hexadecimal string and zero-extend to 64 width"""
+    def encode_hex(xs: bytes) -> str:
+        return codecs.encode(xs, "hex").decode("ascii") # type: ignore
 
-    if type(val) == str:
+    if isinstance(val, str):
         if val.startswith('0x'):
-            padded_hex = g.chain.w3.toHex(hexstr=val)[2:]
+            hex_suffix = val[2:].lower()
+            # verify we're passing back a hexadecimal value
+            if not all(c in string.hexdigits for c in hex_suffix):
+                raise ValueError("Invalid hexadecimal characters detected")
         else:
-            padded_hex = g.chain.w3.toHex(text=val)[2:]
+            hex_suffix = encode_hex(val.encode('utf-8'))
+    elif isinstance(val, bool):
+        hex_suffix = str(int(val))
+    # do we need to check other types here?
+    elif isinstance(val, (bytes, bytearray)):
+        hex_suffix = encode_hex(val)
+    elif isinstance(val, int):
+        hex_suffix = hex(val)[2:]
     else:
-        padded_hex = g.chain.w3.toHex(val)[2:]
+        raise TypeError("Cannot convert to padded hex value")
 
-    l = 64 - len(padded_hex)
+    # `rjust' pads out it's member string to 64 chars
+    result = hex_suffix.rjust(64, '0')
+    if len(result) > 64:
+        raise ValueError("Invalid string passed in. Too long.")
 
-    for i in range(0, l):
-        padded_hex = '0' + padded_hex
-
-    return padded_hex
+    return result
 
 
 def dict_to_state(state_dict):
