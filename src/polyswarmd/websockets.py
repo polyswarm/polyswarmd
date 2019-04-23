@@ -33,116 +33,142 @@ def init_websockets(app):
             }))
 
         filters_initialized = False
+        latest_block = 0
+
         while not ws.closed:
             try:
                 if not filters_initialized:
-                    block_filter = g.chain.w3.eth.filter('latest')
-                    fee_filter = g.chain.bounty_registry.contract.eventFilter('FeesUpdated')
-                    window_filter = g.chain.bounty_registry.contract.eventFilter('WindowsUpdated')
-                    bounty_filter = g.chain.bounty_registry.contract.eventFilter('NewBounty')
-                    assertion_filter = g.chain.bounty_registry.contract.eventFilter('NewAssertion')
-                    vote_filter = g.chain.bounty_registry.contract.eventFilter('NewVote')
-                    quorum_filiter = g.chain.bounty_registry.contract.eventFilter('QuorumReached')
-                    settled_filter = g.chain.bounty_registry.contract.eventFilter('SettledBounty')
-                    reveal_filter = g.chain.bounty_registry.contract.eventFilter('RevealedAssertion')
+                    from_block = "latest" if latest_block == 0 else latest_block
+                    block_filter = g.chain.w3.eth.filter(from_block)
+                    fee_filter = g.chain.bounty_registry.contract.eventFilter('FeesUpdated', {'fromBlock': from_block})
+                    window_filter = g.chain.bounty_registry.contract.eventFilter('WindowsUpdated',
+                                                                                 {'fromBlock': from_block})
+                    bounty_filter = g.chain.bounty_registry.contract.eventFilter('NewBounty', {'fromBlock': from_block})
+                    assertion_filter = g.chain.bounty_registry.contract.eventFilter('NewAssertion',
+                                                                                    {'fromBlock': from_block})
+                    vote_filter = g.chain.bounty_registry.contract.eventFilter('NewVote', {'fromBlock': from_block})
+                    quorum_filiter = g.chain.bounty_registry.contract.eventFilter('QuorumReached',
+                                                                                  {'fromBlock': from_block})
+                    settled_filter = g.chain.bounty_registry.contract.eventFilter('SettledBounty',
+                                                                                  {'fromBlock': from_block})
+                    reveal_filter = g.chain.bounty_registry.contract.eventFilter('RevealedAssertion',
+                                                                                 {'fromBlock': from_block})
                     init_filter = None
                     if g.chain.offer_registry.contract is not None:
                         init_filter = g.chain.offer_registry.contract.eventFilter('InitializedChannel')
 
                     filters_initialized = True
 
-                for event in fee_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'fee_update',
-                            'data': fee_update_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in window_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'window_update',
-                            'data': window_update_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in bounty_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'bounty',
-                            'data': new_bounty_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in assertion_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'assertion',
-                            'data': new_assertion_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in reveal_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'reveal',
-                            'data': revealed_assertion_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in vote_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'vote',
-                            'data': new_vote_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in quorum_filiter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'quorum',
-                            'data': new_quorum_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in settled_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'settled_bounty',
-                            'data': settled_bounty_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                if init_filter is not None:
-                    for event in init_filter.get_new_entries():
+                try:
+                    temp_block = 0
+                    for event in fee_filter.get_new_entries():
                         ws.send(
                             json.dumps({
-                                'event': 'initialized_channel',
-                                'data': new_init_channel_event_to_dict(event.args),
+                                'event': 'fee_update',
+                                'data': fee_update_event_to_dict(event.args),
                                 'block_number': event.blockNumber,
                                 'txhash': event.transactionHash.hex(),
                             }))
+                        temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
 
-                for _ in block_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'block',
-                            'data': {
-                                'number': g.chain.w3.eth.blockNumber,
-                            },
-                        }))
+                    for event in window_filter.get_new_entries():
+                        ws.send(
+                            json.dumps({
+                                'event': 'window_update',
+                                'data': window_update_event_to_dict(event.args),
+                                'block_number': event.blockNumber,
+                                'txhash': event.transactionHash.hex(),
+                            }))
+                        temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
 
-                gevent.sleep(1)
+                    for event in bounty_filter.get_new_entries():
+                        ws.send(
+                            json.dumps({
+                                'event': 'bounty',
+                                'data': new_bounty_event_to_dict(event.args),
+                                'block_number': event.blockNumber,
+                                'txhash': event.transactionHash.hex(),
+                            }))
+                        temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
+
+                    for event in assertion_filter.get_new_entries():
+                        ws.send(
+                            json.dumps({
+                                'event': 'assertion',
+                                'data': new_assertion_event_to_dict(event.args),
+                                'block_number': event.blockNumber,
+                                'txhash': event.transactionHash.hex(),
+                            }))
+                        temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
+
+                    for event in reveal_filter.get_new_entries():
+                        ws.send(
+                            json.dumps({
+                                'event': 'reveal',
+                                'data': revealed_assertion_event_to_dict(event.args),
+                                'block_number': event.blockNumber,
+                                'txhash': event.transactionHash.hex(),
+                            }))
+                        temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
+
+                    for event in vote_filter.get_new_entries():
+                        ws.send(
+                            json.dumps({
+                                'event': 'vote',
+                                'data': new_vote_event_to_dict(event.args),
+                                'block_number': event.blockNumber,
+                                'txhash': event.transactionHash.hex(),
+                            }))
+                        temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
+
+                    for event in quorum_filiter.get_new_entries():
+                        ws.send(
+                            json.dumps({
+                                'event': 'quorum',
+                                'data': new_quorum_event_to_dict(event.args),
+                                'block_number': event.blockNumber,
+                                'txhash': event.transactionHash.hex(),
+                            }))
+                        temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
+
+                    for event in settled_filter.get_new_entries():
+                        ws.send(
+                            json.dumps({
+                                'event': 'settled_bounty',
+                                'data': settled_bounty_event_to_dict(event.args),
+                                'block_number': event.blockNumber,
+                                'txhash': event.transactionHash.hex(),
+                            }))
+                        temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
+
+                    if init_filter is not None:
+                        for event in init_filter.get_new_entries():
+                            ws.send(
+                                json.dumps({
+                                    'event': 'initialized_channel',
+                                    'data': new_init_channel_event_to_dict(event.args),
+                                    'block_number': event.blockNumber,
+                                    'txhash': event.transactionHash.hex(),
+                                }))
+                            temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
+
+                    for _ in block_filter.get_new_entries():
+                        ws.send(
+                            json.dumps({
+                                'event': 'block',
+                                'data': {
+                                    'number': g.chain.w3.eth.blockNumber,
+                                },
+                            }))
+                        temp_block = g.chain.w3.eth.blockNumber if g.chain.w3.eth.blockNumber > temp_block else \
+                            temp_block
+
+                    if temp_block > latest_block:
+                        latest_block = temp_block
+
+                    gevent.sleep(1)
+                except ValueError:
+                    filters_initialized = False
             except WebSocketError:
                 logger.info('Websocket connection closed, exiting loop')
                 break
