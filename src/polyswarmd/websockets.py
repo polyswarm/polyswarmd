@@ -141,7 +141,7 @@ def init_websockets(app):
                                 'number': g.chain.w3.eth.blockNumber,
                             },
                         }))
-                
+
                 gevent.sleep(1)
             except WebSocketError:
                 logger.info('Websocket connection closed, exiting loop')
