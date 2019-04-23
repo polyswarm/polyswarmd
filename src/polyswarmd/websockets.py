@@ -51,15 +51,6 @@ def init_websockets(app):
 
                     filters_initialized = True
 
-                for _ in block_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'block',
-                            'data': {
-                                'number': g.chain.w3.eth.blockNumber,
-                            },
-                        }))
-
                 for event in fee_filter.get_new_entries():
                     ws.send(
                         json.dumps({
@@ -142,6 +133,15 @@ def init_websockets(app):
                                 'txhash': event.transactionHash.hex(),
                             }))
 
+                for _ in block_filter.get_new_entries():
+                    ws.send(
+                        json.dumps({
+                            'event': 'block',
+                            'data': {
+                                'number': g.chain.w3.eth.blockNumber,
+                            },
+                        }))
+                
                 gevent.sleep(1)
             except WebSocketError:
                 logger.info('Websocket connection closed, exiting loop')
