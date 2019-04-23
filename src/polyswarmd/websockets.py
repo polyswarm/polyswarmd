@@ -35,6 +35,9 @@ def init_websockets(app):
         filters_initialized = False
         latest_block = 0
 
+        def get_largest(old, new):
+            return new if new > old else old
+
         while not ws.closed:
             try:
                 if not filters_initialized:
@@ -60,7 +63,7 @@ def init_websockets(app):
                     filters_initialized = True
 
                 try:
-                    temp_block = 0
+                    temp_block = latest_block
                     for event in fee_filter.get_new_entries():
                         ws.send(
                             json.dumps({
@@ -69,7 +72,7 @@ def init_websockets(app):
                                 'block_number': event.blockNumber,
                                 'txhash': event.transactionHash.hex(),
                             }))
-                        temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
+                        temp_block = get_largest(temp_block, event.blockNumber)
 
                     for event in window_filter.get_new_entries():
                         ws.send(
@@ -79,7 +82,7 @@ def init_websockets(app):
                                 'block_number': event.blockNumber,
                                 'txhash': event.transactionHash.hex(),
                             }))
-                        temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
+                        temp_block = get_largest(temp_block, event.blockNumber)
 
                     for event in bounty_filter.get_new_entries():
                         ws.send(
@@ -89,7 +92,7 @@ def init_websockets(app):
                                 'block_number': event.blockNumber,
                                 'txhash': event.transactionHash.hex(),
                             }))
-                        temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
+                        temp_block = get_largest(temp_block, event.blockNumber)
 
                     for event in assertion_filter.get_new_entries():
                         ws.send(
@@ -99,7 +102,7 @@ def init_websockets(app):
                                 'block_number': event.blockNumber,
                                 'txhash': event.transactionHash.hex(),
                             }))
-                        temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
+                        temp_block = get_largest(temp_block, event.blockNumber)
 
                     for event in reveal_filter.get_new_entries():
                         ws.send(
@@ -109,7 +112,7 @@ def init_websockets(app):
                                 'block_number': event.blockNumber,
                                 'txhash': event.transactionHash.hex(),
                             }))
-                        temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
+                        temp_block = get_largest(temp_block, event.blockNumber)
 
                     for event in vote_filter.get_new_entries():
                         ws.send(
@@ -119,7 +122,7 @@ def init_websockets(app):
                                 'block_number': event.blockNumber,
                                 'txhash': event.transactionHash.hex(),
                             }))
-                        temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
+                        temp_block = get_largest(temp_block, event.blockNumber)
 
                     for event in quorum_filiter.get_new_entries():
                         ws.send(
@@ -129,7 +132,7 @@ def init_websockets(app):
                                 'block_number': event.blockNumber,
                                 'txhash': event.transactionHash.hex(),
                             }))
-                        temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
+                        temp_block = get_largest(temp_block, event.blockNumber)
 
                     for event in settled_filter.get_new_entries():
                         ws.send(
@@ -139,7 +142,7 @@ def init_websockets(app):
                                 'block_number': event.blockNumber,
                                 'txhash': event.transactionHash.hex(),
                             }))
-                        temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
+                        temp_block = get_largest(temp_block, event.blockNumber)
 
                     if init_filter is not None:
                         for event in init_filter.get_new_entries():
@@ -150,18 +153,17 @@ def init_websockets(app):
                                     'block_number': event.blockNumber,
                                     'txhash': event.transactionHash.hex(),
                                 }))
-                            temp_block = event.blockNumber if event.blockNumber > temp_block else temp_block
+                            temp_block = get_largest(temp_block, event.blockNumber)
 
-                    for _ in block_filter.get_new_entries():
+                    for event in block_filter.get_new_entries():
                         ws.send(
                             json.dumps({
                                 'event': 'block',
                                 'data': {
-                                    'number': g.chain.w3.eth.blockNumber,
+                                    'number': event.blockNumber,
                                 },
                             }))
-                        temp_block = g.chain.w3.eth.blockNumber if g.chain.w3.eth.blockNumber > temp_block else \
-                            temp_block
+                        temp_block = get_largest(temp_block, event.blockNumber)
 
                     if temp_block > latest_block:
                         latest_block = temp_block

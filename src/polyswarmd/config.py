@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 import yaml
 from consul import Consul
 from consul.base import Timeout
-from web3 import Web3, HTTPProvider
+from web3 import Web3, WebsocketProvider
 from web3.exceptions import MismatchedABI
 from web3.middleware import geth_poa_middleware
 
@@ -172,7 +172,7 @@ class ChainConfig(object):
         eth_uri = config.get('eth_uri')
         chain_id = config.get('chain_id')
         free = config.get('free', False)
-        w3 = Web3(HTTPProvider(eth_uri))
+        w3 = Web3(WebsocketProvider(eth_uri))
         w3.middleware_stack.inject(geth_poa_middleware, layer=0)
 
         contract_configs = {}
@@ -206,7 +206,7 @@ class ChainConfig(object):
         eth_uri = config.get('eth_uri')
         chain_id = config.get('chain_id')
         free = config.get('free', False)
-        w3 = Web3(HTTPProvider(eth_uri))
+        w3 = Web3(WebsocketProvider(eth_uri))
         w3.middleware_stack.inject(geth_poa_middleware, layer=0)
 
         # TODO schema check json
