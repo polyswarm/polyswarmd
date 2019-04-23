@@ -38,7 +38,7 @@ def init_websockets(app):
         while not ws.closed:
             try:
                 if not filters_initialized:
-                    from_block = "latest" if latest_block == 0 else latest_block
+                    from_block = "latest" if latest_block == 0 else latest_block + 1
                     block_filter = g.chain.w3.eth.filter(from_block)
                     fee_filter = g.chain.bounty_registry.contract.eventFilter('FeesUpdated', {'fromBlock': from_block})
                     window_filter = g.chain.bounty_registry.contract.eventFilter('WindowsUpdated',
