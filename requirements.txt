@@ -14,7 +14,6 @@ python-json-logger==0.1.9
 requests==2.20.1
 requests-futures==0.9.9
 requests-mock==1.5.0
-sqlalchemy==1.2.17
 web3==4.8.1
 websocket-client==0.48.0
 Werkzeug==0.14.1
