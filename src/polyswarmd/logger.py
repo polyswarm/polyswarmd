@@ -41,19 +41,14 @@ class LoggerConfig:
         logger.setLevel(self.log_level)
         logger.log(self.log_level, f'Changed log level')
 
-    def __signal_handler(self, signum, _frame):
-        logger = logging.getLogger()
-        if signum == signal.SIGUSR1:
-            try:
-                cur_index = self.LEVELS.index(self.log_level)
-            except ValueError:
-                raise ValueError('Invalid logging level')
+    def __signal_handler(self, _signum, _frame):
+        try:
+            cur_index = self.LEVELS.index(self.log_level)
+        except ValueError:
+            raise ValueError('Invalid logging level')
 
-            index = 0 if cur_index == len(self.LEVELS) - 1 else cur_index + 1
-            self.set_level(self.LEVELS[index])
-        else:
-            logger.warning('Unrecognized signal trapped, ignoring')
-            return
+        index = 0 if cur_index == len(self.LEVELS) - 1 else cur_index + 1
+        self.set_level(self.LEVELS[index])
 
 
 class PolyswarmdJsonFormatter(jsonlogger.JsonFormatter):
