@@ -2,7 +2,7 @@ image: docker:stable
 
 stages:
   - build
-  - test
+  - e2e
   - deploy
   - release
 
@@ -18,7 +18,7 @@ kick-e2e:
     # FIXME in place while e2e chokes on tags
     except:
       - tags
-    stage: test
+    stage: e2e
     script:
       - set -e
 
