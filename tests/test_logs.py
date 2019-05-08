@@ -19,10 +19,9 @@ def test_init_logging_json():
     logger = logging.getLogger()
     # act
     init_logging('json', logging.INFO)
-    logger.warning('asdf')
     # assert
     assert logger.level == logging.INFO
-    assert any([not isinstance(handler, PolyswarmdJsonFormatter) for handler in logger.handlers])
+    assert any([isinstance(handler.formatter, PolyswarmdJsonFormatter) for handler in logger.handlers])
 
 
 def test_logger_config_configure():
