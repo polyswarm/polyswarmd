@@ -18,7 +18,7 @@ kick-e2e:
     # FIXME in place while e2e chokes on tags
     except:
       - tags
-    stage: deploy
+    stage: test
     script:
       - set -e
 
@@ -50,6 +50,18 @@ kick-e2e:
           echo "failure further down the pipeline"
           exit 1
         fi
+
+builddock:
+  stage: deploy
+  only:
+    - master
+    - feature/docker-build
+  script:
+    - docker build -t polyswarm/polyswarmd:latest -t polyswarm/polyswarmd:$CI_COMMIT_SHA --label git_commit_id=$CI_COMMIT_SHA -f docker/Dockerfile .
+    - docker login -u $CI_CUSTOM_DOCKER_HUB_USERNAME -p $CI_CUSTOM_DOCKER_HUB_PASSWORD
+    - docker push polyswarm/polyswarmd:latest
+    - docker push polyswarm/polyswarmd:$CI_COMMIT_SHA
+
 
 release:
     tags:
