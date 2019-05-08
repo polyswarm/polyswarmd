@@ -29,12 +29,12 @@ class LoggerConfig:
             logger.addHandler(log_handler)
             logger.setLevel(self.log_level)
             logger.info("Logging in JSON format.")
-        else:
+        elif not logger.handlers:
             # logger.handlers will have a value during pytest
-            if not logger.handlers:
-                logging.basicConfig(level=self.log_level)
-            else:
-                logger.setLevel(self.log_level)
+            logging.basicConfig(level=self.log_level)
+            logger.info("Logging in text format.")
+        else:
+            logger.setLevel(self.log_level)
             logger.info("Logging in text format.")
 
         signal.signal(signal.SIGUSR1, self.__signal_handler)
