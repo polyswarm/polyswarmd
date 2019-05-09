@@ -59,6 +59,10 @@ def post_bounties():
     schema = {
         'type': 'object',
         'properties': {
+            'artifact_type': {
+                'type': 'string',
+                'enum': ['file', 'url']
+            },
             'amount': {
                 'type': 'string',
                 'minLength': 1,
@@ -75,7 +79,7 @@ def post_bounties():
                 'minimum': 1,
             },
         },
-        'required': ['amount', 'uri', 'duration'],
+        'required': ['required', 'amount', 'uri', 'duration'],
     }
 
     body = request.get_json()
@@ -85,33 +89,35 @@ def post_bounties():
         return failure('Invalid JSON: ' + e.message, 400)
 
     guid = uuid.uuid4()
+    artifact_type = body['artifact_type']
     amount = int(body['amount'])
-    artifactURI = body['uri']
-    durationBlocks = body['duration']
+    artifact_uri = body['uri']
+    duration_blocks = body['duration']
 
     if amount < eth.bounty_amount_min(g.chain.bounty_registry.contract):
         return failure('Invalid bounty amount', 400)
 
-    if not is_valid_ipfshash(artifactURI):
+    if not is_valid_ipfshash(artifact_uri):
         return failure('Invalid artifact URI (should be IPFS hash)', 400)
 
-    arts = list_artifacts(artifactURI)
+    arts = list_artifacts(artifact_uri)
     if not arts:
         return failure('Invalid artifact URI (could not retrieve artifacts)',
                        400)
 
-    numArtifacts = len(arts)
+    num_artifacts = len(arts)
     bloom = calculate_bloom(arts)
 
-    approveAmount = amount + eth.bounty_fee(g.chain.bounty_registry.contract)
+    approve_amount = amount + eth.bounty_fee(g.chain.bounty_registry.contract)
 
     transactions = [
         build_transaction(
-            g.chain.nectar_token.contract.functions.approve(g.chain.bounty_registry.contract.address, approveAmount),
+            g.chain.nectar_token.contract.functions.approve(g.chain.bounty_registry.contract.address, approve_amount),
             base_nonce),
         build_transaction(
-            g.chain.bounty_registry.contract.functions.postBounty(guid.int, amount, artifactURI, numArtifacts,
-                                                                  durationBlocks, bloom), base_nonce + 1),
+            g.chain.bounty_registry.contract.functions.postBounty(guid.int, artifact_type, amount, artifact_uri,
+                                                                  num_artifacts, duration_blocks, bloom),
+            base_nonce + 1),
     ]
 
     return success({'transactions': transactions})
