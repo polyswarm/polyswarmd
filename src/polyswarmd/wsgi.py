@@ -21,5 +21,6 @@ def app(*args, **kwargs):
     init_logging(log_format, log_level)
 
     from polyswarmd import app as application
+
     logger.critical("polyswarmd is ready!")
     return application
