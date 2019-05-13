@@ -4,6 +4,8 @@ import os
 
 from polyswarmd.logger import init_logging
 
+logger = logging.getLogger(__name__)
+
 
 def app(*args, **kwargs):
     # Can't directly pass command line arguments via gunicorn, but can pass arguments to callable
