@@ -79,7 +79,7 @@ def post_bounties():
                 'minimum': 1,
             },
         },
-        'required': ['required', 'amount', 'uri', 'duration'],
+        'required': ['artifact_type', 'amount', 'uri', 'duration'],
     }
 
     body = request.get_json()
