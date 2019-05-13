@@ -7,6 +7,8 @@ from geventwebsocket.handler import WebSocketHandler
 
 from polyswarmd.logger import init_logging
 
+logger = logging.getLogger(__name__)
+
 
 @click.command()
 @click.option('--log-format', envvar='LOG_FORMAT', default='text', help='Logging format')
@@ -23,6 +25,8 @@ def main(log_format, log_level, host, port):
 
     from polyswarmd import app
     server = pywsgi.WSGIServer((host, port), app, handler_class=WebSocketHandler)
+
+    logger.critical("polyswarmd is ready!")
     server.serve_forever()
 
 

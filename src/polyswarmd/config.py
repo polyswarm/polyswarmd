@@ -357,8 +357,6 @@ class Config(object):
         t = threading.Thread(target=watch_for_config_deletion, args=(consul_client, base_key))
         t.start()
 
-        logger.critical("polyswarmd is ready!")
-
         return ret
 
     @classmethod
