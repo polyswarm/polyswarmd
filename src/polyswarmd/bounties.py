@@ -6,6 +6,7 @@ import uuid
 from ethereum.utils import sha3
 from flask import Blueprint, g, request
 from jsonschema.exceptions import ValidationError
+from polyswarmartifact import ArtifactType
 
 from polyswarmd import eth
 from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts
@@ -61,7 +62,7 @@ def post_bounties():
         'properties': {
             'artifact_type': {
                 'type': 'string',
-                'enum': ['file', 'url']
+                'enum': [name.lower() for name, value in ArtifactType.__members__.items()]
             },
             'amount': {
                 'type': 'string',
@@ -89,7 +90,7 @@ def post_bounties():
         return failure('Invalid JSON: ' + e.message, 400)
 
     guid = uuid.uuid4()
-    artifact_type = body['artifact_type']
+    artifact_type = ArtifactType.from_string(body['artifact_type'])
     amount = int(body['amount'])
     artifact_uri = body['uri']
     duration_blocks = body['duration']
@@ -115,7 +116,7 @@ def post_bounties():
             g.chain.nectar_token.contract.functions.approve(g.chain.bounty_registry.contract.address, approve_amount),
             base_nonce),
         build_transaction(
-            g.chain.bounty_registry.contract.functions.postBounty(guid.int, artifact_type, amount, artifact_uri,
+            g.chain.bounty_registry.contract.functions.postBounty(guid.int, artifact_type.value, amount, artifact_uri,
                                                                   num_artifacts, duration_blocks, bloom),
             base_nonce + 1),
     ]

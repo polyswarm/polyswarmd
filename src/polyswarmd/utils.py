@@ -6,6 +6,8 @@ import uuid
 from typing import AnyStr, Union
 
 from flask import g
+from polyswarmartifact import ArtifactType
+
 from polyswarmd.eth import ZERO_ADDRESS
 
 logger = logging.getLogger(__name__)
@@ -34,7 +36,7 @@ def uint256_list_to_hex_string(us):
 def bounty_to_dict(bounty):
     return {
         'guid': str(uuid.UUID(int=bounty[0])),
-        'artifact_type': bounty[1],
+        'artifact_type': ArtifactType.to_string(ArtifactType(bounty[1])),
         'author': bounty[2],
         'amount': str(bounty[3]),
         'uri': bounty[4],
@@ -70,7 +72,7 @@ def window_update_event_to_dict(window_update_event):
 def new_bounty_event_to_dict(new_bounty_event):
     return {
         'guid': str(uuid.UUID(int=new_bounty_event.guid)),
-        'artifact_type': str(new_bounty_event.artifactType),
+        'artifact_type': ArtifactType.to_string(ArtifactType(new_bounty_event.artifactType)),
         'author': new_bounty_event.author,
         'amount': str(new_bounty_event.amount),
         'uri': new_bounty_event.artifactURI,

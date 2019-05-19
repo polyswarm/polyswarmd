@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 def parse_requirements():
     with open('requirements.txt', 'r') as f:
-        return [r for r in f.read().splitlines() if not r.startswith('git')]
+        return [r for r in f.read().splitlines() if not r.startswith('git') and not r.startswith('.')]
 
 setup(name='polyswarmd',
       version='0.3',
