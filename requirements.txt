@@ -19,4 +19,4 @@ websocket-client==0.48.0
 Werkzeug==0.14.1
 rlp==1.1.0
 git+https://github.com/polyswarm/flask-profiler.git@profile-stats#egg=flask_profiler
-polyswarm-artifact==0.1.0
+polyswarm-artifact==1.0.0
