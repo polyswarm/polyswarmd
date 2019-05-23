@@ -222,7 +222,7 @@ def build_transaction(call, nonce):
         gas = int(call.estimateGas({'from': g.eth_address, **options}) * GAS_MULTIPLIER)
         options['gas'] = min(MAX_GAS_LIMIT, gas)
     except ValueError as e:
-        logger.warning('Error estimating gas, using default: %s', e)
+        logger.debug('Error estimating gas, using default: %s', e)
 
     logger.info('options: %s', options)
 
