@@ -58,10 +58,11 @@ def download_and_verify_metadata(session, config, ipfs_uri):
         future = session.get(config.ipfs_uri + '/api/v0/cat', params={'arg': ipfs_uri}, timeout=1)
         r = future.result()
         try:
-            r.raise_for_status()
-            content = json.loads(r.text)
-            if AssertionMetadata.validate(content):
-                return content
+            if r.status_code // 100 == 2:
+                content = json.loads(r.text)
+                return content if AssertionMetadata.validate(content) else None
+            else:
+                logger.critical(f'Got {r.status_code} from ipfs with uri {ipfs_uri}')
         except json.JSONDecodeError:
             logger.exception('Metadata retrieved from IPFS does not match schema')
         except Exception:
@@ -240,8 +241,8 @@ def post_assertion_metadata():
     try:
         if not AssertionMetadata.validate(json.loads(body)):
             return failure('Invalid AssertionMetadata', 400)
-    except json.JSONDecodeError as e:
-        logger.exception(f'Invalid JSON: {e.message}')
+    except json.JSONDecodeError:
+        logger.exception(f'Invalid JSON')
 
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
@@ -253,13 +254,13 @@ def post_assertion_metadata():
             files=[('metadata', body)],
             params={'wrap-with-directory': False})
         r = future.result()
-        r.raise_for_status()
+        if r.status_code // 100 == 2:
+            ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
+            return success(ipfshash)
     except Exception:
         logger.exception('Received error posting to IPFS got response: %s', r.content if r is not None else 'None')
-        return failure('Could not add metadata to IPFS', 400)
 
-    ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
-    return success(ipfshash)
+    return failure('Could not add metadata to IPFS', 400)
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['POST'])
