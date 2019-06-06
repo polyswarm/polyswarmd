@@ -53,7 +53,14 @@ def calculate_commitment(account, verdicts):
     return int_from_bytes(nonce), int_from_bytes(commitment)
 
 
-def download_and_verify_metadata(session, config, ipfs_uri):
+def fetch_ipfs_metadata(session, config, ipfs_uri):
+    """Download metadata from IPFS and validate it against the schema.
+
+    :param session: Requests session
+    :param config: Flask config object
+    :param ipfs_uri: Porential IPFS uri string
+    :return: Metadata from IPFS, or original metadata
+    """
     if not is_valid_ipfshash(ipfs_uri):
         return None
 
@@ -62,10 +69,10 @@ def download_and_verify_metadata(session, config, ipfs_uri):
         r = future.result()
         if r.status_code // 100 != 2:
             logger.critical(f'Got {r.status_code} from ipfs with uri {ipfs_uri}')
-            return None
+            return ipfs_uri
 
         content = json.loads(r.text)
-        return content if AssertionMetadata.validate(content) else None
+        return content if AssertionMetadata.validate(content) else ipfs_uri
     except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
         logger.warning('Metadata retrieved from IPFS does not match schema')
@@ -73,7 +80,7 @@ def download_and_verify_metadata(session, config, ipfs_uri):
         logger.exception('Received error retrieving files from IPFS, got response: %s',
                          r.content if r is not None else 'None')
 
-    return None
+    return ipfs_uri
 
 
 @bounties.route('', methods=['POST'])
@@ -413,10 +420,7 @@ def get_bounties_guid_assertions(guid):
             assertion = assertion_to_dict(
                 g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, i).call(),
                 bounty['num_artifacts'])
-            metadata = download_and_verify_metadata(session, config, assertion.get('metadata', ''))
-            if metadata is not None:
-                assertion['metadata_uri'] = assertion.get('metadata', '')
-                assertion['metadata'] = metadata
+            assertion['metadata'] = fetch_ipfs_metadata(session, config, assertion.get('metadata', ''))
             assertions.append(assertion)
         except Exception:
             logger.exception('Could not retrieve assertion')
@@ -439,10 +443,7 @@ def get_bounties_guid_assertions_id(guid, id_):
     try:
         assertion = assertion_to_dict(g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, id_).call(),
                                       bounty['num_artifacts'])
-        metadata = download_and_verify_metadata(session, config, assertion.get('metadata', ''))
-        if metadata is not None:
-            assertion['metadata_uri'] = assertion.get('metadata', '')
-            assertion['metadata'] = metadata
+        assertion['metadata'] = fetch_ipfs_metadata(session, config, assertion.get('metadata', ''))
 
         return success(assertion)
     except:

@@ -8,7 +8,7 @@ from geventwebsocket import WebSocketError
 from jsonschema.exceptions import ValidationError
 from requests.exceptions import ConnectionError
 
-from polyswarmd.bounties import download_and_verify_metadata
+from polyswarmd.bounties import fetch_ipfs_metadata
 from polyswarmd.chains import chain
 from polyswarmd.utils import *
 
@@ -96,9 +96,7 @@ def init_websockets(app):
                         'block_number': event.blockNumber,
                         'txhash': event.transactionHash.hex(),
                     }
-                    metadata = download_and_verify_metadata(session, config, reveal['data'].get('metadata', ''))
-                    if metadata is not None:
-                        reveal['data']['metadata'] = json.dumps(metadata)
+                    reveal['data']['metadata'] = fetch_ipfs_metadata(session, config, reveal['data'].get('metadata', ''))
 
                     ws.send(json.dumps(reveal))
 
