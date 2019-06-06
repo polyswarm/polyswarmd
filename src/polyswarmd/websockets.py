@@ -20,9 +20,6 @@ def init_websockets(app):
     start_time = time.time()
     message_sockets = dict()
 
-    config = app.config['POLYSWARMD']
-    session = app.config['REQUESTS_SESSION']
-
     @sockets.route('/events')
     @chain(account_required=False)
     def events(ws):
@@ -96,7 +93,7 @@ def init_websockets(app):
                         'block_number': event.blockNumber,
                         'txhash': event.transactionHash.hex(),
                     }
-                    reveal['data']['metadata'] = substitute_ipfs_metadata(session, config, reveal['data'].get('metadata', ''))
+                    reveal['data']['metadata'] = substitute_ipfs_metadata(reveal['data'].get('metadata', ''))
 
                     ws.send(json.dumps(reveal))
 

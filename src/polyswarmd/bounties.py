@@ -4,14 +4,13 @@ import os
 import jsonschema
 import uuid
 
-import requests
 from ethereum.utils import sha3
 from flask import Blueprint, g, request
 from jsonschema.exceptions import ValidationError
 from polyswarmartifact import ArtifactType
 from polyswarmartifact.schema.assertion import Assertion as AssertionMetadata
 
-from polyswarmd import eth, app, cache
+from polyswarmd import eth, cache
 from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts, post_to_ipfs, get_from_ipfs
 from polyswarmd.chains import chain
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
@@ -54,11 +53,9 @@ def calculate_commitment(account, verdicts):
     return int_from_bytes(nonce), int_from_bytes(commitment)
 
 
-def substitute_ipfs_metadata(session, config, ipfs_uri):
+def substitute_ipfs_metadata(ipfs_uri):
     """Download metadata from IPFS and validate it against the schema.
 
-    :param session: Requests session
-    :param config: Flask config object
     :param ipfs_uri: Porential IPFS uri string
     :return: Metadata from IPFS, or original metadata
     """
@@ -66,15 +63,14 @@ def substitute_ipfs_metadata(session, config, ipfs_uri):
         return ipfs_uri
 
     status_code, content = get_from_ipfs(ipfs_uri)
-    if status_code // 100 != 2:
-        return ipfs_uri
-
     try:
-        content = json.loads(content.decode('utf-8'))
-        return content if AssertionMetadata.validate(content) else ipfs_uri
+        if status_code // 100 == 2 and AssertionMetadata.validate(json.loads(content.decode('utf-8'))):
+            return json.loads(content.decode('utf-8'))
     except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
         logger.warning('Metadata retrieved from IPFS does not match schema')
+    except Exception:
+        logger.exception('Error getting metadata from IPFS')
 
     return ipfs_uri
 
@@ -393,9 +389,6 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 @cache.memoize(30)
 @chain
 def get_bounties_guid_assertions(guid):
-    config = app.config['POLYSWARMD']
-    session = app.config['REQUESTS_SESSION']
-
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
     if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
@@ -408,7 +401,7 @@ def get_bounties_guid_assertions(guid):
             assertion = assertion_to_dict(
                 g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, i).call(),
                 bounty['num_artifacts'])
-            assertion['metadata'] = substitute_ipfs_metadata(session, config, assertion.get('metadata', ''))
+            assertion['metadata'] = substitute_ipfs_metadata(assertion.get('metadata', ''))
             assertions.append(assertion)
         except Exception:
             logger.exception('Could not retrieve assertion')
@@ -421,9 +414,6 @@ def get_bounties_guid_assertions(guid):
 @cache.memoize(30)
 @chain
 def get_bounties_guid_assertions_id(guid, id_):
-    config = app.config['POLYSWARMD']
-    session = app.config['REQUESTS_SESSION']
-
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
     if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
@@ -431,7 +421,7 @@ def get_bounties_guid_assertions_id(guid, id_):
     try:
         assertion = assertion_to_dict(g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, id_).call(),
                                       bounty['num_artifacts'])
-        assertion['metadata'] = substitute_ipfs_metadata(session, config, assertion.get('metadata', ''))
+        assertion['metadata'] = substitute_ipfs_metadata(assertion.get('metadata', ''))
 
         return success(assertion)
     except:
