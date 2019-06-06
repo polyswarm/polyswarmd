@@ -1,15 +1,14 @@
 import gevent
 import json
 import jsonschema
-import logging
 import time
 
-from jsonschema.exceptions import ValidationError
-from flask import g
 from flask_sockets import Sockets
 from geventwebsocket import WebSocketError
+from jsonschema.exceptions import ValidationError
 from requests.exceptions import ConnectionError
 
+from polyswarmd.bounties import substitute_ipfs_metadata
 from polyswarmd.chains import chain
 from polyswarmd.utils import *
 
@@ -88,13 +87,15 @@ def init_websockets(app):
                         }))
 
                 for event in reveal_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'reveal',
-                            'data': revealed_assertion_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
+                    reveal = {
+                        'event': 'reveal',
+                        'data': revealed_assertion_event_to_dict(event.args),
+                        'block_number': event.blockNumber,
+                        'txhash': event.transactionHash.hex(),
+                    }
+                    reveal['data']['metadata'] = substitute_ipfs_metadata(reveal['data'].get('metadata', ''))
+
+                    ws.send(json.dumps(reveal))
 
                 for event in vote_filter.get_new_entries():
                     ws.send(

@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import jsonschema
@@ -7,9 +8,10 @@ from ethereum.utils import sha3
 from flask import Blueprint, g, request
 from jsonschema.exceptions import ValidationError
 from polyswarmartifact import ArtifactType
+from polyswarmartifact.schema.assertion import Assertion as AssertionMetadata
 
-from polyswarmd import eth
-from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts
+from polyswarmd import eth, cache
+from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts, post_to_ipfs, get_from_ipfs
 from polyswarmd.chains import chain
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
 from polyswarmd.eth import build_transaction, ZERO_ADDRESS
@@ -49,6 +51,28 @@ def calculate_commitment(account, verdicts):
     account = int(account, 16)
     commitment = sha3(int_to_bytes(verdicts ^ int_from_bytes(sha3(nonce)) ^ account))
     return int_from_bytes(nonce), int_from_bytes(commitment)
+
+
+def substitute_ipfs_metadata(ipfs_uri):
+    """Download metadata from IPFS and validate it against the schema.
+
+    :param ipfs_uri: Porential IPFS uri string
+    :return: Metadata from IPFS, or original metadata
+    """
+    if not is_valid_ipfshash(ipfs_uri):
+        return ipfs_uri
+
+    status_code, content = get_from_ipfs(ipfs_uri)
+    try:
+        if status_code // 100 == 2 and AssertionMetadata.validate(json.loads(content.decode('utf-8'))):
+            return json.loads(content.decode('utf-8'))
+    except json.JSONDecodeError:
+        # Expected when people provide incorrect metadata. Not stack worthy
+        logger.warning('Metadata retrieved from IPFS does not match schema')
+    except Exception:
+        logger.exception('Error getting metadata from IPFS')
+
+    return ipfs_uri
 
 
 @bounties.route('', methods=['POST'])
@@ -213,6 +237,26 @@ def post_bounties_guid_settle(guid):
     return success({'transactions': transactions})
 
 
+@bounties.route('/metadata', methods=['POST'])
+def post_assertion_metadata():
+    body = request.get_json()
+
+    try:
+        if not AssertionMetadata.validate(json.loads(body)):
+            return failure('Invalid Assertion metadata', 400)
+    except json.JSONDecodeError:
+        # Expected when people provide incorrect metadata. Not stack worthy
+        return failure('Invalid Assertion metadata', 400)
+
+    try:
+        status_code, ipfshash = post_to_ipfs([('metadata', body)], wrap_dir=False)
+        return success(ipfshash) if status_code // 100 == 2 else failure('Could not add metadata to IPFS', status_code)
+
+    except Exception:
+        logger.exception('Received error posting to IPFS got response')
+        return failure('Could not add metadata to ipfs', 400)
+
+
 @bounties.route('/<uuid:guid>/assertions', methods=['POST'])
 @chain
 def post_bounties_guid_assertions(guid):
@@ -342,6 +386,7 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['GET'])
+@cache.memoize(30)
 @chain
 def get_bounties_guid_assertions(guid):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
@@ -356,6 +401,7 @@ def get_bounties_guid_assertions(guid):
             assertion = assertion_to_dict(
                 g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, i).call(),
                 bounty['num_artifacts'])
+            assertion['metadata'] = substitute_ipfs_metadata(assertion.get('metadata', ''))
             assertions.append(assertion)
         except Exception:
             logger.exception('Could not retrieve assertion')
@@ -365,6 +411,7 @@ def get_bounties_guid_assertions(guid):
 
 
 @bounties.route('/<uuid:guid>/assertions/<int:id_>', methods=['GET'])
+@cache.memoize(30)
 @chain
 def get_bounties_guid_assertions_id(guid, id_):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
@@ -374,6 +421,8 @@ def get_bounties_guid_assertions_id(guid, id_):
     try:
         assertion = assertion_to_dict(g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, id_).call(),
                                       bounty['num_artifacts'])
+        assertion['metadata'] = substitute_ipfs_metadata(assertion.get('metadata', ''))
+
         return success(assertion)
     except:
         return failure('Assertion not found', 404)
