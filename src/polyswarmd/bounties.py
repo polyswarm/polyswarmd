@@ -12,7 +12,7 @@ from polyswarmartifact import ArtifactType
 from polyswarmartifact.schema.assertion import Assertion as AssertionMetadata
 
 from polyswarmd import eth, app, cache
-from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts, post_to_ipfs
+from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts, post_to_ipfs, get_from_ipfs
 from polyswarmd.chains import chain
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
 from polyswarmd.eth import build_transaction, ZERO_ADDRESS
@@ -65,21 +65,16 @@ def substitute_ipfs_metadata(session, config, ipfs_uri):
     if not is_valid_ipfshash(ipfs_uri):
         return ipfs_uri
 
-    future = session.get(config.ipfs_uri + '/api/v0/cat', params={'arg': ipfs_uri}, timeout=1)
-    try:
-        r = future.result()
-        if r.status_code // 100 != 2:
-            logger.critical(f'Got {r.status_code} from ipfs with uri {ipfs_uri}')
-            return ipfs_uri
+    status_code, content = get_from_ipfs(ipfs_uri)
+    if status_code // 100 != 2:
+        return ipfs_uri
 
-        content = json.loads(r.text)
+    try:
+        content = json.loads(content.decode('utf-8'))
         return content if AssertionMetadata.validate(content) else ipfs_uri
     except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
         logger.warning('Metadata retrieved from IPFS does not match schema')
-    except Exception:
-        logger.exception('Received error retrieving files from IPFS, got response: %s',
-                         r.content if r is not None else 'None')
 
     return ipfs_uri
 

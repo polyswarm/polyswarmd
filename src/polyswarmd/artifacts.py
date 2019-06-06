@@ -79,8 +79,21 @@ def post_to_ipfs(files, wrap_dir=False):
     except requests.exceptions.HTTPError as e:
         return e.response.status_code, None
 
-    ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
-    return 201, success(ipfshash)
+    return 201, json.loads(r.text.splitlines()[-1])['Hash']
+
+
+def get_from_ipfs(ipfs_uri):
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
+
+    try:
+        future = session.get(config.ipfs_uri + '/api/v0/cat', params={'arg': ipfs_uri}, timeout=1)
+        r = future.result()
+        r.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        return e.response.status_code, None
+
+    return 201, r.content
 
 
 @artifacts.route('/status', methods=['GET'])
@@ -134,9 +147,6 @@ def get_artifacts_ipfshash(ipfshash):
 
 @artifacts.route('/<ipfshash>/<int:id_>', methods=['GET'])
 def get_artifacts_ipfshash_id(ipfshash, id_):
-    config = app.config['POLYSWARMD']
-    session = app.config['REQUESTS_SESSION']
-
     if not is_valid_ipfshash(ipfshash):
         return failure('Invalid IPFS hash', 400)
 
@@ -151,17 +161,11 @@ def get_artifacts_ipfshash_id(ipfshash, id_):
     if size > g.user.max_artifact_size:
         return failure('Artifact size greater than maximum allowed')
 
-    r = None
-    try:
-        future = session.get(config.ipfs_uri + '/api/v0/cat', params={'arg': artifact}, timeout=1)
-        r = future.result()
-        r.raise_for_status()
-    except Exception:
-        logger.exception('Received error retrieving files from IPFS, got response: %s',
-                         r.content if r is not None else 'None')
-        return failure('Could not locate IPFS resource', 404)
+    status_code, content = get_from_ipfs(artifact)
+    if status_code // 100 != 2:
+        return failure('Could not locate IPFS resource', status_code)
 
-    return r.content
+    return content
 
 
 @artifacts.route('/<ipfshash>/<int:id_>/stat', methods=['GET'])
