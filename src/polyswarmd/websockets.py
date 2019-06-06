@@ -81,27 +81,26 @@ def init_websockets(app):
                         }))
 
                 for event in assertion_filter.get_new_entries():
-                    assertion = {
-                        'event': 'assertion',
-                        'data': new_assertion_event_to_dict(event.args),
-                        'block_number': event.blockNumber,
-                        'txhash': event.transactionHash.hex(),
-                    }
-                    metadata = download_and_verify_metadata(session, config, assertion.get('metadata', ''))
-                    if metadata is not None:
-                        assertion['metadata_uri'] = assertion.get('metadata', '')
-                        assertion['metadata'] = metadata
-
-                    ws.send(json.dumps(assertion))
-
-                for event in reveal_filter.get_new_entries():
                     ws.send(
                         json.dumps({
-                            'event': 'reveal',
-                            'data': revealed_assertion_event_to_dict(event.args),
+                            'event': 'assertion',
+                            'data': new_assertion_event_to_dict(event.args),
                             'block_number': event.blockNumber,
                             'txhash': event.transactionHash.hex(),
                         }))
+
+                for event in reveal_filter.get_new_entries():
+                    reveal = {
+                        'event': 'reveal',
+                        'data': revealed_assertion_event_to_dict(event.args),
+                        'block_number': event.blockNumber,
+                        'txhash': event.transactionHash.hex(),
+                    }
+                    metadata = download_and_verify_metadata(session, config, reveal['data'].get('metadata', ''))
+                    if metadata is not None:
+                        reveal['data']['metadata'] = json.dumps(metadata)
+
+                    ws.send(json.dumps(reveal))
 
                 for event in vote_filter.get_new_entries():
                     ws.send(
