@@ -64,7 +64,8 @@ def download_and_verify_metadata(session, config, ipfs_uri):
             else:
                 logger.critical(f'Got {r.status_code} from ipfs with uri {ipfs_uri}')
         except json.JSONDecodeError:
-            logger.exception('Metadata retrieved from IPFS does not match schema')
+            # Expected when people provide incorrect metadata. Not stack worthy
+            logger.warning('Metadata retrieved from IPFS does not match schema')
         except Exception:
             logger.exception('Received error retrieving files from IPFS, got response: %s',
                              r.content if r is not None else 'None')
@@ -242,7 +243,9 @@ def post_assertion_metadata():
         if not AssertionMetadata.validate(json.loads(body)):
             return failure('Invalid AssertionMetadata', 400)
     except json.JSONDecodeError:
-        logger.exception(f'Invalid JSON')
+        # Expected when people provide incorrect metadata. Not stack worthy
+        logger.warning(f'Invalid JSON')
+        return failure('Invalid Assertion metadata', 400)
 
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
