@@ -4,6 +4,7 @@ import os
 import jsonschema
 import uuid
 
+import requests
 from ethereum.utils import sha3
 from flask import Blueprint, g, request
 from jsonschema.exceptions import ValidationError
@@ -263,9 +264,10 @@ def post_assertion_metadata():
                               files=[('metadata', body)],
                               params={'wrap-with-directory': False})
         r = future.result()
-        return success(json.loads(r.text.splitlines()[-1])['Hash']) \
-            if r.status_code // 100 == 2 \
-            else failure('Failed to upload to IPFS', r.status_code)
+        r.raise_for_status()
+        return success(json.loads(r.text.splitlines()[-1])['Hash'])
+    except requests.exceptions.HTTPError as e:
+        return failure('Failed to upload to IPFS', e.response.status_code)
     except Exception:
         logger.exception('Received error posting to IPFS got response: %s', r.content if r is not None else 'None')
         return failure('Could not add metadata to IPFS', 400)
