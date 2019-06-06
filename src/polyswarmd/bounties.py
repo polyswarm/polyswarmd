@@ -62,7 +62,7 @@ def fetch_ipfs_metadata(session, config, ipfs_uri):
     :return: Metadata from IPFS, or original metadata
     """
     if not is_valid_ipfshash(ipfs_uri):
-        return None
+        return ipfs_uri
 
     future = session.get(config.ipfs_uri + '/api/v0/cat', params={'arg': ipfs_uri}, timeout=1)
     try:
@@ -254,7 +254,11 @@ def post_assertion_metadata():
     try:
         if not AssertionMetadata.validate(json.loads(body)):
             return failure('Invalid Assertion metadata', 400)
+    except json.JSONDecodeError:
+        # Expected when people provide incorrect metadata. Not stack worthy
+        return failure('Invalid Assertion metadata', 400)
 
+    try:
         future = session.post(f'{config.ipfs_uri}/api/v0/add',
                               files=[('metadata', body)],
                               params={'wrap-with-directory': False})
@@ -262,10 +266,6 @@ def post_assertion_metadata():
         return success(json.loads(r.text.splitlines()[-1])['Hash']) \
             if r.status_code // 100 == 2 \
             else failure('Failed to upload to IPFS', r.status_code)
-
-    except json.JSONDecodeError:
-        # Expected when people provide incorrect metadata. Not stack worthy
-        return failure('Invalid Assertion metadata', 400)
     except Exception:
         logger.exception('Received error posting to IPFS got response: %s', r.content if r is not None else 'None')
         return failure('Could not add metadata to IPFS', 400)
