@@ -54,7 +54,7 @@ def calculate_commitment(account, verdicts):
     return int_from_bytes(nonce), int_from_bytes(commitment)
 
 
-def fetch_ipfs_metadata(session, config, ipfs_uri):
+def substitute_ipfs_metadata(session, config, ipfs_uri):
     """Download metadata from IPFS and validate it against the schema.
 
     :param session: Requests session
@@ -413,7 +413,7 @@ def get_bounties_guid_assertions(guid):
             assertion = assertion_to_dict(
                 g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, i).call(),
                 bounty['num_artifacts'])
-            assertion['metadata'] = fetch_ipfs_metadata(session, config, assertion.get('metadata', ''))
+            assertion['metadata'] = substitute_ipfs_metadata(session, config, assertion.get('metadata', ''))
             assertions.append(assertion)
         except Exception:
             logger.exception('Could not retrieve assertion')
@@ -436,7 +436,7 @@ def get_bounties_guid_assertions_id(guid, id_):
     try:
         assertion = assertion_to_dict(g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, id_).call(),
                                       bounty['num_artifacts'])
-        assertion['metadata'] = fetch_ipfs_metadata(session, config, assertion.get('metadata', ''))
+        assertion['metadata'] = substitute_ipfs_metadata(session, config, assertion.get('metadata', ''))
 
         return success(assertion)
     except:
