@@ -6,6 +6,7 @@ import datetime
 import logging
 
 from flask import Flask, g, request
+from flask_caching import Cache
 from requests_futures.sessions import FuturesSession
 
 from polyswarmd.config import Config, is_service_reachable
@@ -19,6 +20,8 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['POLYSWARMD'] = Config.auto()
 app.config['REQUESTS_SESSION'] = FuturesSession(adapter_kwargs={'max_retries': 5})
+
+cache = Cache(config={"CACHE_TYPE": "simple", "CACHE_DEFAULT_TIMEOUT": 30})
 
 install_error_handlers(app)
 
@@ -44,6 +47,7 @@ app.register_blueprint(staking, url_prefix='/staking')
 
 init_websockets(app)
 setup_profiler(app)
+cache.init_app(app)
 
 AUTH_WHITELIST = {'/status', '/relay/withdrawal', '/transactions'}
 

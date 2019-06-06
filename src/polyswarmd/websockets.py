@@ -1,15 +1,14 @@
 import gevent
 import json
 import jsonschema
-import logging
 import time
 
-from jsonschema.exceptions import ValidationError
-from flask import g
 from flask_sockets import Sockets
 from geventwebsocket import WebSocketError
+from jsonschema.exceptions import ValidationError
 from requests.exceptions import ConnectionError
 
+from polyswarmd.bounties import download_and_verify_metadata
 from polyswarmd.chains import chain
 from polyswarmd.utils import *
 
@@ -20,6 +19,9 @@ def init_websockets(app):
     sockets = Sockets(app)
     start_time = time.time()
     message_sockets = dict()
+
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
 
     @sockets.route('/events')
     @chain(account_required=False)
@@ -79,13 +81,18 @@ def init_websockets(app):
                         }))
 
                 for event in assertion_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'assertion',
-                            'data': new_assertion_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
+                    assertion = {
+                        'event': 'assertion',
+                        'data': new_assertion_event_to_dict(event.args),
+                        'block_number': event.blockNumber,
+                        'txhash': event.transactionHash.hex(),
+                    }
+                    metadata = download_and_verify_metadata(session, config, assertion.get('metadata', ''))
+                    if metadata is not None:
+                        assertion['metadata_uri'] = assertion.get('metadata', '')
+                        assertion['metadata'] = metadata
+
+                    ws.send(json.dumps(assertion))
 
                 for event in reveal_filter.get_new_entries():
                     ws.send(

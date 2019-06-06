@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import jsonschema
@@ -7,8 +8,9 @@ from ethereum.utils import sha3
 from flask import Blueprint, g, request
 from jsonschema.exceptions import ValidationError
 from polyswarmartifact import ArtifactType
+from polyswarmartifact.schema.assertion import Assertion as AssertionMetadata
 
-from polyswarmd import eth
+from polyswarmd import eth, app, cache
 from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts
 from polyswarmd.chains import chain
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
@@ -49,6 +51,24 @@ def calculate_commitment(account, verdicts):
     account = int(account, 16)
     commitment = sha3(int_to_bytes(verdicts ^ int_from_bytes(sha3(nonce)) ^ account))
     return int_from_bytes(nonce), int_from_bytes(commitment)
+
+
+def download_and_verify_metadata(session, config, ipfs_uri):
+    if is_valid_ipfshash(ipfs_uri):
+        future = session.get(config.ipfs_uri + '/api/v0/cat', params={'arg': ipfs_uri}, timeout=1)
+        r = future.result()
+        try:
+            r.raise_for_status()
+            content = json.loads(r.text)
+            if AssertionMetadata.validate(content):
+                return content
+        except json.JSONDecodeError:
+            logger.exception('Metadata retrieved from IPFS does not match schema')
+        except Exception:
+            logger.exception('Received error retrieving files from IPFS, got response: %s',
+                             r.content if r is not None else 'None')
+
+    return None
 
 
 @bounties.route('', methods=['POST'])
@@ -213,6 +233,35 @@ def post_bounties_guid_settle(guid):
     return success({'transactions': transactions})
 
 
+@bounties.route('/metadata', methods=['POST'])
+def post_assertion_metadata():
+    body = request.get_json()
+
+    try:
+        if not AssertionMetadata.validate(json.loads(body)):
+            return failure('Invalid AssertionMetadata', 400)
+    except json.JSONDecodeError as e:
+        logger.exception(f'Invalid JSON: {e.message}')
+
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
+
+    r = None
+    try:
+        future = session.post(
+            config.ipfs_uri + '/api/v0/add',
+            files=[('metadata', body)],
+            params={'wrap-with-directory': False})
+        r = future.result()
+        r.raise_for_status()
+    except Exception:
+        logger.exception('Received error posting to IPFS got response: %s', r.content if r is not None else 'None')
+        return failure('Could not add metadata to IPFS', 400)
+
+    ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
+    return success(ipfshash)
+
+
 @bounties.route('/<uuid:guid>/assertions', methods=['POST'])
 @chain
 def post_bounties_guid_assertions(guid):
@@ -342,8 +391,12 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['GET'])
+@cache.memoize(30)
 @chain
 def get_bounties_guid_assertions(guid):
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
+
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
     if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
@@ -356,6 +409,10 @@ def get_bounties_guid_assertions(guid):
             assertion = assertion_to_dict(
                 g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, i).call(),
                 bounty['num_artifacts'])
+            metadata = download_and_verify_metadata(session, config, assertion.get('metadata', ''))
+            if metadata is not None:
+                assertion['metadata_uri'] = assertion.get('metadata', '')
+                assertion['metadata'] = metadata
             assertions.append(assertion)
         except Exception:
             logger.exception('Could not retrieve assertion')
@@ -365,8 +422,12 @@ def get_bounties_guid_assertions(guid):
 
 
 @bounties.route('/<uuid:guid>/assertions/<int:id_>', methods=['GET'])
+@cache.memoize(30)
 @chain
 def get_bounties_guid_assertions_id(guid, id_):
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
+
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
     if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
@@ -374,6 +435,11 @@ def get_bounties_guid_assertions_id(guid, id_):
     try:
         assertion = assertion_to_dict(g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, id_).call(),
                                       bounty['num_artifacts'])
+        metadata = download_and_verify_metadata(session, config, assertion.get('metadata', ''))
+        if metadata is not None:
+            assertion['metadata_uri'] = assertion.get('metadata', '')
+            assertion['metadata'] = metadata
+
         return success(assertion)
     except:
         return failure('Assertion not found', 404)
