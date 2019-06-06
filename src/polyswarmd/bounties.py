@@ -54,21 +54,24 @@ def calculate_commitment(account, verdicts):
 
 
 def download_and_verify_metadata(session, config, ipfs_uri):
-    if is_valid_ipfshash(ipfs_uri):
-        future = session.get(config.ipfs_uri + '/api/v0/cat', params={'arg': ipfs_uri}, timeout=1)
+    if not is_valid_ipfshash(ipfs_uri):
+        return None
+
+    future = session.get(config.ipfs_uri + '/api/v0/cat', params={'arg': ipfs_uri}, timeout=1)
+    try:
         r = future.result()
-        try:
-            if r.status_code // 100 == 2:
-                content = json.loads(r.text)
-                return content if AssertionMetadata.validate(content) else None
-            else:
-                logger.critical(f'Got {r.status_code} from ipfs with uri {ipfs_uri}')
-        except json.JSONDecodeError:
-            # Expected when people provide incorrect metadata. Not stack worthy
-            logger.warning('Metadata retrieved from IPFS does not match schema')
-        except Exception:
-            logger.exception('Received error retrieving files from IPFS, got response: %s',
-                             r.content if r is not None else 'None')
+        if r.status_code // 100 != 2:
+            logger.critical(f'Got {r.status_code} from ipfs with uri {ipfs_uri}')
+            return None
+
+        content = json.loads(r.text)
+        return content if AssertionMetadata.validate(content) else None
+    except json.JSONDecodeError:
+        # Expected when people provide incorrect metadata. Not stack worthy
+        logger.warning('Metadata retrieved from IPFS does not match schema')
+    except Exception:
+        logger.exception('Received error retrieving files from IPFS, got response: %s',
+                         r.content if r is not None else 'None')
 
     return None
 
@@ -237,33 +240,30 @@ def post_bounties_guid_settle(guid):
 
 @bounties.route('/metadata', methods=['POST'])
 def post_assertion_metadata():
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
     body = request.get_json()
 
     try:
         if not AssertionMetadata.validate(json.loads(body)):
-            return failure('Invalid AssertionMetadata', 400)
+            return failure('Invalid Assertion metadata', 400)
+
+        future = session.post(f'{config.ipfs_uri}/api/v0/add',
+                              files=[('metadata', body)],
+                              params={'wrap-with-directory': False})
+        r = future.result()
+        if r.status_code // 100 != 2:
+            return failure('Failed to upload to IPFS', r.status_code)
+
+        ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
+        return success(ipfshash)
+
     except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
-        logger.warning(f'Invalid JSON')
         return failure('Invalid Assertion metadata', 400)
-
-    config = app.config['POLYSWARMD']
-    session = app.config['REQUESTS_SESSION']
-
-    r = None
-    try:
-        future = session.post(
-            config.ipfs_uri + '/api/v0/add',
-            files=[('metadata', body)],
-            params={'wrap-with-directory': False})
-        r = future.result()
-        if r.status_code // 100 == 2:
-            ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
-            return success(ipfshash)
     except Exception:
         logger.exception('Received error posting to IPFS got response: %s', r.content if r is not None else 'None')
-
-    return failure('Could not add metadata to IPFS', 400)
+        return failure('Could not add metadata to IPFS', 400)
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['POST'])
