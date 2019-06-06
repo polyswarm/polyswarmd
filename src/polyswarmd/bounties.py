@@ -259,11 +259,9 @@ def post_assertion_metadata():
                               files=[('metadata', body)],
                               params={'wrap-with-directory': False})
         r = future.result()
-        if r.status_code // 100 != 2:
-            return failure('Failed to upload to IPFS', r.status_code)
-
-        ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
-        return success(ipfshash)
+        return success(json.loads(r.text.splitlines()[-1])['Hash']) \
+            if r.status_code // 100 == 2 \
+            else failure('Failed to upload to IPFS', r.status_code)
 
     except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
