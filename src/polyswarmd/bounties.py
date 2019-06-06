@@ -12,7 +12,7 @@ from polyswarmartifact import ArtifactType
 from polyswarmartifact.schema.assertion import Assertion as AssertionMetadata
 
 from polyswarmd import eth, app, cache
-from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts
+from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts, post_to_ipfs
 from polyswarmd.chains import chain
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
 from polyswarmd.eth import build_transaction, ZERO_ADDRESS
@@ -248,8 +248,6 @@ def post_bounties_guid_settle(guid):
 
 @bounties.route('/metadata', methods=['POST'])
 def post_assertion_metadata():
-    config = app.config['POLYSWARMD']
-    session = app.config['REQUESTS_SESSION']
     body = request.get_json()
 
     try:
@@ -260,17 +258,14 @@ def post_assertion_metadata():
         return failure('Invalid Assertion metadata', 400)
 
     try:
-        future = session.post(f'{config.ipfs_uri}/api/v0/add',
-                              files=[('metadata', body)],
-                              params={'wrap-with-directory': False})
-        r = future.result()
-        r.raise_for_status()
-        return success(json.loads(r.text.splitlines()[-1])['Hash'])
-    except requests.exceptions.HTTPError as e:
-        return failure('Failed to upload to IPFS', e.response.status_code)
+        status_code, ipfshash = post_to_ipfs([('metadata', body)], wrap_dir=False)
+        if status_code // 100 == 2:
+            return success(ipfshash)
+        else:
+            return failure('Could not add metadata to IPFS', status_code)
     except Exception:
-        logger.exception('Received error posting to IPFS got response: %s', r.content if r is not None else 'None')
-        return failure('Could not add metadata to IPFS', 400)
+        logger.exception('Received error posting to IPFS got response')
+        return failure('Could not add metadata to ipfs', 400)
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['POST'])

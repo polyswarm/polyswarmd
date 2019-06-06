@@ -3,6 +3,7 @@ import logging
 import re
 
 import base58
+import requests
 from flask import current_app as app, g, Blueprint, request
 
 from polyswarmd.response import success, failure
@@ -64,6 +65,24 @@ def list_artifacts(ipfshash):
     return []
 
 
+def post_to_ipfs(files, wrap_dir=False):
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
+
+    try:
+        future = session.post(
+            config.ipfs_uri + '/api/v0/add',
+            files=files,
+            params={'wrap-with-directory': wrap_dir})
+        r = future.result()
+        r.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        return e.response.status_code, None
+
+    ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
+    return 201, success(ipfshash)
+
+
 @artifacts.route('/status', methods=['GET'])
 def get_artifacts_status():
     config = app.config['POLYSWARMD']
@@ -85,7 +104,6 @@ def get_artifacts_status():
 @artifacts.route('', methods=['POST'])
 def post_artifacts():
     config = app.config['POLYSWARMD']
-    session = app.config['REQUESTS_SESSION']
 
     files = [('file', (f.filename, f, 'application/octet-stream')) for f in request.files.getlist(key='file')]
     if not files:
@@ -93,20 +111,11 @@ def post_artifacts():
     if len(files) > config.artifact_limit:
         return failure('Too many artifacts', 400)
 
-    r = None
-    try:
-        future = session.post(
-            config.ipfs_uri + '/api/v0/add',
-            files=files,
-            params={'wrap-with-directory': True})
-        r = future.result()
-        r.raise_for_status()
-    except Exception:
-        logger.exception('Received error posting to IPFS got response: %s', r.content if r is not None else 'None')
-        return failure('Could not add artifacts to IPFS', 400)
-
-    ipfshash = json.loads(r.text.splitlines()[-1])['Hash']
-    return success(ipfshash)
+    status_code, ipfshash = post_to_ipfs(files, wrap_dir=True)
+    if status_code // 100 == 2:
+        return success(ipfshash)
+    else:
+        return failure('Could not add artifacts to IPFS', status_code)
 
 
 @artifacts.route('/<ipfshash>', methods=['GET'])
