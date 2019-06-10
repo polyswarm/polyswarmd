@@ -1,3 +1,4 @@
+import functools
 import json
 import logging
 import os
@@ -53,6 +54,7 @@ def calculate_commitment(account, verdicts):
     return int_from_bytes(nonce), int_from_bytes(commitment)
 
 
+@functools.lru_cache(maxsize=128)
 def substitute_ipfs_metadata(ipfs_uri):
     """Download metadata from IPFS and validate it against the schema.
 
