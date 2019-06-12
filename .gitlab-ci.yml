@@ -25,7 +25,7 @@ build:
   tags:
     - kube
   script:
-    - docker pull $REPO_URL/polyswarmd:latest
+    - docker pull $REPO_URL/polyswarmd:latest || true
     - docker build -t $REPO_URL/polyswarmd:$CI_COMMIT_SHA -f docker/Dockerfile --cache-from=$REPO_URL/polyswarmd:latest .
     - docker push $REPO_URL/polyswarmd:$CI_COMMIT_SHA
 
