@@ -1,20 +1,52 @@
-image: docker:stable
-
-stages:
-  - build
-  - e2e
-  - deploy
-  - release
+image: $REPO_URL/stage
 
 services:
   - docker:dind
 
+stages:
+  - build
+  - test
+  - e2e
+  - release
+  - deployment
+
+variables:
+  DOCKER_HOST: tcp://localhost:2375/
+
 before_script:
   - apk --no-cache add curl jq
 
-kick-e2e:
+###############################################################
+# Build Stage (jobs inside a stage run in parallel)
+###############################################################
+
+build:
+  stage: build
+  tags:
+    - kube
+  script:
+    - docker pull $REPO_URL/polyswarmd:latest || true
+    - docker build -t $REPO_URL/polyswarmd:$CI_COMMIT_SHA -f docker/Dockerfile --cache-from=$REPO_URL/polyswarmd:latest .
+    - docker push $REPO_URL/polyswarmd:$CI_COMMIT_SHA
+
+###############################################################
+# Test Stage
+###############################################################
+
+test:
+  tags:
+    - kube
+  stage: test
+  script:
+    - echo "Still to be implemented"
+
+###############################################################
+# End-to-end Stage
+###############################################################
+
+e2e:
     tags:
-      - docker
+      - kube
     # FIXME in place while e2e chokes on tags
     except:
       - tags
@@ -51,30 +83,47 @@ kick-e2e:
           exit 1
         fi
 
-builddock:
-  stage: deploy
+###############################################################
+# Release Stage
+###############################################################
+
+release-latest:
+  stage: release
+  tags:
+    - kube
   only:
     - master
-    - feature/docker-build
   script:
-    - docker build -t polyswarm/polyswarmd:latest -t polyswarm/polyswarmd:$CI_COMMIT_SHA --label git_commit_id=$CI_COMMIT_SHA -f docker/Dockerfile .
-    - docker login -u $CI_CUSTOM_DOCKER_HUB_USERNAME -p $CI_CUSTOM_DOCKER_HUB_PASSWORD
-    - docker push polyswarm/polyswarmd:latest
-    - docker push polyswarm/polyswarmd:$CI_COMMIT_SHA
+    # Gets the current image that was built in the CI for this commit
+    - docker pull $REPO_URL/polyswarmd:$CI_COMMIT_SHA"
+    # Creates new tags for this image, one that should go to AWS and another to DockerHub with the tag "latest"
+    - docker tag "$REPO_URL/polyswarmd:$CI_COMMIT_SHA" "$REPO_URL/polyswarmd:latest" "polyswarm/polyswarmd:latest"
+    # Pushes to AWS
+    - docker push "$REPO_URL/polyswarmd:latest"
+    # Pushes to DockerHub
+    - docker logout
+    - docker login -u "$CI_CUSTOM_DOCKER_HUB_USERNAME" -p "$CI_CUSTOM_DOCKER_HUB_PASSWORD"
+    - docker push "polyswarm/polyswarmd:latest"
+
+release-tag:
+  stage: release
+  tags:
+    - kube
+  only:
+    - tags
+  script:
+    # Gets the current image that was built in the CI for this commit
+    - docker pull $REPO_URL/polyswarmd:$CI_COMMIT_SHA"
+    # Creates new tags for this image, one that should go to AWS and another to DockerHub with the tag from git
+    - docker tag "$REPO_URL/polyswarmd:$CI_COMMIT_SHA" "$REPO_URL/polyswarmd:$(git describe --tags --abbrev=0)" "polyswarm/polyswarmd:$(git describe --tags --abbrev=0)"
+    # Pushes to AWS
+    - docker push "$REPO_URL/polyswarmd:$(git describe --tags --abbrev=0)"
+    # Pushes to DockerHub
+    - docker logout
+    - docker login -u "$CI_CUSTOM_DOCKER_HUB_USERNAME" -p "$CI_CUSTOM_DOCKER_HUB_PASSWORD"
+    - docker push "polyswarm/polyswarmd:$(git describe --tags --abbrev=0)"
 
 
-release:
-    tags:
-      - docker
-    stage: release
-    only:
-      - tags
-    script:
-      - docker build --build-arg "POLYSWARMD_VERSION=$CI_COMMIT_TAG" --build-arg "CONTRACTS_VERSION=$CI_COMMIT_TAG" -t polyswarm/polyswarmd-release-builder -f docker/Dockerfile.release .
-      - IMG_ID=$(docker create polyswarm/polyswarmd-release-builder)
-      - docker cp "$IMG_ID:/tmp/polyswarmd-$CI_COMMIT_TAG.tar.gz" .
-    artifacts:
-      name: "$CI_COMMIT_TAG"
-      paths:
-        - "polyswarmd-$CI_COMMIT_TAG.tar.gz"
-
+###############################################################
+# Deployment Stage
+###############################################################
