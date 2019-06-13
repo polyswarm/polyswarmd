@@ -12,6 +12,7 @@ stages:
 
 variables:
   DOCKER_HOST: tcp://localhost:2375/
+  BASE_IMAGE_NAME: polyswarmd
 
 before_script:
   - apk --no-cache add curl jq
@@ -25,9 +26,9 @@ build:
   tags:
     - kube
   script:
-    - docker pull $REPO_URL/polyswarmd:latest || true
-    - docker build -t $REPO_URL/polyswarmd:$CI_COMMIT_SHA -f docker/Dockerfile --cache-from=$REPO_URL/polyswarmd:latest .
-    - docker push $REPO_URL/polyswarmd:$CI_COMMIT_SHA
+    - docker pull $REPO_URL/$BASE_IMAGE_NAME:latest || true
+    - docker build -t $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA -f docker/Dockerfile --cache-from=$REPO_URL/$BASE_IMAGE_NAME:latest .
+    - docker push $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
 
 ###############################################################
 # Test Stage
@@ -95,15 +96,15 @@ release-latest:
     - master
   script:
     # Gets the current image that was built in the CI for this commit
-    - docker pull $REPO_URL/polyswarmd:$CI_COMMIT_SHA"
+    - docker pull $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA"
     # Creates new tags for this image, one that should go to AWS and another to DockerHub with the tag "latest"
-    - docker tag "$REPO_URL/polyswarmd:$CI_COMMIT_SHA" "$REPO_URL/polyswarmd:latest" "polyswarm/polyswarmd:latest"
+    - docker tag "$REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA" "$REPO_URL/$BASE_IMAGE_NAME:latest" "polyswarm/$BASE_IMAGE_NAME:latest"
     # Pushes to AWS
-    - docker push "$REPO_URL/polyswarmd:latest"
+    - docker push "$REPO_URL/$BASE_IMAGE_NAME:latest"
     # Pushes to DockerHub
     - docker logout
     - docker login -u "$CI_CUSTOM_DOCKER_HUB_USERNAME" -p "$CI_CUSTOM_DOCKER_HUB_PASSWORD"
-    - docker push "polyswarm/polyswarmd:latest"
+    - docker push "polyswarm/$BASE_IMAGE_NAME:latest"
 
 release-tag:
   stage: release
@@ -113,15 +114,15 @@ release-tag:
     - tags
   script:
     # Gets the current image that was built in the CI for this commit
-    - docker pull $REPO_URL/polyswarmd:$CI_COMMIT_SHA"
+    - docker pull $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA"
     # Creates new tags for this image, one that should go to AWS and another to DockerHub with the tag from git
-    - docker tag "$REPO_URL/polyswarmd:$CI_COMMIT_SHA" "$REPO_URL/polyswarmd:$(git describe --tags --abbrev=0)" "polyswarm/polyswarmd:$(git describe --tags --abbrev=0)"
+    - docker tag "$REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA" "$REPO_URL/$BASE_IMAGE_NAME:$(git describe --tags --abbrev=0)" "polyswarm/$BASE_IMAGE_NAME:$(git describe --tags --abbrev=0)"
     # Pushes to AWS
-    - docker push "$REPO_URL/polyswarmd:$(git describe --tags --abbrev=0)"
+    - docker push "$REPO_URL/$BASE_IMAGE_NAME:$(git describe --tags --abbrev=0)"
     # Pushes to DockerHub
     - docker logout
     - docker login -u "$CI_CUSTOM_DOCKER_HUB_USERNAME" -p "$CI_CUSTOM_DOCKER_HUB_PASSWORD"
-    - docker push "polyswarm/polyswarmd:$(git describe --tags --abbrev=0)"
+    - docker push "polyswarm/$BASE_IMAGE_NAME:$(git describe --tags --abbrev=0)"
 
 
 ###############################################################
