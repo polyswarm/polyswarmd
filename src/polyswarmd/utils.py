@@ -168,7 +168,7 @@ def new_withdrawal_event_to_dict(withdrawal_event):
 
 def deprecate_event_to_dict(deprecate_event):
     return {
-        'block': deprecate_event['blockNumber']
+        'address': deprecate_event['bountyRegistry']
     }
 
 
