@@ -166,6 +166,12 @@ def new_withdrawal_event_to_dict(withdrawal_event):
     }
 
 
+def deprecate_event_to_dict(deprecate_event):
+    return {
+        'block': deprecate_event['blockNumber']
+    }
+
+
 def channel_to_dict(channel_data):
     return {
         'msig_address': channel_data[0],

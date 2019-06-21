@@ -44,6 +44,7 @@ def init_websockets(app):
                     quorum_filiter = g.chain.bounty_registry.contract.eventFilter('QuorumReached')
                     settled_filter = g.chain.bounty_registry.contract.eventFilter('SettledBounty')
                     reveal_filter = g.chain.bounty_registry.contract.eventFilter('RevealedAssertion')
+                    deprecate_filter = g.chain.bounty_registry.contract.eventFilter('Deprecate')
                     init_filter = None
                     if g.chain.offer_registry.contract is not None:
                         init_filter = g.chain.offer_registry.contract.eventFilter('InitializedChannel')
@@ -123,6 +124,16 @@ def init_websockets(app):
                             'block_number': event.blockNumber,
                             'txhash': event.transactionHash.hex(),
                         }))
+
+                for event in deprecate_filter.get_new_entries():
+                    ws.send(
+                        json.dumps({
+                            'event': 'deprecate',
+                            'data': deprecate_event_to_dict(event.args),
+                            'block_number': event.blockNumber,
+                            'txhash': event.transactionHash.hex()
+                        })
+                    )
 
                 if init_filter is not None:
                     for event in init_filter.get_new_entries():
