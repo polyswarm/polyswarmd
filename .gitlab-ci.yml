@@ -50,7 +50,7 @@ e2e:
   tags:
     - kube
   script:
-    - pip install https://gitlab.polyswarm.io/externalci/e2e/-/archive/e2e-refactor/e2e-e2e-refactor.zip
+    - pip install $END_TO_END_LIB
     - e2e init
     - e2e run
 
