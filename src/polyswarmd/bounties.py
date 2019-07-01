@@ -9,7 +9,7 @@ from ethereum.utils import sha3
 from flask import Blueprint, g, request
 from jsonschema.exceptions import ValidationError
 from polyswarmartifact import ArtifactType
-from polyswarmartifact.schema.assertion import Assertion as AssertionMetadata
+from polyswarmartifact.schema import Assertion as AssertionMetadata, Bounty as BountyMetadata
 
 from polyswarmd import eth, cache
 from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts, post_to_ipfs, get_from_ipfs
@@ -54,11 +54,12 @@ def calculate_commitment(account, verdicts):
     return int_from_bytes(nonce), int_from_bytes(commitment)
 
 
-@functools.lru_cache(maxsize=128)
-def substitute_ipfs_metadata(ipfs_uri):
+@functools.lru_cache(maxsize=256)
+def substitute_ipfs_metadata(ipfs_uri, validate=AssertionMetadata.validate):
     """Download metadata from IPFS and validate it against the schema.
 
-    :param ipfs_uri: Porential IPFS uri string
+    :param ipfs_uri: Potential IPFS uri string
+    :param validate: Function that takes a loaded json blob and returns true if it matches the schema
     :return: Metadata from IPFS, or original metadata
     """
     if not is_valid_ipfshash(ipfs_uri):
@@ -66,7 +67,7 @@ def substitute_ipfs_metadata(ipfs_uri):
 
     status_code, content = get_from_ipfs(ipfs_uri)
     try:
-        if status_code // 100 == 2 and AssertionMetadata.validate(json.loads(content.decode('utf-8'))):
+        if status_code // 100 == 2 and validate(json.loads(content.decode('utf-8'))):
             return json.loads(content.decode('utf-8'))
     except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
@@ -105,6 +106,11 @@ def post_bounties():
                 'type': 'integer',
                 'minimum': 1,
             },
+            'metadata': {
+                'type': 'string',
+                'minLength': 1,
+                'maxLength': 100,
+            }
         },
         'required': ['artifact_type', 'amount', 'uri', 'duration'],
     }
@@ -120,6 +126,7 @@ def post_bounties():
     amount = int(body['amount'])
     artifact_uri = body['uri']
     duration_blocks = body['duration']
+    metadata = body.get('metadata', '')
 
     if amount < eth.bounty_amount_min(g.chain.bounty_registry.contract):
         return failure('Invalid bounty amount', 400)
@@ -143,7 +150,7 @@ def post_bounties():
             base_nonce),
         build_transaction(
             g.chain.bounty_registry.contract.functions.postBounty(guid.int, artifact_type.value, amount, artifact_uri,
-                                                                  num_artifacts, duration_blocks, bloom),
+                                                                  num_artifacts, duration_blocks, bloom, metadata),
             base_nonce + 1),
     ]
 
@@ -179,6 +186,7 @@ def get_bounty_parameters():
 def get_bounties_guid(guid):
     bounty = bounty_to_dict(
         g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
+    bounty['metadata'] = substitute_ipfs_metadata(bounty.get('metadata', ''), validate=BountyMetadata.validate)
     if not is_valid_ipfshash(bounty['uri']):
         return failure('Invalid IPFS hash in URI', 400)
     if bounty['author'] == ZERO_ADDRESS:
@@ -243,9 +251,10 @@ def post_bounties_guid_settle(guid):
 def post_assertion_metadata():
     body = request.get_json()
 
+    loaded_body = json.loads(body)
     try:
-        if not AssertionMetadata.validate(json.loads(body)):
-            return failure('Invalid Assertion metadata', 400)
+        if not AssertionMetadata.validate(loaded_body) and not BountyMetadata.validate(loaded_body):
+            return failure('Invalid metadata', 400)
     except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
         return failure('Invalid Assertion metadata', 400)
@@ -253,7 +262,6 @@ def post_assertion_metadata():
     try:
         status_code, ipfshash = post_to_ipfs([('metadata', body)], wrap_dir=False)
         return success(ipfshash) if status_code // 100 == 2 else failure('Could not add metadata to IPFS', status_code)
-
     except Exception:
         logger.exception('Received error posting to IPFS got response')
         return failure('Could not add metadata to ipfs', 400)
