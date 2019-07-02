@@ -258,7 +258,8 @@ def post_assertion_metadata():
 
     loaded_body = json.loads(body)
     try:
-        if not AssertionMetadata.validate(loaded_body) and not BountyMetadata.validate(loaded_body):
+        if not AssertionMetadata.validate(loaded_body, silent=True) and \
+                not BountyMetadata.validate(loaded_body, silent=True):
             return failure('Invalid metadata', 400)
     except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
