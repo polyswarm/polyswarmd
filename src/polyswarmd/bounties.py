@@ -186,7 +186,12 @@ def get_bounty_parameters():
 def get_bounties_guid(guid):
     bounty = bounty_to_dict(
         g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
-    bounty['metadata'] = substitute_ipfs_metadata(bounty.get('metadata', ''), validate=BountyMetadata.validate)
+    metadata = bounty.get('metadata', None)
+    if metadata:
+        metadata = substitute_ipfs_metadata(metadata, validate=BountyMetadata.validate)
+    else:
+        metadata = None
+    bounty['metadata'] = metadata
     if not is_valid_ipfshash(bounty['uri']):
         return failure('Invalid IPFS hash in URI', 400)
     if bounty['author'] == ZERO_ADDRESS:

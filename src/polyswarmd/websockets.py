@@ -76,8 +76,11 @@ def init_websockets(app):
                             'block_number': event.blockNumber,
                             'txhash': event.transactionHash.hex(),
                         }
-                    reveal['data']['metadata'] = substitute_ipfs_metadata(reveal['data'].get('metadata', ''),
-                                                                          BountyMetadata.validate)
+                    metadata = reveal['data'].get('metadata', None)
+                    if metadata:
+                        reveal['data']['metadata'] = substitute_ipfs_metadata(metadata, BountyMetadata.validate)
+                    else:
+                        reveal['data']['metadata'] = None
 
                     ws.send(json.dumps(reveal))
 
