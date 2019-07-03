@@ -41,6 +41,27 @@ test:
   script:
     - echo "Still to be implemented"
 
+# Triggers a CI pipeline for contractor
+create-e2e-pre-latest-images:
+  stage: test
+  tags:
+    - kube
+  script:
+    # Gets the current image that was built in the CI for this commit
+    - docker pull $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
+    # Creates new tags for this image, one that should go to AWS and another to DockerHub with the tag "latest"
+    - docker tag $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA $REPO_URL/$BASE_IMAGE_NAME:pre-latest
+    # Pushes to AWS
+    - docker push $REPO_URL/$BASE_IMAGE_NAME:pre-latest
+    - >-
+      curl
+      --request POST
+      --form "token=$CI_JOB_TOKEN"
+      --form "variables[POLYSWARMD_TAG]=pre-latest"
+      --form ref=master
+      "$TRIGGER_URL_CONTRACTOR"
+  when: manual
+
 ###############################################################
 # End-to-end Stage
 ###############################################################
