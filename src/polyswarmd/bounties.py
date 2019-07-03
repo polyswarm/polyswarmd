@@ -134,6 +134,9 @@ def post_bounties():
     if not is_valid_ipfshash(artifact_uri):
         return failure('Invalid artifact URI (should be IPFS hash)', 400)
 
+    if metadata and not is_valid_ipfshash(metadata):
+        return failure('Invalid bounty metadata URI (should be IPFS hash)', 400)
+
     arts = list_artifacts(artifact_uri)
     if not arts:
         return failure('Invalid artifact URI (could not retrieve artifacts)',
