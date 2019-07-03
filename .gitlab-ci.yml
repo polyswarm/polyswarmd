@@ -50,6 +50,8 @@ e2e:
   tags:
     - kube
   script:
+    - cp $E2E_COMPOSE_FILE ./
+    - cp $E2E_CONFIG_FILE ./
     - pip install $END_TO_END_LIB
     - e2e run
 
@@ -71,7 +73,7 @@ release-latest-contractor:
       --form "token=$CI_JOB_TOKEN"
       --form "variables[RELEASE_LATEST]=true"
       --form ref=master
-      "https://gitlab.polyswarm.io/api/v4/projects/181/trigger/pipeline"
+      "$TRIGGER_URL_CONTRACTOR"
 
 # Triggers a CI pipeline for ci-image
 release-latest-ci-image:
@@ -87,7 +89,7 @@ release-latest-ci-image:
       --form "token=$CI_JOB_TOKEN"
       --form "variables[RELEASE_LATEST]=true"
       --form ref=master
-      "https://gitlab.polyswarm.io/api/v4/projects/210/trigger/pipeline"
+      "$TRIGGER_URL_CI_IMAGE"
 
 release-latest:
   stage: release
