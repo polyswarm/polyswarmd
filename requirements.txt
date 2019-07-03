@@ -8,7 +8,7 @@ jsonschema==2.6.0
 Flask==1.0.2
 Flask-Caching==1.7.2
 Flask-Sockets==0.2.1
-polyswarm-artifact==1.1.0
+polyswarm-artifact==1.2.0
 psycopg2-binary==2.7.6.1
 PyYaml==4.2b4
 pytest== 4.0.0
