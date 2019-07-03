@@ -51,12 +51,43 @@ e2e:
     - kube
   script:
     - pip install $END_TO_END_LIB
-    - e2e init
     - e2e run
 
 ###############################################################
 # Release Stage
 ###############################################################
+
+# Triggers a CI pipeline for contractor
+release-latest-contractor:
+  stage: release
+  tags:
+    - kube
+  only:
+    - master
+  script:
+    - >-
+      curl
+      --request POST
+      --form "token=$CI_JOB_TOKEN"
+      --form "variables[RELEASE_LATEST]=true"
+      --form ref=master
+      "https://gitlab.polyswarm.io/api/v4/projects/181/trigger/pipeline"
+
+# Triggers a CI pipeline for ci-image
+release-latest-ci-image:
+  stage: release
+  tags:
+    - kube
+  only:
+    - master
+  script:
+    - >-
+      curl
+      --request POST
+      --form "token=$CI_JOB_TOKEN"
+      --form "variables[RELEASE_LATEST]=true"
+      --form ref=master
+      "https://gitlab.polyswarm.io/api/v4/projects/210/trigger/pipeline"
 
 release-latest:
   stage: release
