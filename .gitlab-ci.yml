@@ -50,8 +50,8 @@ e2e:
   tags:
     - kube
   script:
-    - cp $E2E_COMPOSE_FILE ./
-    - cp $E2E_CONFIG_FILE ./
+    - cp $E2E_COMPOSE_FILE ./docker-compose.yaml
+    - cp $E2E_CONFIG_FILE ./e2e.yaml
     - pip install $END_TO_END_LIB
     - e2e run
 
