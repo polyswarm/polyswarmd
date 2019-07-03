@@ -1,0 +1,96 @@
+polyswarm:
+  compose-file: docker-compose.yaml
+  environment:
+    - REGISTRY_URL=005789955001.dkr.ecr.us-east-1.amazonaws.com
+  repositories:
+    - polyswarmd
+    - polyswarm-client
+    - contractor
+    - priv-testnet
+    - relay
+    - consumer
+    - api-key-management
+    - artifact-index
+  steps:
+    - services:
+        - homechain:
+            repo: ci-image
+            wait-for-connectivity:
+              - 30303
+              - 8545
+              - 8546
+        - sidechain:
+            repo: ci-image
+            wait-for-connectivity:
+              - 30303
+              - 8545
+              - 8546
+        - postgres:
+            repo: ci-image
+            wait-for-connectivity:
+              - 5432
+        - consul:
+            repo: ci-image
+            wait-for-connectivity:
+              - 8500
+        - ipfs:
+            wait-for-connectivity:
+              - 4001
+        - aipostgres:
+            wait-for-connectivity:
+              - 5432
+        - redis:
+            wait-for-connectivity:
+              - 6379
+        - redis_ai:
+            wait-for-connectivity:
+              - 6379
+        - minio:
+            wait-for-connectivity:
+              - 9000
+        - elasticsearch:
+            wait-for-connectivity:
+              - 9200
+    - services:
+        - apikeymgmt:
+            repo: api-key-management
+            wait-for-connectivity:
+              - 5000
+    - services:
+        - historical_worker:
+            repo: artifact-index
+        - live_worker:
+            repo: artifact-index
+        - artifact_index:
+            repo: artifact-index
+            wait-for-connectivity:
+              - 9696
+        - local_worker:
+            repo: artifact-index
+        - beat:
+            repo: artifact-index
+        - polyswarmd:
+            repo: polyswarmd
+            wait-for-connectivity:
+              - 31337
+    - services:
+        - consumer-frontend:
+            repo: consumer
+            wait-for-connectivity:
+              - 12322
+        - consumer-backend:
+            repo: consumer
+        - relay0:
+            repo: relay
+        - relay1:
+            repo: relay
+        - relay2:
+            repo: relay
+        - maintain:
+            repo: polyswarm-client
+        - microengine-eicar:
+            repo: polyswarm-client
+        - arbiter-verbatim:
+            repo: polyswarm-client
+    - command:
+        - e2e: e2e
