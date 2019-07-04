@@ -68,7 +68,7 @@ e2e:
   script:
     - pip install $END_TO_END_LIB
     - e2e init
-    - e2e run
+    - E2E_FORCE_TAGS=$MANUAL_IMAGE_TAG e2e run
 
 ###############################################################
 # Release Stage
