@@ -46,6 +46,7 @@ def bounty_to_dict(bounty):
         'quorum_reached': bounty[8],
         'quorum_reached_block': bounty[9],
         'quorum_mask': safe_int_to_bool_list(bounty[10], bounty[5]),
+        'metadata': bounty[11]
     }
 
 
@@ -77,6 +78,7 @@ def new_bounty_event_to_dict(new_bounty_event):
         'amount': str(new_bounty_event.amount),
         'uri': new_bounty_event.artifactURI,
         'expiration': str(new_bounty_event.expirationBlock),
+        'metadata': str(new_bounty_event.metadata),
     }
 
 

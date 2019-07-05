@@ -7,7 +7,7 @@ from flask_sockets import Sockets
 from geventwebsocket import WebSocketError
 from jsonschema.exceptions import ValidationError
 from requests.exceptions import ConnectionError
-
+from polyswarmartifact.schema import Bounty as BountyMetadata
 from polyswarmd.bounties import substitute_ipfs_metadata
 from polyswarmd.chains import chain
 from polyswarmd.utils import *
@@ -70,13 +70,19 @@ def init_websockets(app):
                         }))
 
                 for event in bounty_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
+                    reveal = {
                             'event': 'bounty',
                             'data': new_bounty_event_to_dict(event.args),
                             'block_number': event.blockNumber,
                             'txhash': event.transactionHash.hex(),
-                        }))
+                        }
+                    metadata = reveal['data'].get('metadata', None)
+                    if metadata:
+                        reveal['data']['metadata'] = substitute_ipfs_metadata(metadata, BountyMetadata.validate)
+                    else:
+                        reveal['data']['metadata'] = None
+
+                    ws.send(json.dumps(reveal))
 
                 for event in assertion_filter.get_new_entries():
                     ws.send(
