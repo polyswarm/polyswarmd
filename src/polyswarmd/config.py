@@ -373,13 +373,13 @@ class Config(object):
 
     def __validate(self):
         # We expect IPFS and API key service to be up already
-        if not is_service_reachable(self.session, self.ipfs_uri):
+        if not is_service_reachable(self.session, f"{self.ipfs_uri}/api/v0/bootstrap"):
             raise ValueError('IPFS not reachable, is correct URI specified?')
 
         if self.artifact_limit < 1 or self.artifact_limit > 256:
             raise ValueError('Artifact limit must be greater than 0 and cannot exceed contract limit of 256')
 
-        if self.auth_uri and not is_service_reachable(self.session, self.auth_uri):
+        if self.auth_uri and not is_service_reachable(self.session, f"{self.auth_uri}/communities/public"):
             raise ValueError('API key service not reachable, is correct URI specified?')
 
         if self.require_api_key and not self.auth_uri:
