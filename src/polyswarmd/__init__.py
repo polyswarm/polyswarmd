@@ -23,7 +23,7 @@ app = Flask(__name__)
 app.config['POLYSWARMD'] = Config.auto()
 
 session = FuturesSession(executor=ThreadPoolExecutor(16),
-                                                adapter_kwargs={'max_retries': 3})
+                         adapter_kwargs={'max_retries': 3})
 
 session.request = functools.partial(session.request, timeout=3)
 
