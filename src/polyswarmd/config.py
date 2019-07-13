@@ -139,6 +139,8 @@ class ContractConfig(object):
 
 
 class ChainConfig(object):
+    session = requests.Session()
+
     def __init__(self, name, eth_uri, chain_id, w3, nectar_token, bounty_registry, arbiter_staking, erc20_relay,
                  offer_registry, offer_multisig, free):
         self.name = name
@@ -240,7 +242,7 @@ class ChainConfig(object):
         return cls.from_contract_configs(name, eth_uri, chain_id, w3, contract_configs, free)
 
     def __validate(self):
-        if not is_service_reachable(self.eth_uri):
+        if not is_service_reachable(self.session, self.eth_uri):
             raise ValueError('Ethereum not reachable, is correct URI specified?')
 
         if self.chain_id != int(self.w3.version.network):
@@ -272,6 +274,8 @@ class ChainConfig(object):
 
 
 class Config(object):
+    session = requests.Session()
+
     def __init__(self, community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config,
                  sidechain_config, trace_transactions, profiler_enabled):
         self.community = community
@@ -322,9 +326,7 @@ class Config(object):
         consul_uri = os.environ.get('CONSUL')
         consul_token = os.environ.get('CONSUL_TOKEN', None)
 
-        session = requests.Session()
-
-        wait_for_service(session, consul_uri)
+        wait_for_service(cls.session, consul_uri)
 
         u = urlparse(consul_uri)
         consul_client = Consul(host=u.hostname, port=u.port, scheme=u.scheme, token=consul_token)
@@ -371,13 +373,13 @@ class Config(object):
 
     def __validate(self):
         # We expect IPFS and API key service to be up already
-        if not is_service_reachable(self.ipfs_uri):
+        if not is_service_reachable(self.session, self.ipfs_uri):
             raise ValueError('IPFS not reachable, is correct URI specified?')
 
         if self.artifact_limit < 1 or self.artifact_limit > 256:
             raise ValueError('Artifact limit must be greater than 0 and cannot exceed contract limit of 256')
 
-        if self.auth_uri and not is_service_reachable(self.auth_uri):
+        if self.auth_uri and not is_service_reachable(self.session, self.auth_uri):
             raise ValueError('API key service not reachable, is correct URI specified?')
 
         if self.require_api_key and not self.auth_uri:
