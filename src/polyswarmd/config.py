@@ -5,6 +5,8 @@ import os
 import socket
 import threading
 import time
+import requests
+
 from urllib.parse import urlparse
 
 import yaml
@@ -30,22 +32,21 @@ SUPPORTED_CONTRACT_VERSIONS = {
 }
 
 
-def is_service_reachable(uri):
-    u = urlparse(uri)
-    with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-        sock.settimeout(1)
-        try:
-            return sock.connect_ex((u.hostname, u.port)) == 0
-        except OSError as e:
-            logger.error('Non-socket error while checking connectivity: %s', e)
-            return False
+def is_service_reachable(session, uri):
+    r = session.get(uri)
+
+    # check if futures session or normal
+    if hasattr(r, "result"):
+        r = r.result()
+
+    return r is not None and r.status_code == 200
 
 
-def wait_for_service(uri):
+def wait_for_service(session, uri):
     logger.info('Waiting for service at %s', uri)
 
     while True:
-        if is_service_reachable(uri):
+        if is_service_reachable(session, uri):
             logger.info('%s available, continuing', uri)
             return
         else:
@@ -321,7 +322,9 @@ class Config(object):
         consul_uri = os.environ.get('CONSUL')
         consul_token = os.environ.get('CONSUL_TOKEN', None)
 
-        wait_for_service(consul_uri)
+        session = requests.Session()
+
+        wait_for_service(session, consul_uri)
 
         u = urlparse(consul_uri)
         consul_client = Consul(host=u.hostname, port=u.port, scheme=u.scheme, token=consul_token)

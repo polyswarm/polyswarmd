@@ -4,10 +4,12 @@ patch_all()
 
 import datetime
 import logging
+import functools
 
 from flask import Flask, g, request
 from flask_caching import Cache
 from requests_futures.sessions import FuturesSession
+from concurrent.futures import ThreadPoolExecutor
 
 from polyswarmd.config import Config, is_service_reachable
 from polyswarmd.logger import init_logging
@@ -19,7 +21,9 @@ logger = logging.getLogger(__name__)
 # Set up our app object
 app = Flask(__name__)
 app.config['POLYSWARMD'] = Config.auto()
-app.config['REQUESTS_SESSION'] = FuturesSession(adapter_kwargs={'max_retries': 5})
+
+app.config['REQUESTS_SESSION'] = FuturesSession(executor=ThreadPoolExecutor(16),
+                                                adapter_kwargs={'max_retries': 3, 'timeout': 5})
 
 cache = Cache(config={"CACHE_TYPE": "simple", "CACHE_DEFAULT_TIMEOUT": 30})
 
@@ -96,22 +100,24 @@ class User(object):
 @app.route('/status')
 def status():
     config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
+
     ret = {}
 
     ret['community'] = config.community
 
     ret['ipfs'] = {
-        'reachable': is_service_reachable(config.ipfs_uri),
+        'reachable': is_service_reachable(session, f"{config.ipfs_uri}/api/v0/bootstrap"),
     }
 
     if config.auth_uri:
         ret['auth'] = {
-            'reachable': is_service_reachable(config.auth_uri),
+            'reachable': is_service_reachable(session, f"{config.auth_uri}/communities/public"),
         }
 
     for name, chain in config.chains.items():
         ret[name] = {
-            'reachable': is_service_reachable(chain.eth_uri),
+            'reachable': is_service_reachable(session, f"{chain.eth_uri}"),
         }
 
         if ret[name]['reachable']:
