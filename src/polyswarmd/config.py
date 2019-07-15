@@ -5,6 +5,8 @@ import os
 import socket
 import threading
 import time
+import requests
+
 from urllib.parse import urlparse
 
 import yaml
@@ -30,22 +32,21 @@ SUPPORTED_CONTRACT_VERSIONS = {
 }
 
 
-def is_service_reachable(uri):
-    u = urlparse(uri)
-    with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-        sock.settimeout(1)
-        try:
-            return sock.connect_ex((u.hostname, u.port)) == 0
-        except OSError as e:
-            logger.error('Non-socket error while checking connectivity: %s', e)
-            return False
+def is_service_reachable(session, uri):
+    r = session.get(uri)
+
+    # check if futures session or normal
+    if hasattr(r, "result"):
+        r = r.result()
+
+    return r is not None and r.status_code == 200
 
 
-def wait_for_service(uri):
+def wait_for_service(session, uri):
     logger.info('Waiting for service at %s', uri)
 
     while True:
-        if is_service_reachable(uri):
+        if is_service_reachable(session, uri):
             logger.info('%s available, continuing', uri)
             return
         else:
@@ -138,6 +139,8 @@ class ContractConfig(object):
 
 
 class ChainConfig(object):
+    session = requests.Session()
+
     def __init__(self, name, eth_uri, chain_id, w3, nectar_token, bounty_registry, arbiter_staking, erc20_relay,
                  offer_registry, offer_multisig, free):
         self.name = name
@@ -239,7 +242,7 @@ class ChainConfig(object):
         return cls.from_contract_configs(name, eth_uri, chain_id, w3, contract_configs, free)
 
     def __validate(self):
-        if not is_service_reachable(self.eth_uri):
+        if not is_service_reachable(self.session, self.eth_uri):
             raise ValueError('Ethereum not reachable, is correct URI specified?')
 
         if self.chain_id != int(self.w3.version.network):
@@ -271,6 +274,8 @@ class ChainConfig(object):
 
 
 class Config(object):
+    session = requests.Session()
+
     def __init__(self, community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config,
                  sidechain_config, trace_transactions, profiler_enabled):
         self.community = community
@@ -321,7 +326,7 @@ class Config(object):
         consul_uri = os.environ.get('CONSUL')
         consul_token = os.environ.get('CONSUL_TOKEN', None)
 
-        wait_for_service(consul_uri)
+        wait_for_service(cls.session, consul_uri)
 
         u = urlparse(consul_uri)
         consul_client = Consul(host=u.hostname, port=u.port, scheme=u.scheme, token=consul_token)
@@ -368,13 +373,13 @@ class Config(object):
 
     def __validate(self):
         # We expect IPFS and API key service to be up already
-        if not is_service_reachable(self.ipfs_uri):
+        if not is_service_reachable(self.session, f"{self.ipfs_uri}/api/v0/bootstrap"):
             raise ValueError('IPFS not reachable, is correct URI specified?')
 
         if self.artifact_limit < 1 or self.artifact_limit > 256:
             raise ValueError('Artifact limit must be greater than 0 and cannot exceed contract limit of 256')
 
-        if self.auth_uri and not is_service_reachable(self.auth_uri):
+        if self.auth_uri and not is_service_reachable(self.session, f"{self.auth_uri}/communities/public"):
             raise ValueError('API key service not reachable, is correct URI specified?')
 
         if self.require_api_key and not self.auth_uri:
