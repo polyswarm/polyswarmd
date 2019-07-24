@@ -422,7 +422,7 @@ def get_bounties_guid_assertions(guid):
                 bounty['num_artifacts'])
             # Nonce is 0 when a reveal did not occur
             if assertion['nonce'] == 0:
-                assertion['verdict'] = [None] * bounty['num_artifacts']
+                assertion['verdicts'] = [None] * bounty['num_artifacts']
             assertion['metadata'] = substitute_ipfs_metadata(assertion.get('metadata', ''))
             assertions.append(assertion)
         except Exception:
