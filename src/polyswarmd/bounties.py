@@ -420,6 +420,9 @@ def get_bounties_guid_assertions(guid):
             assertion = assertion_to_dict(
                 g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, i).call(),
                 bounty['num_artifacts'])
+            # Nonce is 0 when a reveal did not occur
+            if assertion['nonce'] == 0:
+                assertion['verdict'] = [None] * bounty['num_artifacts']
             assertion['metadata'] = substitute_ipfs_metadata(assertion.get('metadata', ''))
             assertions.append(assertion)
         except Exception:
