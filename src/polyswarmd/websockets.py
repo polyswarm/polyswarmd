@@ -4,15 +4,48 @@ import jsonschema
 import time
 
 from flask_sockets import Sockets
+from gevent.lock import BoundedSemaphore
 from geventwebsocket import WebSocketError
 from jsonschema.exceptions import ValidationError
 from requests.exceptions import ConnectionError
-from polyswarmartifact.schema import Bounty as BountyMetadata
-from polyswarmd.bounties import substitute_ipfs_metadata
 from polyswarmd.chains import chain
 from polyswarmd.utils import *
 
 logger = logging.getLogger(__name__)
+
+
+class Websocket:
+    def __init__(self, ws):
+        self.guid = uuid.uuid4()
+        self.ws = ws
+        self.queue = []
+        self.queue_lock = BoundedSemaphore(1)
+
+    def send(self, message):
+        try:
+            self.queue_lock.acquire()
+            self.queue.append(message)
+        finally:
+            self.queue_lock.release()
+
+    def get_messages(self):
+        try:
+            self.queue_lock.acquire()
+            messages = [msg for msg in self.queue]
+        except:
+            logger.exception('Failed to get messages in websocket')
+            messages = []
+        finally:
+            self.queue_lock.release()
+
+        return messages
+
+    def __repr__(self):
+        return f'<Websocket UUID={str(self.guid)}>'
+
+    def __eq__(self, other):
+        return isinstance(other, Websocket) and \
+               other.guid == self.guid
 
 
 def init_websockets(app):
@@ -23,6 +56,7 @@ def init_websockets(app):
     @sockets.route('/events')
     @chain(account_required=False)
     def events(ws):
+        rpc = g.chain.rpc
         ws.send(
             json.dumps({
                 'event': 'connected',
@@ -31,147 +65,24 @@ def init_websockets(app):
                 }
             }))
 
-        filters_initialized = False
+        wrapper = Websocket(ws)
+
+        rpc.register(wrapper)
+
         while not ws.closed:
-            try:
-                if not filters_initialized:
-                    block_filter = g.chain.w3.eth.filter('latest')
-                    fee_filter = g.chain.bounty_registry.contract.eventFilter('FeesUpdated')
-                    window_filter = g.chain.bounty_registry.contract.eventFilter('WindowsUpdated')
-                    bounty_filter = g.chain.bounty_registry.contract.eventFilter('NewBounty')
-                    assertion_filter = g.chain.bounty_registry.contract.eventFilter('NewAssertion')
-                    vote_filter = g.chain.bounty_registry.contract.eventFilter('NewVote')
-                    quorum_filiter = g.chain.bounty_registry.contract.eventFilter('QuorumReached')
-                    settled_filter = g.chain.bounty_registry.contract.eventFilter('SettledBounty')
-                    reveal_filter = g.chain.bounty_registry.contract.eventFilter('RevealedAssertion')
-                    deprecated_filter = g.chain.bounty_registry.contract.eventFilter('Deprecated')
-                    init_filter = None
-                    if g.chain.offer_registry.contract is not None:
-                        init_filter = g.chain.offer_registry.contract.eventFilter('InitializedChannel')
+            for msg in wrapper.get_messages():
+                try:
+                    ws.send(msg)
+                except WebSocketError as e:
+                    logger.error('Websocket %s closed %s', wrapper, e)
+                    rpc.unregister(wrapper)
+                    return
 
-                    filters_initialized = True
+            with gevent.Timeout(1.0, False):
+                logger.debug('Checking %s against timeout', wrapper)
+                ws.receive()
 
-                for event in fee_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'fee_update',
-                            'data': fee_update_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in window_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'window_update',
-                            'data': window_update_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in bounty_filter.get_new_entries():
-                    reveal = {
-                            'event': 'bounty',
-                            'data': new_bounty_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }
-                    metadata = reveal['data'].get('metadata', None)
-                    if metadata:
-                        reveal['data']['metadata'] = substitute_ipfs_metadata(metadata, BountyMetadata.validate)
-                    else:
-                        reveal['data']['metadata'] = None
-
-                    ws.send(json.dumps(reveal))
-
-                for event in assertion_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'assertion',
-                            'data': new_assertion_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in reveal_filter.get_new_entries():
-                    reveal = {
-                        'event': 'reveal',
-                        'data': revealed_assertion_event_to_dict(event.args),
-                        'block_number': event.blockNumber,
-                        'txhash': event.transactionHash.hex(),
-                    }
-                    reveal['data']['metadata'] = substitute_ipfs_metadata(reveal['data'].get('metadata', ''))
-
-                    ws.send(json.dumps(reveal))
-
-                for event in vote_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'vote',
-                            'data': new_vote_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in quorum_filiter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'quorum',
-                            'data': new_quorum_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in settled_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'settled_bounty',
-                            'data': settled_bounty_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in deprecated_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'deprecated',
-                            'data': deprecated_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex()
-                        })
-                    )
-
-                if init_filter is not None:
-                    for event in init_filter.get_new_entries():
-                        ws.send(
-                            json.dumps({
-                                'event': 'initialized_channel',
-                                'data': new_init_channel_event_to_dict(event.args),
-                                'block_number': event.blockNumber,
-                                'txhash': event.transactionHash.hex(),
-                            }))
-
-                for _ in block_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'block',
-                            'data': {
-                                'number': g.chain.w3.eth.blockNumber,
-                            },
-                        }))
-
-                gevent.sleep(1)
-            except WebSocketError:
-                logger.info('Websocket connection closed, exiting loop')
-                break
-            except ConnectionError:
-                logger.exception('ConnectionError in /events (is geth down?)')
-                filters_initialized = False
-                continue
-            except Exception:
-                logger.exception('Exception in /events, resetting filters')
-                filters_initialized = False
-                continue
+        rpc.unregister(wrapper)
 
     @sockets.route('/events/<uuid:guid>')
     @chain(chain_name='home', account_required=False)
