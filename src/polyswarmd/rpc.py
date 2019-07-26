@@ -30,13 +30,10 @@ class GethRpc:
 
     def broadcast(self, message):
         logger.debug('Sending: %s', message)
-        try:
-            self.websockets_lock.acquire()
+        with self.websockets_lock:
             for ws in self.websockets:
                 logger.critical('Sending ws %s %s', ws, message)
                 ws.send(json.dumps(message))
-        finally:
-            self.websockets_lock.release()
 
     def flush_filters(self):
         self.block_filter.get_new_entries()
@@ -59,11 +56,8 @@ class GethRpc:
         while True:
             gevent.sleep(1)
             # Check that there is some websocket connection
-            try:
-                self.websockets_lock.acquire()
+            with self.websockets_lock:
                 skip = not self.websockets
-            finally:
-                self.websockets_lock.release()
 
             # If there isn't, hit the filters anyway, since we don't want old data
             if skip:
@@ -192,8 +186,7 @@ class GethRpc:
         """
         # Cross greenlet communication here
         start = False
-        try:
-            self.websockets_lock.acquire()
+        with self.websockets_lock:
             if self.websockets is None:
                 start = True
                 self.websockets = []
@@ -203,8 +196,6 @@ class GethRpc:
                 self.flush_filters()
 
             self.websockets.append(ws)
-        finally:
-            self.websockets_lock.release()
 
         if start:
             logger.debug('First websocket registered, starting greenlet')
@@ -227,11 +218,7 @@ class GethRpc:
 
     def unregister(self, ws):
         logger.debug('Unregistering websocket %s', ws)
-        try:
-            self.websockets_lock.acquire()
+        with self.websockets_lock:
             if ws in self.websockets:
                 logger.critical('Removing ws %s', ws)
                 self.websockets.remove(ws)
-
-        finally:
-            self.websockets_lock.release()

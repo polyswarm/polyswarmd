@@ -22,21 +22,12 @@ class Websocket:
         self.queue_lock = BoundedSemaphore(1)
 
     def send(self, message):
-        try:
-            self.queue_lock.acquire()
+        with self.queue_lock:
             self.queue.append(message)
-        finally:
-            self.queue_lock.release()
 
     def get_messages(self):
-        try:
-            self.queue_lock.acquire()
+        with self.queue_lock:
             messages = [msg for msg in self.queue]
-        except:
-            logger.exception('Failed to get messages in websocket')
-            messages = []
-        finally:
-            self.queue_lock.release()
 
         return messages
 
