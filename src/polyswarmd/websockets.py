@@ -3,6 +3,8 @@ import json
 import jsonschema
 import time
 
+from gevent.queue import Queue, Empty
+
 from flask_sockets import Sockets
 from gevent.lock import BoundedSemaphore
 from geventwebsocket import WebSocketError
@@ -18,18 +20,10 @@ class Websocket:
     def __init__(self, ws):
         self.guid = uuid.uuid4()
         self.ws = ws
-        self.queue = []
-        self.queue_lock = BoundedSemaphore(1)
+        self.queue = Queue()
 
     def send(self, message):
-        with self.queue_lock:
-            self.queue.append(message)
-
-    def get_messages(self):
-        with self.queue_lock:
-            messages = [msg for msg in self.queue]
-
-        return messages
+        self.queue.put(message)
 
     def __repr__(self):
         return f'<Websocket UUID={str(self.guid)}>'
@@ -61,17 +55,18 @@ def init_websockets(app):
         rpc.register(wrapper)
 
         while not ws.closed:
-            for msg in wrapper.get_messages():
+            try:
+                msg = wrapper.queue.get(block=False)
                 try:
                     ws.send(msg)
                 except WebSocketError as e:
                     logger.error('Websocket %s closed %s', wrapper, e)
                     rpc.unregister(wrapper)
                     return
-
-            with gevent.Timeout(1.0, False):
-                logger.debug('Checking %s against timeout', wrapper)
-                ws.receive()
+            except Empty:
+                with gevent.Timeout(.5, False):
+                    logger.debug('Checking %s against timeout', wrapper)
+                    ws.receive()
 
         rpc.unregister(wrapper)
 
