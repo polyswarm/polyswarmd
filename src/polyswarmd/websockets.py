@@ -57,16 +57,15 @@ def init_websockets(app):
         while not ws.closed:
             try:
                 msg = wrapper.queue.get(block=False)
-                try:
-                    ws.send(msg)
-                except WebSocketError as e:
-                    logger.error('Websocket %s closed %s', wrapper, e)
-                    rpc.unregister(wrapper)
-                    return
+                ws.send(msg)
             except Empty:
                 with gevent.Timeout(.5, False):
                     logger.debug('Checking %s against timeout', wrapper)
                     ws.receive()
+            except WebSocketError as e:
+                logger.error('Websocket %s closed %s', wrapper, e)
+                rpc.unregister(wrapper)
+                return
 
         rpc.unregister(wrapper)
 
