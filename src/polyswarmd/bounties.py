@@ -1,4 +1,3 @@
-import functools
 import json
 import logging
 import os
@@ -54,7 +53,7 @@ def calculate_commitment(account, verdicts):
     return int_from_bytes(nonce), int_from_bytes(commitment)
 
 
-@functools.lru_cache(maxsize=256)
+@cache.memoize(30)
 def substitute_ipfs_metadata(ipfs_uri, validate=AssertionMetadata.validate):
     """Download metadata from IPFS and validate it against the schema.
 
@@ -161,6 +160,7 @@ def post_bounties():
 
 
 @bounties.route('/parameters', methods=['GET'])
+@cache.memoize(1)
 @chain
 def get_bounty_parameters():
     bounty_fee = g.chain.bounty_registry.contract.functions.bountyFee().call()
@@ -185,6 +185,7 @@ def get_bounty_parameters():
 
 
 @bounties.route('/<uuid:guid>', methods=['GET'])
+@cache.memoize(1)
 @chain
 def get_bounties_guid(guid):
     bounty = bounty_to_dict(
@@ -405,7 +406,7 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['GET'])
-@cache.memoize(30)
+@cache.memoize(1)
 @chain
 def get_bounties_guid_assertions(guid):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
@@ -430,7 +431,7 @@ def get_bounties_guid_assertions(guid):
 
 
 @bounties.route('/<uuid:guid>/assertions/<int:id_>', methods=['GET'])
-@cache.memoize(30)
+@cache.memoize(1)
 @chain
 def get_bounties_guid_assertions_id(guid, id_):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
@@ -448,6 +449,7 @@ def get_bounties_guid_assertions_id(guid, id_):
 
 
 @bounties.route('/<uuid:guid>/votes', methods=['GET'])
+@cache.memoize(1)
 @chain
 def get_bounties_guid_votes(guid):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
@@ -471,6 +473,7 @@ def get_bounties_guid_votes(guid):
 
 
 @bounties.route('/<uuid:guid>/votes/<int:id_>', methods=['GET'])
+@cache.memoize(1)
 @chain
 def get_bounties_guid_votes_id(guid, id_):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
@@ -486,6 +489,7 @@ def get_bounties_guid_votes_id(guid, id_):
 
 
 @bounties.route('/<uuid:guid>/bloom', methods=['GET'])
+@cache.memoize(30)
 @chain
 def get_bounties_guid_bloom(guid):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
