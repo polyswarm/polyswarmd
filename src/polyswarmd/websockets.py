@@ -6,7 +6,6 @@ import time
 from gevent.queue import Queue, Empty
 
 from flask_sockets import Sockets
-from gevent.lock import BoundedSemaphore
 from geventwebsocket import WebSocketError
 from jsonschema.exceptions import ValidationError
 from requests.exceptions import ConnectionError

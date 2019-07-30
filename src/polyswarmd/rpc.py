@@ -1,9 +1,12 @@
+from concurrent.futures import ThreadPoolExecutor
 import gevent
 import json
 
 from gevent.lock import BoundedSemaphore
 from requests.exceptions import ConnectionError
 from polyswarmartifact.schema import Bounty as BountyMetadata
+from requests_futures.sessions import FuturesSession
+
 from polyswarmd.utils import *
 
 
@@ -14,6 +17,8 @@ class GethRpc:
     """
     def __init__(self, chain):
         self.chain = chain
+        self.session = FuturesSession(executor=ThreadPoolExecutor(32),
+                                      adapter_kwargs={'max_retries': 3})
         self.assertion_filter = None
         self.block_filter = None
         self.bounty_filter = None
@@ -50,9 +55,10 @@ class GethRpc:
             self.init_filter.get_new_entries()
 
     # noinspection PyBroadException
-    def poll(self):
-        from polyswarmd.bounties import substitute_ipfs_metadata
+    def poll(self, ipfs_uri):
+        logger.info('Starting greenlet')
         self.setup_filters()
+        from polyswarmd.bounties import substitute_ipfs_metadata
         while True:
             gevent.sleep(1)
             # Check that there is some websocket connection
@@ -91,7 +97,10 @@ class GethRpc:
                     }
                     metadata = bounty['data'].get('metadata', None)
                     if metadata:
-                        bounty['data']['metadata'] = substitute_ipfs_metadata(metadata, BountyMetadata.validate)
+                        bounty['data']['metadata'] = substitute_ipfs_metadata(metadata,
+                                                                              validate=BountyMetadata.validate,
+                                                                              ipfs_root=ipfs_uri,
+                                                                              session=self.session)
                     else:
                         bounty['data']['metadata'] = None
 
@@ -113,7 +122,9 @@ class GethRpc:
                         'block_number': event.blockNumber,
                         'txhash': event.transactionHash.hex(),
                     }
-                    reveal['data']['metadata'] = substitute_ipfs_metadata(reveal['data'].get('metadata', ''))
+                    reveal['data']['metadata'] = substitute_ipfs_metadata(reveal['data'].get('metadata', ''),
+                                                                          ipfs_root=ipfs_uri,
+                                                                          session=self.session)
 
                     self.broadcast(reveal)
 
@@ -184,8 +195,8 @@ class GethRpc:
         Gets all events going forward
         :param ws: websocket to send to
         """
-        # Cross greenlet communication here
         start = False
+        # Cross greenlet list
         with self.websockets_lock:
             if self.websockets is None:
                 start = True
@@ -199,7 +210,9 @@ class GethRpc:
 
         if start:
             logger.debug('First websocket registered, starting greenlet')
-            gevent.spawn(self.poll)
+            from polyswarmd import app
+            ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
+            gevent.spawn(self.poll, ipfs_uri)
 
     def setup_filters(self):
         self.block_filter = self.chain.w3.eth.filter('latest')

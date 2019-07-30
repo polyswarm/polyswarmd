@@ -82,12 +82,15 @@ def post_to_ipfs(files, wrap_dir=False):
     return 201, json.loads(r.text.splitlines()[-1])['Hash']
 
 
-def get_from_ipfs(ipfs_uri):
-    config = app.config['POLYSWARMD']
-    session = app.config['REQUESTS_SESSION']
+def get_from_ipfs(ipfs_uri, ipfs_root=None, session=None):
+    if not ipfs_root:
+        ipfs_root = app.config['POLYSWARMD'].ipfs_uri
+
+    if not session:
+        session = app.config['REQUESTS_SESSION']
 
     try:
-        future = session.get(config.ipfs_uri + '/api/v0/cat', params={'arg': ipfs_uri}, timeout=1)
+        future = session.get(ipfs_root + '/api/v0/cat', params={'arg': ipfs_uri}, timeout=1)
         r = future.result()
         r.raise_for_status()
     except requests.exceptions.HTTPError as e:

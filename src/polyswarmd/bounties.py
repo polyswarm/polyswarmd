@@ -54,17 +54,19 @@ def calculate_commitment(account, verdicts):
 
 
 @cache.memoize(30)
-def substitute_ipfs_metadata(ipfs_uri, validate=AssertionMetadata.validate):
+def substitute_ipfs_metadata(ipfs_uri, validate=AssertionMetadata.validate, ipfs_root=None, session=None):
     """Download metadata from IPFS and validate it against the schema.
 
     :param ipfs_uri: Potential IPFS uri string
     :param validate: Function that takes a loaded json blob and returns true if it matches the schema
+    :param ipfs_root: Root uri for ipfs
+    :param session: Requests session for ipfs request
     :return: Metadata from IPFS, or original metadata
     """
     if not is_valid_ipfshash(ipfs_uri):
         return ipfs_uri
 
-    status_code, content = get_from_ipfs(ipfs_uri)
+    status_code, content = get_from_ipfs(ipfs_uri, ipfs_root=ipfs_root, session=session)
     try:
         if status_code // 100 == 2 and validate(json.loads(content.decode('utf-8'))):
             return json.loads(content.decode('utf-8'))
