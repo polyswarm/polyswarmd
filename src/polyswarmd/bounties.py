@@ -188,7 +188,6 @@ def get_bounty_parameters():
 
 
 @bounties.route('/<uuid:guid>', methods=['GET'])
-@cache.memoize(1)
 @chain
 def get_bounties_guid(guid):
     bounty = bounty_to_dict(
@@ -409,7 +408,6 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['GET'])
-@cache.memoize(1)
 @chain
 def get_bounties_guid_assertions(guid):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
@@ -434,7 +432,6 @@ def get_bounties_guid_assertions(guid):
 
 
 @bounties.route('/<uuid:guid>/assertions/<int:id_>', methods=['GET'])
-@cache.memoize(1)
 @chain
 def get_bounties_guid_assertions_id(guid, id_):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
@@ -452,7 +449,6 @@ def get_bounties_guid_assertions_id(guid, id_):
 
 
 @bounties.route('/<uuid:guid>/votes', methods=['GET'])
-@cache.memoize(1)
 @chain
 def get_bounties_guid_votes(guid):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
@@ -476,7 +472,6 @@ def get_bounties_guid_votes(guid):
 
 
 @bounties.route('/<uuid:guid>/votes/<int:id_>', methods=['GET'])
-@cache.memoize(1)
 @chain
 def get_bounties_guid_votes_id(guid, id_):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())

@@ -8,6 +8,7 @@ from polyswarmd.response import success, failure
 logger = logging.getLogger(__name__)
 balances = Blueprint('balances', __name__)
 
+
 @balances.route('/<address>/eth', methods=['GET'])
 @chain(account_required=False)
 def get_balance_address_eth(address):
@@ -21,6 +22,7 @@ def get_balance_address_eth(address):
     except Exception:
         logger.exception('Unexpected exception retrieving ETH balance')
         return failure("Could not retrieve balance")
+
 
 @balances.route('/<address>/staking/total', methods=['GET'])
 @chain(account_required=False)
