@@ -37,7 +37,7 @@ class GethRpc:
         logger.debug('Sending: %s', message)
         with self.websockets_lock:
             for ws in self.websockets:
-                logger.critical('Sending ws %s %s', ws, message)
+                logger.debug('Sending ws %s %s', ws, message)
                 ws.send(json.dumps(message))
 
     def flush_filters(self):
@@ -56,18 +56,16 @@ class GethRpc:
 
     # noinspection PyBroadException
     def poll(self, ipfs_uri):
-        logger.info('Starting greenlet')
         self.setup_filters()
         from polyswarmd.bounties import substitute_ipfs_metadata
         while True:
             gevent.sleep(1)
-            # Check that there is some websocket connection
+            # If there is no websocket, don't sleep loop, just exit
             with self.websockets_lock:
-                skip = not self.websockets
-
-            # If there isn't, hit the filters anyway, since we don't want old data
-            if skip:
-                continue
+                if not self.websockets:
+                    # Set websockets to None so the greenlet is recreated on new join
+                    self.websockets = None
+                    return
 
             try:
                 for event in self.fee_filter.get_new_entries():
@@ -185,9 +183,10 @@ class GethRpc:
                 logger.exception('ConnectionError in filters (is geth down?)')
                 continue
             except Exception:
-                logger.exception('Exception in filter checks, resetting filters')
-                self.flush_filters()
-                continue
+                logger.exception('Exception in filter checks, restarting greenlet')
+                # Creates a new greenlet with all new filters and let's this one die.
+                gevent.spawn(self.poll, ipfs_uri)
+                break
 
     def register(self, ws):
         """
@@ -202,8 +201,9 @@ class GethRpc:
                 start = True
                 self.websockets = []
             elif not self.websockets:
-                # Clear the filters of old data
-                logger.critical('Clearing out of date filter events.')
+                # Clear the filters of old data.
+                # Possible when last ws closes & new one opens before the 1 second sleep triggers again in the poll loop
+                logger.debug('Clearing out of date filter events.')
                 self.flush_filters()
 
             self.websockets.append(ws)
@@ -233,5 +233,5 @@ class GethRpc:
         logger.debug('Unregistering websocket %s', ws)
         with self.websockets_lock:
             if ws in self.websockets:
-                logger.critical('Removing ws %s', ws)
+                logger.debug('Removing ws %s', ws)
                 self.websockets.remove(ws)
