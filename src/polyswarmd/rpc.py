@@ -10,10 +10,9 @@ from requests_futures.sessions import FuturesSession
 from polyswarmd.utils import *
 
 
-class GethRpc:
+class EthereumRpc:
     """
-    This class periodically polls several geth filters, and multicasts the results across any open websockets
-
+    This class periodically polls several geth filters, and multicasts the results across any open WebSockets
     """
     def __init__(self, chain):
         self.chain = chain
@@ -34,13 +33,20 @@ class GethRpc:
         self.websockets = None
 
     def broadcast(self, message):
+        """
+        Send a message to all connected WebSockets
+        :param message: dict to be converted to json and sent
+        """
         logger.debug('Sending: %s', message)
         with self.websockets_lock:
             for ws in self.websockets:
-                logger.debug('Sending ws %s %s', ws, message)
+                logger.debug('Sending WebSocket %s %s', ws, message)
                 ws.send(json.dumps(message))
 
     def flush_filters(self):
+        """
+        Clear filters of existing entires
+        """
         self.block_filter.get_new_entries()
         self.fee_filter.get_new_entries()
         self.window_filter.get_new_entries()
@@ -56,6 +62,10 @@ class GethRpc:
 
     # noinspection PyBroadException
     def poll(self, ipfs_uri):
+        """
+        Continually poll all Ethereum filters as long as there are WebSockets listening
+        :param ipfs_uri: IPFS root uri
+        """
         self.setup_filters()
         from polyswarmd.bounties import substitute_ipfs_metadata
         while True:
@@ -190,9 +200,9 @@ class GethRpc:
 
     def register(self, ws):
         """
-        Register a websocket with the rpc nodes
+        Register a WebSocket with the rpc nodes
         Gets all events going forward
-        :param ws: websocket to send to
+        :param ws: WebSocket wrapper to register
         """
         start = False
         # Cross greenlet list
@@ -202,19 +212,22 @@ class GethRpc:
                 self.websockets = []
             elif not self.websockets:
                 # Clear the filters of old data.
-                # Possible when last ws closes & new one opens before the 1 second sleep triggers again in the poll loop
+                # Possible when last WebSocket closes & a new one opens before the 1 poll sleep ends
                 logger.debug('Clearing out of date filter events.')
                 self.flush_filters()
 
             self.websockets.append(ws)
 
         if start:
-            logger.debug('First websocket registered, starting greenlet')
+            logger.debug('First WebSocket registered, starting greenlet')
             from polyswarmd import app
             ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
             gevent.spawn(self.poll, ipfs_uri)
 
     def setup_filters(self):
+        """
+        Start all required filters on the eth node.
+        """
         self.block_filter = self.chain.w3.eth.filter('latest')
         self.fee_filter = self.chain.bounty_registry.contract.eventFilter('FeesUpdated')
         self.window_filter = self.chain.bounty_registry.contract.eventFilter('WindowsUpdated')
@@ -230,8 +243,12 @@ class GethRpc:
             self.init_filter = self.chain.offer_registry.contract.eventFilter('InitializedChannel')
 
     def unregister(self, ws):
-        logger.debug('Unregistering websocket %s', ws)
+        """
+        Remove a Websocket wrapper object
+        :param ws: WebSocket to remove
+        """
+        logger.debug('Unregistering WebSocket %s', ws)
         with self.websockets_lock:
             if ws in self.websockets:
-                logger.debug('Removing ws %s', ws)
+                logger.debug('Removing WebSocket %s', ws)
                 self.websockets.remove(ws)

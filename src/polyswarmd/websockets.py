@@ -3,9 +3,8 @@ import json
 import jsonschema
 import time
 
-from gevent.queue import Queue, Empty
-
 from flask_sockets import Sockets
+from gevent.queue import Queue, Empty
 from geventwebsocket import WebSocketError
 from jsonschema.exceptions import ValidationError
 from requests.exceptions import ConnectionError
@@ -15,20 +14,31 @@ from polyswarmd.utils import *
 logger = logging.getLogger(__name__)
 
 
-class Websocket:
+class WebSocket:
+    """
+    Wrapper around a WebSocket that has a queue of messages that can be sent from another greenlet.
+    """
     def __init__(self, ws):
+        """
+        Create a wrapper around a WebSocket with a guid to easily identify it, and a queue of messages to send
+        :param ws: gevent WebSocket to wrap
+        """
         self.guid = uuid.uuid4()
         self.ws = ws
         self.queue = Queue()
 
     def send(self, message):
+        """
+        Add message to the queue of messages to be sent
+        :param message: json blob to be sent over the WebSocket
+        """
         self.queue.put(message)
 
     def __repr__(self):
         return f'<Websocket UUID={str(self.guid)}>'
 
     def __eq__(self, other):
-        return isinstance(other, Websocket) and \
+        return isinstance(other, WebSocket) and \
                other.guid == self.guid
 
 
@@ -49,17 +59,20 @@ def init_websockets(app):
                 }
             }))
 
-        wrapper = Websocket(ws)
+        wrapper = WebSocket(ws)
 
         rpc.register(wrapper)
 
         while not ws.closed:
             try:
+                # Try to read a message off the queue, and then send over the websocket.
                 msg = wrapper.queue.get(block=False)
                 ws.send(msg)
             except Empty:
+                # Anytime there are no new messages to send, check that the websocket is still connected with ws.receive
                 with gevent.Timeout(.5, False):
                     logger.debug('Checking %s against timeout', wrapper)
+                    # This raises WebSocketError if socket is closed, and does not block if there are no messages
                     ws.receive()
             except WebSocketError as e:
                 logger.error('Websocket %s closed %s', wrapper, e)

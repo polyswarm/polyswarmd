@@ -243,7 +243,8 @@ def camel_case_to_snake_case(s):
 
 
 def to_padded_hex(val: Union[str, bool, int, bytes]) -> str:
-    """Convert an argument to a hexadecimal string and zero-extend to 64 width"""
+    """
+    Convert an argument to a hexadecimal string and zero-extend to 64 width"""
     def encode_hex(xs: bytes) -> str:
         return codecs.encode(xs, "hex").decode("ascii") # type: ignore
 

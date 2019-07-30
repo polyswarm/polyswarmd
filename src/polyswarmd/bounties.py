@@ -1,7 +1,7 @@
 import json
+import jsonschema
 import logging
 import os
-import jsonschema
 import uuid
 
 from ethereum.utils import sha3
@@ -55,7 +55,8 @@ def calculate_commitment(account, verdicts):
 
 @cache.memoize(30)
 def substitute_ipfs_metadata(ipfs_uri, validate=AssertionMetadata.validate, ipfs_root=None, session=None):
-    """Download metadata from IPFS and validate it against the schema.
+    """
+    Download metadata from IPFS and validate it against the schema.
 
     :param ipfs_uri: Potential IPFS uri string
     :param validate: Function that takes a loaded json blob and returns true if it matches the schema
