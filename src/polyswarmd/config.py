@@ -18,6 +18,7 @@ from web3.middleware import geth_poa_middleware
 
 from polyswarmd.eth import ZERO_ADDRESS
 from polyswarmd.utils import camel_case_to_snake_case
+from polyswarmd.rpc import EthereumRpc
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +154,7 @@ class ChainConfig(object):
         self.erc20_relay = erc20_relay
         self.offer_registry = offer_registry
         self.offer_multisig = offer_multisig
+        self.rpc = EthereumRpc(self)
 
         self.free = free
         self.config_filename = ''

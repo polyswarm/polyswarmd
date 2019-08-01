@@ -11,11 +11,13 @@ from polyswarmd.eth import build_transaction
 logger = logging.getLogger(__name__)
 relay = Blueprint('relay', __name__)
 
+
 @relay.route('/deposit', methods=['POST'])
 @chain(chain_name='home')
 def deposit_funds():
     # Move funds from home to side
     return send_funds_from()
+
 
 @relay.route('/withdrawal', methods=['POST'])
 @chain(chain_name='side')
@@ -23,10 +25,12 @@ def withdraw_funds():
     # Move funds from side to home
     return send_funds_from()
 
+
 @relay.route('/fees', methods=['GET'])
 @chain
 def fees():
     return success({'fees': g.chain.erc20_relay.functions.fees().call()})
+
 
 def send_funds_from():
     # Grab correct versions by chain type

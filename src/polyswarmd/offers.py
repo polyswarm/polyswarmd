@@ -577,7 +577,7 @@ def get_websocket(guid):
 
     if not validate_ws_url(socket_uri):
         return failure(
-            'Contract does not have a valid websocket uri',
+            'Contract does not have a valid WebSocket uri',
             400)
 
     return success({'websocket': socket_uri})

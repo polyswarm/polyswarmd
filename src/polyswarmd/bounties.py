@@ -1,8 +1,7 @@
-import functools
 import json
+import jsonschema
 import logging
 import os
-import jsonschema
 import uuid
 
 from ethereum.utils import sha3
@@ -54,18 +53,21 @@ def calculate_commitment(account, verdicts):
     return int_from_bytes(nonce), int_from_bytes(commitment)
 
 
-@functools.lru_cache(maxsize=256)
-def substitute_ipfs_metadata(ipfs_uri, validate=AssertionMetadata.validate):
-    """Download metadata from IPFS and validate it against the schema.
+@cache.memoize(30)
+def substitute_ipfs_metadata(ipfs_uri, validate=AssertionMetadata.validate, ipfs_root=None, session=None):
+    """
+    Download metadata from IPFS and validate it against the schema.
 
     :param ipfs_uri: Potential IPFS uri string
     :param validate: Function that takes a loaded json blob and returns true if it matches the schema
+    :param ipfs_root: Root uri for ipfs
+    :param session: Requests session for ipfs request
     :return: Metadata from IPFS, or original metadata
     """
     if not is_valid_ipfshash(ipfs_uri):
         return ipfs_uri
 
-    status_code, content = get_from_ipfs(ipfs_uri)
+    status_code, content = get_from_ipfs(ipfs_uri, ipfs_root=ipfs_root, session=session)
     try:
         if status_code // 100 == 2 and validate(json.loads(content.decode('utf-8'))):
             return json.loads(content.decode('utf-8'))
@@ -161,6 +163,7 @@ def post_bounties():
 
 
 @bounties.route('/parameters', methods=['GET'])
+@cache.memoize(1)
 @chain
 def get_bounty_parameters():
     bounty_fee = g.chain.bounty_registry.contract.functions.bountyFee().call()
@@ -405,7 +408,6 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['GET'])
-@cache.memoize(30)
 @chain
 def get_bounties_guid_assertions(guid):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
@@ -433,7 +435,6 @@ def get_bounties_guid_assertions(guid):
 
 
 @bounties.route('/<uuid:guid>/assertions/<int:id_>', methods=['GET'])
-@cache.memoize(30)
 @chain
 def get_bounties_guid_assertions_id(guid, id_):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
@@ -489,6 +490,7 @@ def get_bounties_guid_votes_id(guid, id_):
 
 
 @bounties.route('/<uuid:guid>/bloom', methods=['GET'])
+@cache.memoize(30)
 @chain
 def get_bounties_guid_bloom(guid):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
