@@ -1,3 +1,4 @@
+import time
 from concurrent.futures import ThreadPoolExecutor
 import gevent
 import json
@@ -31,6 +32,21 @@ class EthereumRpc:
         self.window_filter = None
         self.websockets_lock = BoundedSemaphore(1)
         self.websockets = None
+
+    @staticmethod
+    def compute_sleep(diff):
+        """ Adjusts sleep based on the difference of last iteration.
+        If last iteration took over 500 millis, adjust this sleep lower. Otherwise, return 500
+
+
+        :param diff: time in millis
+        :return: sleep time in millis
+        """
+        if diff > 500:
+            sleep = 1000 - diff
+            return sleep if sleep > 0 else 0
+        else:
+            return 500
 
     def broadcast(self, message):
         """
@@ -68,7 +84,11 @@ class EthereumRpc:
         """
         self.setup_filters()
         from polyswarmd.bounties import substitute_ipfs_metadata
+        last = time.time() * 1000 // 1
         while True:
+            now = time.time() * 1000 // 1
+            gevent.sleep(EthereumRpc.compute_sleep(now - last) / 1000)
+            last = now
             # If there is no websocket, exit greenlet
             with self.websockets_lock:
                 if not self.websockets:
