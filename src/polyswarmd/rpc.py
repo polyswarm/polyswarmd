@@ -69,8 +69,7 @@ class EthereumRpc:
         self.setup_filters()
         from polyswarmd.bounties import substitute_ipfs_metadata
         while True:
-            gevent.sleep(1)
-            # If there is no websocket, don't sleep loop, just exit
+            # If there is no websocket, exit greenlet
             with self.websockets_lock:
                 if not self.websockets:
                     # Set websockets to None so the greenlet is recreated on new join
