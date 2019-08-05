@@ -21,30 +21,23 @@ before_script:
 # Build Stage (jobs inside a stage run in parallel)
 ###############################################################
 
-# triggers itself in a new pipeline with the MANUAL_IMAGE_TAG=manual-tag
-self-trigger-with-manual-tag:
-  stage: build
-  tags:
-    - kube
-  script:
-    - >-
-      curl
-      --request POST
-      --form "token=$CI_JOB_TOKEN"
-      --form "variables[MANUAL_IMAGE_TAG]=manual-tag"
-      --form ref=$CI_COMMIT_REF_NAME
-      "https://gitlab.polyswarm.io/api/v4/projects/$CI_PROJECT_ID/trigger/pipeline"
-  when: manual
-
-
 build:
   stage: build
   tags:
     - kube
   script:
-    - docker pull $REPO_URL/$BASE_IMAGE_NAME:latest || true
-    - docker build -t $REPO_URL/$BASE_IMAGE_NAME:${MANUAL_IMAGE_TAG:-$CI_COMMIT_SHA} -f docker/Dockerfile --cache-from=$REPO_URL/$BASE_IMAGE_NAME:latest .
-    - docker push $REPO_URL/$BASE_IMAGE_NAME:${MANUAL_IMAGE_TAG:-$CI_COMMIT_SHA}
+     # try to download a cache image
+     - docker pull $REPO_URL/$BASE_IMAGE_NAME:latest || true
+     # explicitly pull the latest version of the dependant image
+     - docker pull python:3.6-jessie
+     - docker build
+       -f docker/Dockerfile
+       -t $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
+       -t $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_REF_SLUG
+       --cache-from=$REPO_URL/$BASE_IMAGE_NAME:latest
+       .
+     - docker push $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
+     - docker push $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_REF_SLUG
 
 ###############################################################
 # Test Stage
@@ -66,9 +59,9 @@ e2e:
   tags:
     - kube
   script:
-    - pip install $END_TO_END_LIB
+    - pip install $END_TO_END_LIB@$CI_COMMIT_REF_NAME || pip install $END_TO_END_LIB
     - e2e init
-    - E2E_FORCE_TAGS=$MANUAL_IMAGE_TAG e2e run
+    - e2e run
 
 ###############################################################
 # Release Stage
@@ -82,10 +75,10 @@ release-latest:
     - master
   script:
     # Gets the current image that was built in the CI for this commit
-    - docker pull $REPO_URL/$BASE_IMAGE_NAME:${MANUAL_IMAGE_TAG:-$CI_COMMIT_SHA}
+    - docker pull $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
     # Creates new tags for this image, one that should go to AWS and another to DockerHub with the tag "latest"
-    - docker tag $REPO_URL/$BASE_IMAGE_NAME:${MANUAL_IMAGE_TAG:-$CI_COMMIT_SHA} $REPO_URL/$BASE_IMAGE_NAME:latest
-    - docker tag $REPO_URL/$BASE_IMAGE_NAME:${MANUAL_IMAGE_TAG:-$CI_COMMIT_SHA} polyswarm/$BASE_IMAGE_NAME:latest
+    - docker tag $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA $REPO_URL/$BASE_IMAGE_NAME:latest
+    - docker tag $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA polyswarm/$BASE_IMAGE_NAME:latest
     # Pushes to AWS
     - docker push $REPO_URL/$BASE_IMAGE_NAME:latest
     # Pushes to DockerHub
@@ -101,10 +94,10 @@ release-tag:
     - tags
   script:
     # Gets the current image that was built in the CI for this commit
-    - docker pull $REPO_URL/$BASE_IMAGE_NAME:${MANUAL_IMAGE_TAG:-$CI_COMMIT_SHA}
+    - docker pull $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
     # Creates new tags for this image, one that should go to AWS and another to DockerHub with the tag from git
-    - docker tag $REPO_URL/$BASE_IMAGE_NAME:${MANUAL_IMAGE_TAG:-$CI_COMMIT_SHA} $REPO_URL/$BASE_IMAGE_NAME:$(git describe --tags --abbrev=0)
-    - docker tag $REPO_URL/$BASE_IMAGE_NAME:${MANUAL_IMAGE_TAG:-$CI_COMMIT_SHA} polyswarm/$BASE_IMAGE_NAME:$(git describe --tags --abbrev=0)
+    - docker tag $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA $REPO_URL/$BASE_IMAGE_NAME:$(git describe --tags --abbrev=0)
+    - docker tag $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA polyswarm/$BASE_IMAGE_NAME:$(git describe --tags --abbrev=0)
     # Pushes to AWS
     - docker push $REPO_URL/$BASE_IMAGE_NAME:$(git describe --tags --abbrev=0)
     # Pushes to DockerHub
