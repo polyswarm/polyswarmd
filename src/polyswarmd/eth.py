@@ -208,6 +208,7 @@ def post_transactions():
 
     return success(results)
 
+
 def build_transaction(call, nonce):
     options = {
         'nonce': nonce,

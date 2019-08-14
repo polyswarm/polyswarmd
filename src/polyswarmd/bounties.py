@@ -46,10 +46,10 @@ def int_from_bytes(b):
     return int.from_bytes(b, byteorder='big')
 
 
-def calculate_commitment(account, verdicts):
+def calculate_commitment(account, verdicts, bid_portion):
     nonce = os.urandom(32)
     account = int(account, 16)
-    commitment = sha3(int_to_bytes(verdicts ^ int_from_bytes(sha3(nonce)) ^ account))
+    commitment = sha3(int_to_bytes(verdicts ^ int_from_bytes(sha3(nonce)) ^ int_from_bytes(sha3(bid_portion)) ^ account))
     return int_from_bytes(nonce), int_from_bytes(commitment)
 
 
@@ -288,6 +288,16 @@ def post_bounties_guid_assertions(guid):
     schema = {
         'type': 'object',
         'properties': {
+            'bidPortion': {
+                'type': 'array',
+                'maxItems': 256,
+                'minItems': 1,
+                'items': {
+                    'type': 'number',
+                    'minimum': 0,
+                    'exclusiveMaximum': 256,
+                }
+            },
             'bid': {
                 'type': 'string',
                 'minLength': 1,
@@ -325,7 +335,9 @@ def post_bounties_guid_assertions(guid):
         return failure('Invalid JSON: ' + e.message, 400)
 
     bid = int(body['bid'])
+    bid_portion = body.get('bidPortion')
     mask = bool_list_to_int(body['mask'])
+    verdict_count = len([m for m in body['mask'] if m])
 
     commitment = body.get('commitment')
     verdicts = body.get('verdicts')
@@ -333,21 +345,24 @@ def post_bounties_guid_assertions(guid):
     if commitment is None and verdicts is None:
         return failure('Require verdicts or a commitment', 400)
 
-    if bid < eth.assertion_bid_min(g.chain.bounty_registry.contract):
+    if len(bid_portion) != verdict_count:
+        return failure('bidPortion must be equal in length to the number of true mask values', 400)
+
+    if bid < eth.assertion_bid_min(g.chain.bounty_registry.contract) * verdict_count:
         return failure('Invalid assertion bid', 400)
 
-    approveAmount = bid + eth.assertion_fee(g.chain.bounty_registry.contract)
+    approve_amount = bid + eth.assertion_fee(g.chain.bounty_registry.contract)
 
     nonce = None
     if commitment is None:
-        nonce, commitment = calculate_commitment(account, bool_list_to_int(verdicts))
+        nonce, commitment = calculate_commitment(account, bool_list_to_int(verdicts), bytes(bid_portion))
     else:
         commitment = int(commitment)
 
     ret = {'transactions': [
         build_transaction(
             g.chain.nectar_token.contract.functions.approve(g.chain.bounty_registry.contract.address,
-                                                            approveAmount), base_nonce),
+                                                            approve_amount), base_nonce),
         build_transaction(g.chain.bounty_registry.contract.functions.postAssertion(guid.int, bid, mask, commitment),
                           base_nonce + 1),
     ]}
@@ -381,6 +396,16 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
                     'type': 'boolean',
                 },
             },
+            'bidPortion': {
+                'type': 'array',
+                'maxItems': 256,
+                'minItems': 1,
+                'items': {
+                    'type': 'number',
+                    'minimum': 0,
+                    'exclusiveMaximum': 256,
+                }
+            },
             'metadata': {
                 'type': 'string',
                 'maxLength': 1024,
@@ -397,11 +422,13 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 
     nonce = int(body['nonce'])
     verdicts = bool_list_to_int(body['verdicts'])
+    bid_portion = body['bidPortion']
     metadata = body['metadata']
 
     transactions = [
         build_transaction(
-            g.chain.bounty_registry.contract.functions.revealAssertion(guid.int, id_, nonce, verdicts, metadata),
+            g.chain.bounty_registry.contract.functions.revealAssertion(guid.int, id_, nonce, verdicts,
+                                                                       bytes(bid_portion), metadata),
             base_nonce),
     ]
     return success({'transactions': transactions})
