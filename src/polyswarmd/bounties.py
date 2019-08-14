@@ -342,8 +342,8 @@ def post_bounties_guid_assertions(guid):
     commitment = body.get('commitment')
     verdicts = body.get('verdicts')
 
-    if commitment is None and verdicts is None:
-        return failure('Require verdicts or a commitment', 400)
+    if commitment is None and (verdicts is None or bid_portion is None):
+        return failure('Require verdicts and bidPortion or a commitment', 400)
 
     if len(bid_portion) != verdict_count:
         return failure('bidPortion must be equal in length to the number of true mask values', 400)
@@ -411,7 +411,7 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
                 'maxLength': 1024,
             },
         },
-        'required': ['nonce', 'verdicts', 'metadata'],
+        'required': ['nonce', 'verdicts', 'bidPortion', 'metadata'],
     }
 
     body = request.get_json()
