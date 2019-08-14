@@ -79,6 +79,10 @@ def wait_for_consul_key_deletion(client, key, recurse=False, index=0):
             continue
 
 
+def free_gas_strategy(web3, tx_params):
+    return Web3.toWei(0)
+
+
 class ContractConfig(object):
     def __init__(self, w3, name, abi, address=None):
         self.name = name
@@ -180,6 +184,9 @@ class ChainConfig(object):
         w3 = Web3(HTTPProvider(eth_uri))
         w3.middleware_stack.inject(geth_poa_middleware, layer=0)
 
+        if free:
+            w3.eth.setGasPriceStrategy(free_gas_strategy)
+
         contract_configs = {}
 
         contracts_dir = os.path.join(os.path.dirname(filename), 'contracts')
@@ -213,6 +220,9 @@ class ChainConfig(object):
         free = config.get('free', False)
         w3 = Web3(HTTPProvider(eth_uri))
         w3.middleware_stack.inject(geth_poa_middleware, layer=0)
+
+        if free:
+            w3.eth.setGasPriceStrategy(free_gas_strategy)
 
         # TODO schema check json
         expected_contracts = ['NectarToken', 'BountyRegistry', 'ArbiterStaking', 'ERC20Relay', 'OfferRegistry',
