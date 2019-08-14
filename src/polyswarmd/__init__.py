@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['POLYSWARMD'] = Config.auto()
 
-session = FuturesSession(executor=ThreadPoolExecutor(16),
-                         adapter_kwargs={'max_retries': 3})
+session = FuturesSession(executor=ThreadPoolExecutor(4),
+                         adapter_kwargs={'max_retries': 2})
 
-session.request = functools.partial(session.request, timeout=3)
+session.request = functools.partial(session.request, timeout=10)
 
 app.config['REQUESTS_SESSION'] = session
 
