@@ -76,6 +76,7 @@ def get_nonce():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     return success(g.chain.w3.eth.getTransactionCount(account, 'pending'))
 
+
 @misc.route('/transactions', methods=['GET'])
 @chain
 def get_transactions():
@@ -112,6 +113,7 @@ def get_transactions():
         logging.exception('Got transaction errors: %s', ret['errors'])
         return failure(ret, 400)
     return success(ret)
+
 
 @misc.route('/transactions', methods=['POST'])
 @chain
@@ -431,7 +433,7 @@ def bounty_amount_min(bounty_registry):
 
 
 def assertion_bid_min(bounty_registry):
-    return bounty_registry.functions.ASSERTION_BID_MINIMUM().call()
+    return bounty_registry.functions.ASSERTION_BID_ARTIFACT_MINIMUM().call()
 
 
 def staking_total_max(arbiter_staking):

@@ -112,7 +112,7 @@ def revealed_assertion_event_to_dict(revealed_assertion_event):
         'index': revealed_assertion_event.index,
         'nonce': str(revealed_assertion_event.nonce),
         'verdicts': safe_int_to_bool_list(revealed_assertion_event.verdicts, revealed_assertion_event.numArtifacts),
-        'bid_portion': (int(b) for b in revealed_assertion_event.bidPortion),
+        'bid_portions': [int(b) for b in revealed_assertion_event.bidPortion],
         'metadata': revealed_assertion_event.metadata,
     }
 

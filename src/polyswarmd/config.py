@@ -27,7 +27,7 @@ CONFIG_LOCATIONS = ['/etc/polyswarmd', '~/.config/polyswarmd']
 # Allow interfacing with contract versions in this range
 SUPPORTED_CONTRACT_VERSIONS = {
     'ArbiterStaking': ((1, 2, 0), (1, 3, 0)),
-    'BountyRegistry': ((1, 2, 0), (1, 4, 0)),
+    'BountyRegistry': ((1, 2, 0), (1, 5, 0)),
     'ERC20Relay': ((1, 1, 0), (1, 3, 0)),
     'OfferRegistry': ((1, 2, 0), (1, 3, 0)),
 }

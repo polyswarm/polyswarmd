@@ -49,7 +49,7 @@ def int_from_bytes(b):
 def calculate_commitment(account, verdicts, bid_portion):
     nonce = os.urandom(32)
     account = int(account, 16)
-    commitment = sha3(int_to_bytes(verdicts ^ int_from_bytes(sha3(nonce)) ^ int_from_bytes(sha3(bid_portion)) ^ account))
+    commitment = sha3(int_to_bytes(verdicts ^ int_from_bytes(sha3(nonce)) ^ int_from_bytes(sha3((bytes(bid_portion))) ^ account)))
     return int_from_bytes(nonce), int_from_bytes(commitment)
 
 
@@ -169,7 +169,7 @@ def get_bounty_parameters():
     bounty_fee = g.chain.bounty_registry.contract.functions.bountyFee().call()
     assertion_fee = g.chain.bounty_registry.contract.functions.assertionFee().call()
     bounty_amount_minimum = g.chain.bounty_registry.contract.functions.BOUNTY_AMOUNT_MINIMUM().call()
-    assertion_bid_minimum = g.chain.bounty_registry.contract.functions.ASSERTION_BID_MINIMUM().call()
+    assertion_bid_minimum = g.chain.bounty_registry.contract.functions.ASSERTION_BID_ARTIFACT_MINIMUM().call()
     arbiter_lookback_range = g.chain.bounty_registry.contract.functions.ARBITER_LOOKBACK_RANGE().call()
     max_duration = g.chain.bounty_registry.contract.functions.MAX_DURATION().call()
     assertion_reveal_window = g.chain.bounty_registry.contract.functions.ASSERTION_REVEAL_WINDOW().call()
@@ -288,14 +288,12 @@ def post_bounties_guid_assertions(guid):
     schema = {
         'type': 'object',
         'properties': {
-            'bidPortion': {
+            'bid_portions': {
                 'type': 'array',
+                'minItems': 0,
                 'maxItems': 256,
-                'minItems': 1,
                 'items': {
                     'type': 'number',
-                    'minimum': 0,
-                    'exclusiveMaximum': 256,
                 }
             },
             'bid': {
@@ -335,7 +333,7 @@ def post_bounties_guid_assertions(guid):
         return failure('Invalid JSON: ' + e.message, 400)
 
     bid = int(body['bid'])
-    bid_portion = body.get('bidPortion')
+    bid_portion = body.get('bid_portions')
     mask = bool_list_to_int(body['mask'])
     verdict_count = len([m for m in body['mask'] if m])
 
@@ -343,10 +341,13 @@ def post_bounties_guid_assertions(guid):
     verdicts = body.get('verdicts')
 
     if commitment is None and (verdicts is None or bid_portion is None):
-        return failure('Require verdicts and bidPortion or a commitment', 400)
+        return failure('Require verdicts and bid_portions or a commitment', 400)
 
-    if len(bid_portion) != verdict_count:
-        return failure('bidPortion must be equal in length to the number of true mask values', 400)
+    if bid_portion and len(bid_portion) != verdict_count:
+        return failure('bid_portions must be equal in length to the number of true mask values', 400)
+
+    if bid_portion and any(portion < 0 or portion >= 256 for portion in bid_portion):
+        return failure('bid_portions values must be between 0 and 255, inclusive.', 400)
 
     if bid < eth.assertion_bid_min(g.chain.bounty_registry.contract) * verdict_count:
         return failure('Invalid assertion bid', 400)
@@ -355,7 +356,7 @@ def post_bounties_guid_assertions(guid):
 
     nonce = None
     if commitment is None:
-        nonce, commitment = calculate_commitment(account, bool_list_to_int(verdicts), bytes(bid_portion))
+        nonce, commitment = calculate_commitment(account, bool_list_to_int(verdicts), bid_portion)
     else:
         commitment = int(commitment)
 
@@ -396,14 +397,12 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
                     'type': 'boolean',
                 },
             },
-            'bidPortion': {
+            'bid_portions': {
                 'type': 'array',
+                'minItems': 0,
                 'maxItems': 256,
-                'minItems': 1,
                 'items': {
                     'type': 'number',
-                    'minimum': 0,
-                    'exclusiveMaximum': 256,
                 }
             },
             'metadata': {
@@ -411,7 +410,7 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
                 'maxLength': 1024,
             },
         },
-        'required': ['nonce', 'verdicts', 'bidPortion', 'metadata'],
+        'required': ['nonce', 'verdicts', 'bid_portions', 'metadata'],
     }
 
     body = request.get_json()
@@ -422,8 +421,12 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 
     nonce = int(body['nonce'])
     verdicts = bool_list_to_int(body['verdicts'])
-    bid_portion = body['bidPortion']
+    bid_portion = body['bid_portions']
     metadata = body['metadata']
+
+    if bid_portion and any(portion < 0 or portion >= 256 for portion in bid_portion):
+        logger.critical(bid_portion)
+        return failure('bid_portions values must be between 0 and 255, inclusive.', 400)
 
     transactions = [
         build_transaction(
