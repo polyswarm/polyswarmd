@@ -76,7 +76,6 @@ def test_get_artifacts_ipfshash_id(client):
         assert rv.data == expected[1]
 
 
-
 def test_get_artifacts_ipfshash_id_stat(client):
     expected = (
         b'{"result":{"block_size":12,"cumulative_size":12,"data_size":10,"hash":"QmTz3oc4gdpRMKP2sdGUPZTAGRngqjsi99BPoztyP53JMM","links_size":2,"name":"bar","num_links":0},"status":"OK"}\n',
