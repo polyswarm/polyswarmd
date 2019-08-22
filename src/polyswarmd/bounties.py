@@ -451,6 +451,7 @@ def get_bounties_guid_assertions(guid):
         try:
             assertion = assertion_to_dict(
                 g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, i).call(),
+                g.chain.bounty_registry.contract.functions.bidPortionByGuid(guid.int, i).call(),
                 bounty['num_artifacts'])
             # Nonce is 0 when a reveal did not occur
             if assertion['nonce'] == "0":
@@ -472,8 +473,10 @@ def get_bounties_guid_assertions_id(guid, id_):
         return failure('Bounty not found', 404)
 
     try:
-        assertion = assertion_to_dict(g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, id_).call(),
-                                      bounty['num_artifacts'])
+        assertion = assertion_to_dict(
+            g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, id_).call(),
+            g.chain.bounty_registry.contract.functions.bidPortionByGuid(guid.int, id_).call(),
+            bounty['num_artifacts'])
         assertion['metadata'] = substitute_ipfs_metadata(assertion.get('metadata', ''))
 
         return success(assertion)

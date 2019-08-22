@@ -82,7 +82,7 @@ def new_bounty_event_to_dict(new_bounty_event):
     }
 
 
-def assertion_to_dict(assertion, num_artifacts):
+def assertion_to_dict(assertion, bid_portions, num_artifacts):
     return {
         'author': assertion[0],
         'bid': str(assertion[1]),
@@ -90,6 +90,7 @@ def assertion_to_dict(assertion, num_artifacts):
         'commitment': str(assertion[3]),
         'nonce': str(assertion[4]),
         'verdicts': safe_int_to_bool_list(assertion[5], num_artifacts),
+        'bid_portions': [int(portion) for portion in bid_portions],
         'metadata': assertion[6],
     }
 
