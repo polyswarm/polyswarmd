@@ -1,4 +1,4 @@
-FROM pypy:3.6-jessie
+FROM pypy:3.6-7.0-jessie
 LABEL maintainer="PolySwarm Developers <info@polyswarm.io>"
 
 WORKDIR /usr/src/app
