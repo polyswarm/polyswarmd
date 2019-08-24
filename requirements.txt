@@ -1,14 +1,14 @@
 base58==0.2.5
 python-consul==1.1.0
 click==7.0
-ethereum==2.3.2
+py-evm==0.3.0a5
 gevent==1.2.2
 gevent-websocket==0.10.1
 jsonschema==2.6.0
 Flask==1.0.2
 Flask-Caching==1.7.2
 Flask-Sockets==0.2.1
-polyswarm-artifact==1.2.0
+polyswarm-artifact==1.2.1
 psycopg2-binary==2.7.6.1
 PyYaml==4.2b4
 pytest== 4.0.0
@@ -17,7 +17,8 @@ requests==2.20.1
 requests-futures==0.9.9
 requests-mock==1.5.0
 rlp==1.1.0
-web3==4.8.1
+web3==4.9.2
 websocket-client==0.48.0
 Werkzeug==0.14.1
+pycryptodome==3.8.1
 git+https://github.com/polyswarm/flask-profiler.git@profile-stats#egg=flask_profiler
