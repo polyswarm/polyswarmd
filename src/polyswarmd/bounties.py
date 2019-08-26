@@ -46,11 +46,23 @@ def int_from_bytes(b):
     return int.from_bytes(b, byteorder='big')
 
 
-def calculate_commitment(account, verdicts, bid_portion):
+def calculate_commitment(account, verdicts):
     nonce = os.urandom(32)
     account = int(account, 16)
-    commitment = sha3(int_to_bytes(verdicts ^ int_from_bytes(sha3(nonce)) ^ int_from_bytes(sha3((bytes(bid_portion))) ^ account)))
+    commitment = sha3(int_to_bytes(verdicts ^ int_from_bytes(sha3(nonce)) ^ account))
     return int_from_bytes(nonce), int_from_bytes(commitment)
+
+
+def get_assertion(guid, index, num_artifacts):
+    assertion = assertion_to_dict(
+        g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, index).call(),
+        num_artifacts)
+
+    bid = [str(g.chain.bounty_registry.contract.functions.assertionBidByGuid(guid.int, index, j).call())
+           for j in range(0, len(assertion.get('mask', [])))]
+    assertion['bid'] = bid
+    assertion['metadata'] = substitute_ipfs_metadata(assertion.get('metadata', ''))
+    return assertion
 
 
 @cache.memoize(30)
@@ -288,19 +300,16 @@ def post_bounties_guid_assertions(guid):
     schema = {
         'type': 'object',
         'properties': {
-            'bid_portions': {
+            'bid': {
                 'type': 'array',
                 'minItems': 0,
                 'maxItems': 256,
                 'items': {
-                    'type': 'number',
+                    'type': 'string',
+                    'minLength': 1,
+                    'maxLength': 100,
+                    'pattern': r'^\d+$',
                 }
-            },
-            'bid': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 100,
-                'pattern': r'^\d+$',
             },
             'mask': {
                 'type': 'array',
@@ -332,31 +341,27 @@ def post_bounties_guid_assertions(guid):
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
-    bid = int(body['bid'])
-    bid_portion = body.get('bid_portions')
+    bid = [int(b) for b in body['bid']]
     mask = bool_list_to_int(body['mask'])
     verdict_count = len([m for m in body['mask'] if m])
 
     commitment = body.get('commitment')
     verdicts = body.get('verdicts')
 
-    if commitment is None and (verdicts is None or bid_portion is None):
+    if commitment is None and verdicts is None:
         return failure('Require verdicts and bid_portions or a commitment', 400)
 
-    if bid_portion and len(bid_portion) != verdict_count:
+    if not bid or len(bid) != verdict_count:
         return failure('bid_portions must be equal in length to the number of true mask values', 400)
 
-    if bid_portion and any(portion < 0 or portion >= 256 for portion in bid_portion):
-        return failure('bid_portions values must be between 0 and 255, inclusive.', 400)
-
-    if bid < eth.assertion_bid_min(g.chain.bounty_registry.contract) * verdict_count:
+    if any((b < eth.assertion_bid_min(g.chain.bounty_registry.contract) for b in bid)):
         return failure('Invalid assertion bid', 400)
 
-    approve_amount = bid + eth.assertion_fee(g.chain.bounty_registry.contract)
+    approve_amount = sum(bid) + eth.assertion_fee(g.chain.bounty_registry.contract)
 
     nonce = None
     if commitment is None:
-        nonce, commitment = calculate_commitment(account, bool_list_to_int(verdicts), bid_portion)
+        nonce, commitment = calculate_commitment(account, bool_list_to_int(verdicts))
     else:
         commitment = int(commitment)
 
@@ -397,20 +402,12 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
                     'type': 'boolean',
                 },
             },
-            'bid_portions': {
-                'type': 'array',
-                'minItems': 0,
-                'maxItems': 256,
-                'items': {
-                    'type': 'number',
-                }
-            },
             'metadata': {
                 'type': 'string',
                 'maxLength': 1024,
             },
         },
-        'required': ['nonce', 'verdicts', 'bid_portions', 'metadata'],
+        'required': ['nonce', 'verdicts', 'metadata'],
     }
 
     body = request.get_json()
@@ -421,17 +418,11 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 
     nonce = int(body['nonce'])
     verdicts = bool_list_to_int(body['verdicts'])
-    bid_portion = body['bid_portions']
     metadata = body['metadata']
-
-    if bid_portion and any(portion < 0 or portion >= 256 for portion in bid_portion):
-        logger.critical(bid_portion)
-        return failure('bid_portions values must be between 0 and 255, inclusive.', 400)
 
     transactions = [
         build_transaction(
-            g.chain.bounty_registry.contract.functions.revealAssertion(guid.int, id_, nonce, verdicts,
-                                                                       bytes(bid_portion), metadata),
+            g.chain.bounty_registry.contract.functions.revealAssertion(guid.int, id_, nonce, verdicts, metadata),
             base_nonce),
     ]
     return success({'transactions': transactions})
@@ -445,18 +436,13 @@ def get_bounties_guid_assertions(guid):
         return failure('Bounty not found', 404)
 
     num_assertions = g.chain.bounty_registry.contract.functions.getNumberOfAssertions(guid.int).call()
-
     assertions = []
     for i in range(num_assertions):
         try:
-            assertion = assertion_to_dict(
-                g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, i).call(),
-                g.chain.bounty_registry.contract.functions.bidPortionByGuid(guid.int, i).call(),
-                bounty['num_artifacts'])
+            assertion = get_assertion(guid, i, bounty['num_artifacts'])
             # Nonce is 0 when a reveal did not occur
             if assertion['nonce'] == "0":
                 assertion['verdicts'] = [None] * bounty['num_artifacts']
-            assertion['metadata'] = substitute_ipfs_metadata(assertion.get('metadata', ''))
             assertions.append(assertion)
         except Exception:
             logger.exception('Could not retrieve assertion')
@@ -473,12 +459,7 @@ def get_bounties_guid_assertions_id(guid, id_):
         return failure('Bounty not found', 404)
 
     try:
-        assertion = assertion_to_dict(
-            g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, id_).call(),
-            g.chain.bounty_registry.contract.functions.bidPortionByGuid(guid.int, id_).call(),
-            bounty['num_artifacts'])
-        assertion['metadata'] = substitute_ipfs_metadata(assertion.get('metadata', ''))
-
+        assertion = get_assertion(guid, id_, bounty['num_artifacts'])
         return success(assertion)
     except:
         return failure('Assertion not found', 404)
