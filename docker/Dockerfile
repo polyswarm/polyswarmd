@@ -1,4 +1,4 @@
-FROM python:3.6-jessie
+FROM pypy:3.6-7.0-jessie
 LABEL maintainer="PolySwarm Developers <info@polyswarm.io>"
 
 WORKDIR /usr/src/app
@@ -17,4 +17,4 @@ COPY . .
 RUN set -x && pip install .
 
 # You can set log format and level in command line by e.g. `polyswarmd.wsgi:app(log_format='text', log_level='WARNING')`
-CMD ["gunicorn", "--bind", "0.0.0.0:31337", "-k", "flask_sockets.worker", "-t", "600", "-w", "4", "polyswarmd.wsgi:app()"]
+CMD ["pypy3", "/usr/local/bin/gunicorn", "--bind", "0.0.0.0:31337", "-k", "flask_sockets.worker", "-t", "600", "-w", "4", "polyswarmd.wsgi:app()"]

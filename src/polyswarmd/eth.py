@@ -6,7 +6,9 @@ import rlp
 from collections import defaultdict
 from eth_abi import decode_abi
 from eth_abi.exceptions import InsufficientDataBytes
-from ethereum.transactions import Transaction
+from eth.vm.forks.constantinople.transactions import (
+    ConstantinopleTransaction
+)
 from flask import current_app as app, Blueprint, g, request
 from hexbytes import HexBytes
 from jsonschema.exceptions import ValidationError
@@ -156,7 +158,7 @@ def post_transactions():
     results = []
     for raw_tx in body['transactions']:
         try:
-            tx = rlp.decode(bytes.fromhex(raw_tx), Transaction)
+            tx = rlp.decode(bytes.fromhex(raw_tx), ConstantinopleTransaction)
         except ValueError as e:
             logger.error('Invalid transaction: %s', e)
             continue

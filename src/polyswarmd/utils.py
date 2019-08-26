@@ -3,7 +3,8 @@ import logging
 import string
 import re
 import uuid
-from typing import AnyStr, Union
+from typing import Union
+from Crypto.Hash import keccak
 
 from flask import g
 from polyswarmartifact import ArtifactType
@@ -337,3 +338,9 @@ def validate_ws_url(uri):
         r'(?:/?|[/?]\S+)$', re.IGNORECASE)
 
     return re.match(regex, uri) is not None
+
+
+def sha3(data):
+    h = keccak.new(digest_bits=256)
+    h.update(data)
+    return h.digest()
