@@ -60,6 +60,12 @@ cache.init_app(app)
 AUTH_WHITELIST = {'/status', '/relay/withdrawal', '/transactions'}
 
 
+@cache.memoize(30)
+def get_auth(api_key, auth_uri):
+    future = session.get(auth_uri, headers={'Authorization': api_key})
+    return future.result()
+
+
 class User(object):
     def __init__(self, authorized=False, user_id=None):
         self.authorized = authorized
@@ -72,8 +78,7 @@ class User(object):
 
         auth_uri = '{}/communities/{}/auth'.format(config.auth_uri, config.community)
 
-        future = session.get(auth_uri, headers={'Authorization': api_key})
-        r = future.result()
+        r = get_auth(api_key, auth_uri)
         if r is None or r.status_code != 200:
             return cls(authorized=False, user_id=None)
 
