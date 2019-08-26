@@ -71,7 +71,6 @@ class User(object):
         self.authorized = authorized
         self.user_id = user_id if authorized else None
 
-
     @classmethod
     def from_api_key(cls, api_key):
         config = app.config['POLYSWARMD']
