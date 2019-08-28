@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 misc = Blueprint('misc', __name__)
 
-MAX_GAS_LIMIT = 500000
+MAX_GAS_LIMIT = 94000000
 GAS_MULTIPLIER = 1.5
 ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 TRANSFER_SIGNATURE_HASH = 'a9059cbb'
@@ -135,7 +135,6 @@ def post_transactions():
                 'items': {
                     'type': 'string',
                     'minLength': 1,
-                    'maxLength': 4096,
                     'pattern': r'^[0-9a-fA-F]+$',
                 }
             },
