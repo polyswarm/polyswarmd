@@ -77,13 +77,13 @@ class EthereumRpc:
             self.init_filter.get_new_entries()
 
     # noinspection PyBroadException
-    def poll(self, ipfs_uri):
+    def poll(self, artifact_client):
         """
         Continually poll all Ethereum filters as long as there are WebSockets listening
-        :param ipfs_uri: IPFS root uri
+        :param artifact_client: ArtifactClient for making requests to artifact service
         """
         self.setup_filters()
-        from polyswarmd.bounties import substitute_ipfs_metadata
+        from polyswarmd.bounties import substitute_metadata
         last = time.time() * 1000 // 1
         while True:
             now = time.time() * 1000 // 1
@@ -124,10 +124,9 @@ class EthereumRpc:
                     }
                     metadata = bounty['data'].get('metadata', None)
                     if metadata:
-                        bounty['data']['metadata'] = substitute_ipfs_metadata(metadata,
-                                                                              validate=BountyMetadata.validate,
-                                                                              ipfs_root=ipfs_uri,
-                                                                              session=self.session)
+                        bounty['data']['metadata'] = substitute_metadata(metadata, validate=BountyMetadata.validate,
+                                                                         artifact_client=artifact_client,
+                                                                         session=self.session)
                     else:
                         bounty['data']['metadata'] = None
 
@@ -149,9 +148,9 @@ class EthereumRpc:
                         'block_number': event.blockNumber,
                         'txhash': event.transactionHash.hex(),
                     }
-                    reveal['data']['metadata'] = substitute_ipfs_metadata(reveal['data'].get('metadata', ''),
-                                                                          ipfs_root=ipfs_uri,
-                                                                          session=self.session)
+                    reveal['data']['metadata'] = substitute_metadata(reveal['data'].get('metadata', ''),
+                                                                     artifact_client=artifact_client,
+                                                                     session=self.session)
 
                     self.broadcast(reveal)
 
@@ -214,7 +213,7 @@ class EthereumRpc:
             except Exception:
                 logger.exception('Exception in filter checks, restarting greenlet')
                 # Creates a new greenlet with all new filters and let's this one die.
-                gevent.spawn(self.poll, ipfs_uri)
+                gevent.spawn(self.poll, artifact_client)
                 break
 
     def register(self, ws):
@@ -240,8 +239,8 @@ class EthereumRpc:
         if start:
             logger.debug('First WebSocket registered, starting greenlet')
             from polyswarmd import app
-            ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
-            gevent.spawn(self.poll, ipfs_uri)
+            artifact_client = app.config['POLYSWARMD'].artifact_client
+            gevent.spawn(self.poll, artifact_client)
 
     def setup_filters(self):
         """

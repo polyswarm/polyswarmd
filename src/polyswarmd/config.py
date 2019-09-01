@@ -1,8 +1,6 @@
-import contextlib
 import json
 import logging
 import os
-import socket
 import threading
 import time
 import requests
@@ -16,6 +14,7 @@ from web3 import Web3, HTTPProvider
 from web3.exceptions import MismatchedABI
 from web3.middleware import geth_poa_middleware
 
+from polyswarmd.artifacts.ipfs import IpfsServiceClient
 from polyswarmd.eth import ZERO_ADDRESS
 from polyswarmd.utils import camel_case_to_snake_case
 from polyswarmd.rpc import EthereumRpc
@@ -281,7 +280,8 @@ class Config(object):
     def __init__(self, community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config,
                  sidechain_config, trace_transactions, profiler_enabled):
         self.community = community
-        self.ipfs_uri = ipfs_uri
+        # For now, there is no other option than IpfsServiceClient, but this will eventually be configurable
+        self.artifact_client = IpfsServiceClient(ipfs_uri)
         self.artifact_limit = artifact_limit
         self.auth_uri = auth_uri
         self.require_api_key = require_api_key
@@ -375,13 +375,13 @@ class Config(object):
 
     def __validate(self):
         # We expect IPFS and API key service to be up already
-        if not is_service_reachable(self.session, f"{self.ipfs_uri}/api/v0/bootstrap"):
-            raise ValueError('IPFS not reachable, is correct URI specified?')
+        if not is_service_reachable(self.session, self.artifact_client.reachable_endpoint):
+            raise ValueError('{0} not reachable, is correct URI specified?'.format(self.artifact_client.name))
 
         if self.artifact_limit < 1 or self.artifact_limit > 256:
             raise ValueError('Artifact limit must be greater than 0 and cannot exceed contract limit of 256')
 
-        if self.auth_uri and not is_service_reachable(self.session, f"{self.auth_uri}/communities/public"):
+        if self.auth_uri and not is_service_reachable(self.session, "{0}/communities/public".format(self.auth_uri)):
             raise ValueError('API key service not reachable, is correct URI specified?')
 
         if self.require_api_key and not self.auth_uri:

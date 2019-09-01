@@ -11,7 +11,6 @@ from flask import current_app as app, Blueprint, g, request
 from hexbytes import HexBytes
 from jsonschema.exceptions import ValidationError
 
-from polyswarmd.artifacts import is_valid_ipfshash
 from polyswarmd.chains import chain
 from polyswarmd.response import success, failure
 
@@ -264,7 +263,8 @@ def events_from_transaction(txhash, chain):
         new_vote_event_to_dict, revealed_assertion_event_to_dict, \
         transfer_event_to_dict, new_withdrawal_event_to_dict, new_deposit_event_to_dict
 
-    trace_transactions = app.config['POLYSWARMD'].trace_transactions
+    config = app.config['POLYSWARMD']
+    trace_transactions = config.trace_transactions
     if trace_transactions:
         try:
             Debug.attach(g.chain.w3, 'debug')
@@ -340,7 +340,7 @@ def events_from_transaction(txhash, chain):
     if processed:
         bounty = new_bounty_event_to_dict(processed[0]['args'])
 
-        if is_valid_ipfshash(bounty['uri']):
+        if config.artifact_client.check_uri(bounty['uri']):
             ret['bounties'] = ret.get('bounties', []) + [bounty]
 
     processed = g.chain.bounty_registry.contract.events.NewAssertion().processReceipt(

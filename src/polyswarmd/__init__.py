@@ -35,7 +35,7 @@ install_error_handlers(app)
 
 from polyswarmd.eth import misc
 from polyswarmd.utils import bool_list_to_int, int_to_bool_list
-from polyswarmd.artifacts import artifacts, MAX_ARTIFACT_SIZE_REGULAR, MAX_ARTIFACT_SIZE_ANONYMOUS
+from polyswarmd.artifacts.artifacts import artifacts, MAX_ARTIFACT_SIZE_REGULAR, MAX_ARTIFACT_SIZE_ANONYMOUS
 from polyswarmd.balances import balances
 from polyswarmd.bounties import bounties
 from polyswarmd.relay import relay
@@ -110,18 +110,20 @@ def status():
 
     ret['community'] = config.community
 
-    ret['ipfs'] = {
-        'reachable': is_service_reachable(session, f"{config.ipfs_uri}/api/v0/bootstrap"),
+    ret['artifact_services'] = {
+        config.artifact_client: {
+            'reachable': is_service_reachable(session, config.artifact_client.reachable_endpoint),
+        }
     }
 
     if config.auth_uri:
         ret['auth'] = {
-            'reachable': is_service_reachable(session, f"{config.auth_uri}/communities/public"),
+            'reachable': is_service_reachable(session, "{0}/communities/public".format(config.auth_uri)),
         }
 
     for name, chain in config.chains.items():
         ret[name] = {
-            'reachable': is_service_reachable(session, f"{chain.eth_uri}"),
+            'reachable': is_service_reachable(session, "{0}".format(chain.eth_uri)),
         }
 
         if ret[name]['reachable']:

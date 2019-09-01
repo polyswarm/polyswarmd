@@ -10,8 +10,7 @@ from jsonschema.exceptions import ValidationError
 from polyswarmartifact import ArtifactType
 from polyswarmartifact.schema import Assertion as AssertionMetadata, Bounty as BountyMetadata
 
-from polyswarmd import eth, cache
-from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts, post_to_ipfs, get_from_ipfs
+from polyswarmd import eth, cache, app
 from polyswarmd.chains import chain
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
 from polyswarmd.eth import build_transaction, ZERO_ADDRESS
@@ -61,25 +60,29 @@ def get_assertion(guid, index, num_artifacts):
     bid = [str(g.chain.bounty_registry.contract.functions.assertionBidByGuid(guid.int, index, j).call())
            for j in range(0, len(assertion.get('mask', [])))]
     assertion['bid'] = bid
-    assertion['metadata'] = substitute_ipfs_metadata(assertion.get('metadata', ''))
+    assertion['metadata'] = substitute_metadata(assertion.get('metadata', ''))
     return assertion
 
 
 @cache.memoize(30)
-def substitute_ipfs_metadata(ipfs_uri, validate=AssertionMetadata.validate, ipfs_root=None, session=None):
+def substitute_metadata(ipfs_uri, validate=AssertionMetadata.validate, artifact_client=None, session=None):
     """
-    Download metadata from IPFS and validate it against the schema.
+    Download metadata from artifact service and validate it against the schema.
 
     :param ipfs_uri: Potential IPFS uri string
     :param validate: Function that takes a loaded json blob and returns true if it matches the schema
-    :param ipfs_root: Root uri for ipfs
+    :param artifact_client: Artifact Client for accessing artifacts stored on a service
     :param session: Requests session for ipfs request
-    :return: Metadata from IPFS, or original metadata
+    :return: Metadata from artifact service, or original metadata
     """
-    if not is_valid_ipfshash(ipfs_uri):
-        return ipfs_uri
+    if not session:
+        session = app.config['REQUESTS_SESSION']
 
-    status_code, content = get_from_ipfs(ipfs_uri, ipfs_root=ipfs_root, session=session)
+    if not artifact_client:
+        config = app.config['POLYSWARMD']
+        artifact_client = config.artifact_client
+
+    status_code, content = artifact_client.get_artifact(ipfs_uri, session=session)
     try:
         if status_code // 100 == 2 and validate(json.loads(content.decode('utf-8'))):
             return json.loads(content.decode('utf-8'))
@@ -95,6 +98,8 @@ def substitute_ipfs_metadata(ipfs_uri, validate=AssertionMetadata.validate, ipfs
 @bounties.route('', methods=['POST'])
 @chain
 def post_bounties():
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
 
@@ -145,13 +150,13 @@ def post_bounties():
     if amount < eth.bounty_amount_min(g.chain.bounty_registry.contract):
         return failure('Invalid bounty amount', 400)
 
-    if not is_valid_ipfshash(artifact_uri):
+    if not config.artifact_client.check_uri(artifact_uri):
         return failure('Invalid artifact URI (should be IPFS hash)', 400)
 
-    if metadata and not is_valid_ipfshash(metadata):
+    if metadata and not config.artifact_client.check_uri(metadata):
         return failure('Invalid bounty metadata URI (should be IPFS hash)', 400)
 
-    arts = list_artifacts(artifact_uri)
+    arts = config.artifact_client.ls(artifact_uri, session)
     if not arts:
         return failure('Invalid artifact URI (could not retrieve artifacts)',
                        400)
@@ -202,16 +207,17 @@ def get_bounty_parameters():
 @bounties.route('/<uuid:guid>', methods=['GET'])
 @chain
 def get_bounties_guid(guid):
+    config = app.config['POLYSWARMD']
     bounty = bounty_to_dict(
         g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
     metadata = bounty.get('metadata', None)
     if metadata:
-        metadata = substitute_ipfs_metadata(metadata, validate=BountyMetadata.validate)
+        metadata = substitute_metadata(metadata, validate=BountyMetadata.validate)
     else:
         metadata = None
     bounty['metadata'] = metadata
-    if not is_valid_ipfshash(bounty['uri']):
-        return failure('Invalid IPFS hash in URI', 400)
+    if not config.artifact_client.check_uri(bounty['uri']):
+        return failure('Invalid {0} URI'.format(config.artifact_client.name), 400)
     if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
 
@@ -272,6 +278,8 @@ def post_bounties_guid_settle(guid):
 
 @bounties.route('/metadata', methods=['POST'])
 def post_assertion_metadata():
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
     body = request.get_json()
 
     loaded_body = json.loads(body)
@@ -284,7 +292,7 @@ def post_assertion_metadata():
         return failure('Invalid Assertion metadata', 400)
 
     try:
-        status_code, ipfshash = post_to_ipfs([('metadata', body)], wrap_dir=False)
+        status_code, ipfshash = config.artifact_client.add_artifact(('metadata', body), session)
         return success(ipfshash) if status_code // 100 == 2 else failure('Could not add metadata to IPFS', status_code)
     except Exception:
         logger.exception('Received error posting to IPFS got response')
