@@ -1,6 +1,12 @@
 from abc import ABC, abstractmethod
 
 
+class ArtifactServiceException(Exception):
+    def __init__(self, status_code, response):
+        self.status_code = status_code
+        self.response = response
+
+
 class AbstractArtifactServiceClient(ABC):
     """
     Abstract class that defines the interface all Artifact Service Clients must follow
@@ -19,10 +25,10 @@ class AbstractArtifactServiceClient(ABC):
 
         :param artifacts: list[tuple]: List of files to be added to the service.
         :param session: connection session
-        :return: (int, json str): Tup[le of status code and json content returned by the server
+        :return: (str) URI for the directory of files
+        :raises ArtifactServiceException: If service is unreachable or gives non-200 response
         """
         raise NotImplementedError()
-
 
     @abstractmethod
     def add_artifact(self, artifact, session):
@@ -31,7 +37,8 @@ class AbstractArtifactServiceClient(ABC):
 
         :param artifact: list[tuple]: List of files to be added to the service.
         :param session: connection session
-        :return: (int, json str): Tup[le of status code and json content returned by the server
+        :return: (str) URI for the added file
+        :raises ArtifactServiceException: If service is unreachable or gives non-200 response
         """
         raise NotImplementedError()
 
@@ -40,6 +47,7 @@ class AbstractArtifactServiceClient(ABC):
         Check if the given uri is valid for the service.
         :param uri: uri to check
         :return: bool
+        :raises ArtifactServiceException: If service is unreachable or gives non-200 response
         """
         raise NotImplementedError()
 
@@ -51,7 +59,8 @@ class AbstractArtifactServiceClient(ABC):
         :param identifier: uri or other identifier for the artifact
         :param index: index of the artifact in a directory, or 0 if file is not a directory
         :param session: connection session
-        :return:
+        :return: (dict) Dict of values about the file in question
+        :raises ArtifactServiceException: If service is unreachable or gives non-200 response
         """
         raise NotImplementedError()
 
@@ -63,7 +72,8 @@ class AbstractArtifactServiceClient(ABC):
         :param identifier: uri or other identifier for the artifact
         :param index: index of the artifact in a directory, or 0 if file is not a directory
         :param session: connection session
-        :return: (int, json str): Tup[le of status code and json content returned by the server
+        :return: (bytes) Byte content of the given file
+        :raises ArtifactServiceException: If service is unreachable or gives non-200 response
         """
         raise NotImplementedError()
 
@@ -74,7 +84,8 @@ class AbstractArtifactServiceClient(ABC):
 
         :param identifier: uri or other identifier for the directory (or directory-like object)
         :param session: connection session
-        :return: (int, json str): Tup[le of status code and json content returned by the server
+        :return: (list[(string, string)]) List of tuples containing name, uri pairs
+        :raises ArtifactServiceException: If service is unreachable or gives non-200 response
         """
         raise NotImplementedError()
 
@@ -84,6 +95,7 @@ class AbstractArtifactServiceClient(ABC):
         Performs an request against an artifact service to determine current running status
 
         :param session: connection session
-        :return: (int, json str): Tup[le of status code and json content returned by the server
+        :return: (dict) with key `online`
+        :raises ArtifactServiceException: If service is unreachable or gives non-200 response
         """
         raise NotImplementedError()

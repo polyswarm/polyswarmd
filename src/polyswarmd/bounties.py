@@ -11,6 +11,7 @@ from polyswarmartifact import ArtifactType
 from polyswarmartifact.schema import Assertion as AssertionMetadata, Bounty as BountyMetadata
 
 from polyswarmd import eth, cache, app
+from polyswarmd.artifacts.client import ArtifactServiceException
 from polyswarmd.chains import chain
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
 from polyswarmd.eth import build_transaction, ZERO_ADDRESS
@@ -82,9 +83,9 @@ def substitute_metadata(ipfs_uri, validate=AssertionMetadata.validate, artifact_
         config = app.config['POLYSWARMD']
         artifact_client = config.artifact_client
 
-    status_code, content = artifact_client.get_artifact(ipfs_uri, session=session)
     try:
-        if status_code // 100 == 2 and validate(json.loads(content.decode('utf-8'))):
+        content = artifact_client.get_artifact(ipfs_uri, session=session)
+        if validate(json.loads(content.decode('utf-8'))):
             return json.loads(content.decode('utf-8'))
     except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
@@ -156,8 +157,9 @@ def post_bounties():
     if metadata and not config.artifact_client.check_uri(metadata):
         return failure('Invalid bounty metadata URI (should be IPFS hash)', 400)
 
-    arts = config.artifact_client.ls(artifact_uri, session)
-    if not arts:
+    try:
+        arts = config.artifact_client.ls(artifact_uri, session)
+    except ArtifactServiceException:
         return failure('Invalid artifact URI (could not retrieve artifacts)',
                        400)
 
@@ -292,8 +294,8 @@ def post_assertion_metadata():
         return failure('Invalid Assertion metadata', 400)
 
     try:
-        status_code, ipfshash = config.artifact_client.add_artifact(('metadata', body), session)
-        return success(ipfshash) if status_code // 100 == 2 else failure('Could not add metadata to IPFS', status_code)
+        ipfshash = config.artifact_client.add_artifact(('metadata', body), session)
+        return success(ipfshash)
     except Exception:
         logger.exception('Received error posting to IPFS got response')
         return failure('Could not add metadata to ipfs', 400)

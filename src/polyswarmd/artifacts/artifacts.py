@@ -3,6 +3,7 @@ import logging
 from flask import current_app as app, g, Blueprint, request
 
 from polyswarmd.response import success, failure
+from polyswarmd.artifacts.client import ArtifactServiceException
 
 logger = logging.getLogger(__name__)
 artifacts = Blueprint('artifacts', __name__)
@@ -18,11 +19,10 @@ def get_artifacts_status():
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
 
-    status, response = config.artifact_client.status(session)
-    if status // 100 != 2:
-        return failure(response, status)
-
-    return success(response)
+    try:
+        return success(config.artifact_client.status(session))
+    except ArtifactServiceException as e:
+        return failure(e.response, e.status_code)
 
 
 @artifacts.route('', methods=['POST'])
@@ -36,11 +36,10 @@ def post_artifacts():
     if len(files) > config.artifact_limit:
         return failure('Too many artifacts', 400)
 
-    status_code, identifier = config.artifact_client.add_artifacts(files, session)
-    if status_code // 100 != 2:
-        return failure('Could not add artifacts to IPFS', status_code)
-    else:
-        return success(identifier)
+    try:
+        return success(config.artifact_client.add_artifacts(files, session))
+    except ArtifactServiceException as e:
+        return failure(e.response, e.status_code)
 
 
 @artifacts.route('/<identifier>', methods=['GET'])
@@ -48,7 +47,11 @@ def get_artifacts_identifier(identifier):
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
 
-    arts = config.artifact_client.ls(identifier, session)
+    try:
+        arts = config.artifact_client.ls(identifier, session)
+    except ArtifactServiceException as e:
+        return failure(e.response, e.status_code)
+
     if not arts:
         return failure('Could not locate {0} resource'.format(config.artifact_client.name), 404)
     if len(arts) > 256:
@@ -62,14 +65,13 @@ def get_artifacts_identifier_id(identifier, id_):
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
 
-    status, response = config.artifact_client.get_artifact(identifier,
-                                                           session,
-                                                           index=id_,
-                                                           max_size=g.user.max_artifact_size)
-    if status // 100 != 2:
-        return failure(response, status)
-
-    return response
+    try:
+        return config.artifact_client.get_artifact(identifier,
+                                                   session,
+                                                   index=id_,
+                                                   max_size=g.user.max_artifact_size)
+    except ArtifactServiceException as e:
+        return failure(e.response, e.status_code)
 
 
 @artifacts.route('/<identifier>/<int:id_>/stat', methods=['GET'])
@@ -77,8 +79,7 @@ def get_artifacts_identifier_id_stat(identifier, id_):
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
 
-    status, response = config.artifact_client.details(identifier, id_, session)
-    if status // 100 != 2:
-        return failure(response, status)
-
-    return success(response)
+    try:
+        return config.artifact_client.details(identifier, id_, session)
+    except ArtifactServiceException as e:
+        return failure(e.response, e.status_code)
