@@ -148,6 +148,11 @@ def post_bounties():
     duration_blocks = body['duration']
     metadata = body.get('metadata', '')
 
+    try:
+        arts = config.artifact_client.ls(artifact_uri, session)
+    except ArtifactServiceException as e:
+        return failure(e.response, e.status_code)
+
     if amount < eth.bounty_amount_min(g.chain.bounty_registry.contract):
         return failure('Invalid bounty amount', 400)
 
@@ -156,11 +161,6 @@ def post_bounties():
 
     if metadata and not config.artifact_client.check_uri(metadata):
         return failure('Invalid bounty metadata URI (should be IPFS hash)', 400)
-
-    try:
-        arts = config.artifact_client.ls(artifact_uri, session)
-    except ArtifactServiceException:
-        return failure('Invalid artifact URI (could not retrieve artifacts)', 400)
 
     num_artifacts = len(arts)
     bloom = calculate_bloom(arts)
