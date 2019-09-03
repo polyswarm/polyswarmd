@@ -1,4 +1,5 @@
 import base58
+import functools
 import json
 import logging
 import re
@@ -15,6 +16,21 @@ class InvalidIpfsHashException(Exception):
     pass
 
 
+def catch_ipfs_errors(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except HTTPError as e:
+            logger.exception('Failed to execute IPFS command %s', func.__name__)
+            raise ArtifactServiceException(e.response.status_code, e.response.content)
+        except Exception:
+            logger.exception('Received error from IPFS')
+            raise ArtifactServiceException(500, 'Error executing IPFS command {0}'.format(func.__name__))
+
+    return wrapper
+
+
 class IpfsServiceClient(AbstractArtifactServiceClient):
     """
     Artifact Service Client for IPFS.
@@ -26,33 +42,32 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         reachable_endpoint = "{}{}".format(self.base_uri, '/api/v0/bootstrap')
         super().__init__('IPFS', reachable_endpoint)
 
+    @staticmethod
+    def check_ls(artifacts, index, max_size=None):
+        if not artifacts:
+            raise ArtifactServiceException(404, 'Could not locate IPFS resource')
+
+        if index < 0 or index > 256 or index >= len(artifacts):
+            raise ArtifactServiceException(404, 'Could not locate artifact ID')
+
+        _, artifact, size = artifacts[index]
+        if max_size and size > max_size:
+            raise ArtifactServiceException(400, 'Artifact size greater than maximum allowed')
+
+        return artifacts[index]
+
     def add_artifacts(self, artifacts, session):
-        try:
-            directory = self._mfs_mkdir(session)
-            for artifact in artifacts:
-                ipfs_uri = self._add(artifact, session)
-                filename = artifact[1][0]
-                self._mfs_copy(directory, filename, ipfs_uri, session)
+        directory = self._mfs_mkdir(session)
+        for artifact in artifacts:
+            ipfs_uri = self._add(artifact, session)
+            filename = artifact[1][0]
+            self._mfs_copy(directory, filename, ipfs_uri, session)
 
-            stat = self._mfs_stat(directory, session)
-            return stat.get('Hash', '')
-
-        except HTTPError as e:
-            logger.exception('Failed to upload files')
-            raise ArtifactServiceException(e.response.status_code, e.response.content)
-        except Exception:
-            logger.exception('Received error adding files in directory in IPFS')
-            raise ArtifactServiceException(500, 'Error adding files to IPFS')
+        stat = self._mfs_stat(directory, session)
+        return stat.get('Hash', '')
 
     def add_artifact(self, artifact, session):
-        try:
-            return self._add(artifact, session)
-        except HTTPError as e:
-            logger.exception('Failed to upload file')
-            raise ArtifactServiceException(e.response.status_code, e.response.content)
-        except Exception:
-            logger.exception('Received error adding files to IPFS')
-            raise ArtifactServiceException(500, 'Error executing IPFS add')
+        return self._add(artifact, session)
 
     # noinspection PyBroadException
     def check_uri(self, uri):
@@ -68,16 +83,9 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
             raise ArtifactServiceException(400, 'Invalid IPFS Hash')
 
         artifacts = self.ls(uri, session)
-        name, artifact, _ = self._check_ls(artifacts, index)
+        name, artifact, _ = IpfsServiceClient.check_ls(artifacts, index)
 
-        try:
-            stat = self._stat(artifact, session)
-        except HTTPError as e:
-            logger.exception('Failed to get details')
-            raise ArtifactServiceException(e.response.status_code, e.response.content)
-        except Exception:
-            logger.exception('Received error stating files from IPFS')
-            raise ArtifactServiceException(500, 'Error executing IPFS stat')
+        stat = self._stat(artifact, session)
 
         # Convert stats to snake_case
         stats = {
@@ -92,33 +100,19 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         if not self.check_uri(uri):
             raise ArtifactServiceException(400, 'Invalid IPFS Hash')
 
-        try:
-            if index is not None:
-                artifacts = self.ls(uri, session)
-                _, uri, _ = self._check_ls(artifacts, index, max_size)
+        if index is not None:
+            artifacts = self.ls(uri, session)
+            _, uri, _ = IpfsServiceClient.check_ls(artifacts, index, max_size)
 
-            return self._cat(uri, session)
-        except HTTPError as e:
-            logger.exception('Failed to read artifact')
-            raise ArtifactServiceException(e.response.status_code, e.response.content)
-        except Exception:
-            logger.exception('Received error running cat or ls on artifact')
-            raise ArtifactServiceException(500, 'Error executing IPFS cat')
+        return self._cat(uri, session)
 
     # noinspection PyBroadException
     def ls(self, uri, session):
         if not self.check_uri(uri):
             raise ArtifactServiceException(400, 'Invalid IPFS Hash')
 
-        try:
-            stats = self._stat(uri, session)
-            ls = self._ls(uri, session)
-        except HTTPError as e:
-            logger.exception('Failed to list files')
-            raise ArtifactServiceException(e.response.status_code, e.response.content)
-        except Exception:
-            logger.exception('Received error listing files from IPFS')
-            return []
+        stats = self._stat(uri, session)
+        ls = self._ls(uri, session)
 
         if stats.get('NumLinks', 0) == 0:
             return [('', stats.get('Hash', ''), stats.get('DataSize'))]
@@ -136,14 +130,9 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
 
     # noinspection PyBroadException
     def status(self, session):
-        try:
-            return {'online': self._sys(session)}
-        except HTTPError as e:
-            raise ArtifactServiceException(e.response.status_code, e.response.content)
-        except Exception:
-            logger.exception('Received error running sys')
-            raise ArtifactServiceException(500, 'Error executing IPFS sys')
+        return {'online': self._sys(session)}
 
+    @catch_ipfs_errors
     def _add(self, file, session):
         future = session.post(
             self.base_uri + '/api/v0/add',
@@ -152,6 +141,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         r.raise_for_status()
         return json.loads(r.text.splitlines()[-1])['Hash']
 
+    @catch_ipfs_errors
     def _cat(self, ipfs_uri, session):
         if not self.check_uri(ipfs_uri):
             raise InvalidIpfsHashException()
@@ -161,25 +151,14 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         r.raise_for_status()
         return r.content
 
-    def _check_ls(self, artifacts, index, max_size=None):
-        if not artifacts:
-            raise ArtifactServiceException(404, 'Could not locate IPFS resource')
-
-        if index < 0 or index > 256 or index >= len(artifacts):
-            raise ArtifactServiceException(404, 'Could not locate artifact ID')
-
-        _, artifact, size = artifacts[index]
-        if max_size and size > max_size:
-            raise ArtifactServiceException(400, 'Artifact size greater than maximum allowed')
-
-        return artifacts[index]
-
+    @catch_ipfs_errors
     def _ls(self, ipfs_uri, session):
         future = session.get(self.base_uri + '/api/v0/ls', params={'arg': ipfs_uri}, timeout=1)
         r = future.result()
         r.raise_for_status()
         return r.json()
 
+    @catch_ipfs_errors
     def _mfs_copy(self, directory, filename, ipfs_uri, session):
         if not self.check_uri(ipfs_uri):
             raise InvalidIpfsHashException()
@@ -202,6 +181,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
 
         return
 
+    @catch_ipfs_errors
     def _mfs_mkdir(self, session):
         while True:
             directory_name = uuid.uuid4()
@@ -233,6 +213,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
 
         return r.json().get('Entries', [])
 
+    @catch_ipfs_errors
     def _mfs_stat(self, directory, session):
         future = session.get(self.base_uri + '/api/v0/files/stat', params={
             'arg': '/{0}'.format(directory),
@@ -242,12 +223,14 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
 
         return r.json()
 
+    @catch_ipfs_errors
     def _stat(self, ipfs_uri, session):
         future = session.get(self.base_uri + '/api/v0/object/stat', params={'arg': ipfs_uri})
         r = future.result()
         r.raise_for_status()
         return r.json()
 
+    @catch_ipfs_errors
     def _sys(self, session):
         future = session.get(self.base_uri + '/api/v0/diag/sys', timeout=1)
         r = future.result()
