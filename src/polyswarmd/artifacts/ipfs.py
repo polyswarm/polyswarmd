@@ -173,7 +173,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         future = session.get(self.base_uri + '/api/v0/files/cp', params={
             'arg': [
                 '/ipfs/{0}'.format(ipfs_uri),
-                '/{0}/{1}'.format(directory, filename)
+                '{0}/{1}'.format(directory, filename)
             ]
         }, timeout=1)
         r = future.result()
@@ -184,7 +184,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
     @catch_ipfs_errors
     def _mfs_mkdir(self, session):
         while True:
-            directory_name = uuid.uuid4()
+            directory_name = '/{0}'.format(uuid.uuid4()),
             # Try again if name is taken (Should never happen)
             try:
                 if self._mfs_ls(directory_name, session)[1]:
@@ -195,17 +195,17 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
                 pass
 
             future = session.get(self.base_uri + '/api/v0/files/mkdir', params={
-                'arg': '/{0}'.format(directory_name),
+                'arg': directory_name,
                 'parents': True,
             }, timeout=1)
             r = future.result()
             r.raise_for_status()
 
-            return str(directory_name)
+            return directory_name
 
     def _mfs_ls(self, directory, session):
         future = session.get(self.base_uri + '/api/v0/files/ls', params={
-            'arg': '/{0}'.format(directory),
+            'arg': directory,
             'l': True
         }, timeout=1)
         r = future.result()
@@ -216,7 +216,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
     @catch_ipfs_errors
     def _mfs_stat(self, directory, session):
         future = session.get(self.base_uri + '/api/v0/files/stat', params={
-            'arg': '/{0}'.format(directory),
+            'arg': directory,
         }, timeout=1)
         r = future.result()
         r.raise_for_status()
