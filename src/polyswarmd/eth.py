@@ -6,7 +6,9 @@ import rlp
 from collections import defaultdict
 from eth_abi import decode_abi
 from eth_abi.exceptions import InsufficientDataBytes
-from ethereum.transactions import Transaction
+from eth.vm.forks.constantinople.transactions import (
+    ConstantinopleTransaction
+)
 from flask import current_app as app, Blueprint, g, request
 from hexbytes import HexBytes
 from jsonschema.exceptions import ValidationError
@@ -156,7 +158,7 @@ def post_transactions():
     results = []
     for raw_tx in body['transactions']:
         try:
-            tx = rlp.decode(bytes.fromhex(raw_tx), Transaction)
+            tx = rlp.decode(bytes.fromhex(raw_tx), ConstantinopleTransaction)
         except ValueError as e:
             logger.error('Invalid transaction: %s', e)
             continue
@@ -218,12 +220,15 @@ def build_transaction(call, nonce):
 
     if g.chain.free:
         options["gasPrice"] = 0
+        gas = MAX_GAS_LIMIT
+    else:
+        try:
+            gas = int(call.estimateGas({'from': g.eth_address, **options}) * GAS_MULTIPLIER)
+        except ValueError as e:
+            logger.debug('Error estimating gas, using default: %s', e)
+            gas = MAX_GAS_LIMIT
 
-    try:
-        gas = int(call.estimateGas({'from': g.eth_address, **options}) * GAS_MULTIPLIER)
-        options['gas'] = min(MAX_GAS_LIMIT, gas)
-    except ValueError as e:
-        logger.debug('Error estimating gas, using default: %s', e)
+    options['gas'] = min(MAX_GAS_LIMIT, gas)
 
     logger.info('options: %s', options)
 

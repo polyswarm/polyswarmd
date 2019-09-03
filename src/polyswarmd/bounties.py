@@ -4,7 +4,6 @@ import logging
 import os
 import uuid
 
-from ethereum.utils import sha3
 from flask import Blueprint, g, request
 from jsonschema.exceptions import ValidationError
 from polyswarmartifact import ArtifactType
@@ -16,7 +15,7 @@ from polyswarmd.chains import chain
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
 from polyswarmd.eth import build_transaction, ZERO_ADDRESS
 from polyswarmd.response import success, failure
-from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, vote_to_dict, bloom_to_dict
+from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, vote_to_dict, bloom_to_dict, sha3
 
 logger = logging.getLogger(__name__)
 bounties = Blueprint('bounties', __name__)
