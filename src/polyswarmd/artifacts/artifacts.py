@@ -30,7 +30,11 @@ def post_artifacts():
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
 
-    files = [('file', (f.filename, f, 'application/octet-stream')) for f in request.files.getlist(key='file')]
+    files = [('file', (f.filename, f, 'application/octet-stream')) for f in request.files.getlist(key='file')
+             if f.content_length <= g.user.max_artifact_size]
+    if len(files) < len(request.files.getlist(key='file')):
+        return failure('Some artifact exceeds max file size', 413)
+
     if not files:
         return failure('No artifacts', 400)
     if len(files) > config.artifact_limit:

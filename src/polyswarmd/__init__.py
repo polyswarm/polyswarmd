@@ -41,7 +41,7 @@ from polyswarmd.offers import offers
 from polyswarmd.staking import staking
 from polyswarmd.websockets import init_websockets
 
-app.config['MAX_CONTENT_LENGTH'] = MAX_ARTIFACT_SIZE_REGULAR
+app.config['MAX_CONTENT_LENGTH'] = MAX_ARTIFACT_SIZE_REGULAR * 256
 
 app.register_blueprint(misc, url_prefix='/')
 app.register_blueprint(artifacts, url_prefix='/artifacts')
