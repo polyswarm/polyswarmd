@@ -1,3 +1,4 @@
+from requests_futures.sessions import FuturesSession
 from polyswarmd.monkey import patch_all
 
 patch_all()
@@ -8,8 +9,6 @@ import functools
 
 from flask import Flask, g, request
 from flask_caching import Cache
-from requests_futures.sessions import FuturesSession
-from concurrent.futures import ThreadPoolExecutor
 
 from polyswarmd.config import Config, is_service_reachable
 from polyswarmd.logger import init_logging
@@ -22,8 +21,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['POLYSWARMD'] = Config.auto()
 
-session = FuturesSession(executor=ThreadPoolExecutor(16),
-                         adapter_kwargs={'max_retries': 3})
+session = FuturesSession(adapter_kwargs={'max_retries': 3})
 
 session.request = functools.partial(session.request, timeout=3)
 

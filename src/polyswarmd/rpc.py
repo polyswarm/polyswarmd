@@ -1,5 +1,4 @@
 import time
-from concurrent.futures import ThreadPoolExecutor
 import gevent
 import json
 
@@ -17,8 +16,7 @@ class EthereumRpc:
     """
     def __init__(self, chain):
         self.chain = chain
-        self.session = FuturesSession(executor=ThreadPoolExecutor(32),
-                                      adapter_kwargs={'max_retries': 3})
+        self.session = FuturesSession(adapter_kwargs={'max_retries': 3})
         self.assertion_filter = None
         self.block_filter = None
         self.bounty_filter = None
