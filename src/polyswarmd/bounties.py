@@ -160,8 +160,7 @@ def post_bounties():
     try:
         arts = config.artifact_client.ls(artifact_uri, session)
     except ArtifactServiceException:
-        return failure('Invalid artifact URI (could not retrieve artifacts)',
-                       400)
+        return failure('Invalid artifact URI (could not retrieve artifacts)', 400)
 
     num_artifacts = len(arts)
     bloom = calculate_bloom(arts)
