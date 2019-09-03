@@ -155,9 +155,6 @@ def post_bounties():
     if amount < eth.bounty_amount_min(g.chain.bounty_registry.contract):
         return failure('Invalid bounty amount', 400)
 
-    if not config.artifact_client.check_uri(artifact_uri):
-        return failure('Invalid artifact URI (should be IPFS hash)', 400)
-
     if metadata and not config.artifact_client.check_uri(metadata):
         return failure('Invalid bounty metadata URI (should be IPFS hash)', 400)
 
