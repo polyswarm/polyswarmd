@@ -11,7 +11,7 @@ artifacts = Blueprint('artifacts', __name__)
 # 100MB limit
 # TODO: Should this be configurable in config file?
 MAX_ARTIFACT_SIZE_REGULAR = 32 * 1024 * 1024
-MAX_ARTIFACT_SIZE_ANONYMOUS = 2 * 1024 * 1024
+MAX_ARTIFACT_SIZE_ANONYMOUS = 10 * 1024 * 1024
 
 
 @artifacts.route('/status', methods=['GET'])
