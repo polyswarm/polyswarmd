@@ -1,6 +1,7 @@
 import click
 import logging
 import sys
+import redis
 
 from gevent import pywsgi
 from geventwebsocket.handler import WebSocketHandler
@@ -15,7 +16,8 @@ logger = logging.getLogger(__name__)
 @click.option('--log-level', envvar='LOG_LEVEL', default='WARNING', help='Logging level')
 @click.option('--host', default='', help='Host to listen on')
 @click.option('--port', default=31337, help='Port to listen on')
-def main(log_format, log_level, host, port):
+@click.option('--redis-uri', default=None, envvar='REDIS', help='Redis server to use for caching')
+def main(log_format, log_level, host, port, redis_uri):
     log_level = getattr(logging, log_level.upper(), None)
     if not isinstance(log_level, int):
         logging.error('Invalid log level')
@@ -24,6 +26,9 @@ def main(log_format, log_level, host, port):
     init_logging(log_format, log_level)
 
     from polyswarmd import app
+
+    app['REDIS'] = redis.Redis.from_url(redis_uri) if redis_uri else None
+
     server = pywsgi.WSGIServer((host, port), app, handler_class=WebSocketHandler)
 
     logger.critical("polyswarmd is ready!")

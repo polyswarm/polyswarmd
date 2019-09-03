@@ -271,7 +271,7 @@ def post_assertion_metadata():
         return failure('Invalid Assertion metadata', 400)
 
     try:
-        status_code, ipfshash = post_to_ipfs([('metadata', body)], wrap_dir=False)
+        status_code, ipfshash = post_to_ipfs([('metadata', body)], wrap_dir=False, cache=True)
         return success(ipfshash) if status_code // 100 == 2 else failure('Could not add metadata to IPFS', status_code)
     except Exception:
         logger.exception('Received error posting to IPFS got response')
