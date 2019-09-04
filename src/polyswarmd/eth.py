@@ -216,8 +216,9 @@ def build_transaction(call, nonce):
     gas_limit = MAX_GAS_LIMIT
     if app.config['CHECK_BLOCK_LIMIT']:
         gas_limit = g.chain.w3.eth.getBlock('latest').gasLimit
-        if gas_limit >= MAX_GAS_LIMIT:
-            app.config['CHECK_BLOCK_LIMIT'] = False
+
+    if gas_limit >= MAX_GAS_LIMIT:
+        app.config['CHECK_BLOCK_LIMIT'] = False
 
     options = {
         'nonce': nonce,
