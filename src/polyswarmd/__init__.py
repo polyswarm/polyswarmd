@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from requests_futures.sessions import FuturesSession
 from polyswarmd.monkey import patch_all
 
@@ -27,6 +28,7 @@ session = FuturesSession(executor=ThreadPoolExecutor(4),
 session.request = functools.partial(session.request, timeout=10)
 
 app.config['REQUESTS_SESSION'] = session
+app.config['CHECK_BLOCK_LIMIT'] = True
 
 cache = Cache(config={"CACHE_TYPE": "simple", "CACHE_DEFAULT_TIMEOUT": 30})
 

@@ -184,7 +184,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
     @catch_ipfs_errors
     def _mfs_mkdir(self, session):
         while True:
-            directory_name = '/{0}'.format(uuid.uuid4()),
+            directory_name = '/{0}'.format(str(uuid.uuid4()))
             # Try again if name is taken (Should never happen)
             try:
                 if self._mfs_ls(directory_name, session)[1]:
