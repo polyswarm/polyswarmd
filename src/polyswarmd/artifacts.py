@@ -87,21 +87,21 @@ def post_to_ipfs(files, wrap_dir=False, cache=False):
     return 201, h
 
 
-def get_from_ipfs(ipfs_uri, ipfs_root=None, session=None):
-    with app.app_context():
-        config = app.config['POLYSWARMD']
+def get_from_ipfs(ipfs_uri, ipfs_root=None, session=None, redis=None):
+    if not ipfs_root:
+        ipfs_root = app.config['POLYSWARMD'].ipfs_uri
 
-        if not ipfs_root:
-            ipfs_root = config.ipfs_uri
+    if not session:
+        session = app.config['REQUESTS_SESSION']
 
-        if not session:
-            session = app.config['REQUESTS_SESSION']
+    if not redis:
+        redis = app.config['POLYSWARMD'].redis
 
-    if config.redis:
-        result = config.redis.get(f'polyswarmd:{ipfs_uri}')
+        if redis:
+            result = redis.get(f'polyswarmd:{ipfs_uri}')
 
-        if result:
-            return 201, result
+            if result:
+                return 201, result
 
     try:
         future = session.get(ipfs_root + '/api/v0/cat', params={'arg': ipfs_uri}, timeout=1)

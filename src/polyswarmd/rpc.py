@@ -77,7 +77,7 @@ class EthereumRpc:
             self.init_filter.get_new_entries()
 
     # noinspection PyBroadException
-    def poll(self, ipfs_uri):
+    def poll(self, ipfs_uri, redis):
         """
         Continually poll all Ethereum filters as long as there are WebSockets listening
         :param ipfs_uri: IPFS root uri
@@ -127,7 +127,8 @@ class EthereumRpc:
                         bounty['data']['metadata'] = substitute_ipfs_metadata(metadata,
                                                                               validate=BountyMetadata.validate,
                                                                               ipfs_root=ipfs_uri,
-                                                                              session=self.session)
+                                                                              session=self.session,
+                                                                              redis=redis)
                     else:
                         bounty['data']['metadata'] = None
 
@@ -151,7 +152,8 @@ class EthereumRpc:
                     }
                     reveal['data']['metadata'] = substitute_ipfs_metadata(reveal['data'].get('metadata', ''),
                                                                           ipfs_root=ipfs_uri,
-                                                                          session=self.session)
+                                                                          session=self.session,
+                                                                          redis=redis)
 
                     self.broadcast(reveal)
 
@@ -241,7 +243,8 @@ class EthereumRpc:
             logger.debug('First WebSocket registered, starting greenlet')
             from polyswarmd import app
             ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
-            gevent.spawn(self.poll, ipfs_uri)
+            redis = app.config['POLYSWARMD'].redis
+            gevent.spawn(self.poll, ipfs_uri, redis)
 
     def setup_filters(self):
         """
