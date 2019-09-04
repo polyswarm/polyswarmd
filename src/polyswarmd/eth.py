@@ -212,22 +212,6 @@ def post_transactions():
 
 
 def build_transaction(call, nonce):
-    options = {
-        'nonce': nonce,
-        'chainId': int(g.chain.chain_id),
-        'gas': MAX_GAS_LIMIT,
-    }
-
-    if g.chain.free:
-        options["gasPrice"] = 0
-        gas = MAX_GAS_LIMIT
-    else:
-        try:
-            gas = int(call.estimateGas({'from': g.eth_address, **options}) * GAS_MULTIPLIER)
-        except ValueError as e:
-            logger.debug('Error estimating gas, using default: %s', e)
-            gas = MAX_GAS_LIMIT
-
     # Only a problem for fresh chains
     gas_limit = MAX_GAS_LIMIT
     if app.config['CHECK_BLOCK_LIMIT']:
@@ -235,9 +219,22 @@ def build_transaction(call, nonce):
         if gas_limit >= MAX_GAS_LIMIT:
             app.config['CHECK_BLOCK_LIMIT'] = False
 
-    options['gas'] = min(gas_limit, gas)
-    logger.critical('Gas for transaction: %s', options['gas'])
+    options = {
+        'nonce': nonce,
+        'chainId': int(g.chain.chain_id),
+        'gas': gas_limit,
+    }
 
+    gas = gas_limit
+    if g.chain.free:
+        options["gasPrice"] = 0
+    else:
+        try:
+            gas = int(call.estimateGas({'from': g.eth_address, **options}) * GAS_MULTIPLIER)
+        except ValueError as e:
+            logger.debug('Error estimating gas, using default: %s', e)
+
+    options['gas'] = min(gas_limit, gas)
     logger.info('options: %s', options)
 
     return call.buildTransaction(options)
