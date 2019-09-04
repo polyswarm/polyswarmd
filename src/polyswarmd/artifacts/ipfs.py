@@ -26,7 +26,7 @@ def catch_ipfs_errors(func):
             raise ArtifactServiceException(e.response.status_code, e.response.content)
         except Exception:
             logger.exception('Received error from IPFS')
-            raise ArtifactServiceException(500, 'Error executing IPFS command {0}'.format(func.__name__))
+            raise ArtifactServiceException(500, f'Error executing IPFS command {func.__name__}')
 
     return wrapper
 
@@ -39,7 +39,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
     """
     def __init__(self, base_uri):
         self.base_uri = base_uri
-        reachable_endpoint = "{}{}".format(self.base_uri, '/api/v0/bootstrap')
+        reachable_endpoint = f"{self.base_uri}{'/api/v0/bootstrap'}"
         super().__init__('IPFS', reachable_endpoint)
 
     @staticmethod
@@ -59,7 +59,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
     @staticmethod
     def check_redis(uri, redis):
         try:
-            result = redis.get('polyswarmd:{0}'.format(uri))
+            result = redis.get(f'polyswarmd:{uri}')
             if result:
                 return result
         except RuntimeError:
@@ -79,7 +79,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
     def add_artifact(self, artifact, session, redis=None):
         ipfs_uri = self._add(artifact, session)
         if redis:
-            redis.set('polyswarmd:{0}'.format(ipfs_uri), artifact[1][1], ex=300)
+            redis.set(f'polyswarmd:{ipfs_uri}', artifact[1][1], ex=300)
 
         return ipfs_uri
 
@@ -190,8 +190,8 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
 
         future = session.get(self.base_uri + '/api/v0/files/cp', params={
             'arg': [
-                '/ipfs/{0}'.format(ipfs_uri),
-                '{0}/{1}'.format(directory, filename)
+                f'/ipfs/{ipfs_uri}',
+                f'{directory}/{filename}'
             ]
         }, timeout=1)
         r = future.result()
@@ -202,7 +202,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
     @catch_ipfs_errors
     def _mfs_mkdir(self, session):
         while True:
-            directory_name = '/{0}'.format(str(uuid.uuid4()))
+            directory_name = f'/{str(uuid.uuid4())}'
             # Try again if name is taken (Should never happen)
             try:
                 if self._mfs_ls(directory_name, session)[1]:

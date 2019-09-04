@@ -204,7 +204,7 @@ class ChainConfig(object):
     def from_consul(cls, consul_client, name, key):
         config = fetch_from_consul_or_wait(consul_client, key).get('Value')
         if config is None:
-            raise ValueError('Invalid chain config for chain {0}'.format(name))
+            raise ValueError(f'Invalid chain config for chain {name}')
 
         config = json.loads(config.decode('utf-8'))
 
@@ -338,10 +338,10 @@ class Config(object):
         consul_client = Consul(host=u.hostname, port=u.port, scheme=u.scheme, token=consul_token)
 
         community = os.environ['POLY_COMMUNITY_NAME']
-        homechain_config = ChainConfig.from_consul(consul_client, 'home', 'chain/{0}/homechain'.format(community))
-        sidechain_config = ChainConfig.from_consul(consul_client, 'side', 'chain/{0}/sidechain'.format(community))
+        homechain_config = ChainConfig.from_consul(consul_client, 'home', f'chain/{community}/homechain')
+        sidechain_config = ChainConfig.from_consul(consul_client, 'side', f'chain/{community}/sidechain')
 
-        base_key = 'chain/{0}'.format(community)
+        base_key = f'chain/{community}'
         config = fetch_from_consul_or_wait(consul_client, base_key + '/config').get('Value')
         if config is None:
             raise ValueError('Invalid global config')
@@ -383,12 +383,12 @@ class Config(object):
     def __validate(self):
         # We expect IPFS and API key service to be up already
         if not is_service_reachable(self.session, self.artifact_client.reachable_endpoint):
-            raise ValueError('{0} not reachable, is correct URI specified?'.format(self.artifact_client.name))
+            raise ValueError(f'{self.artifact_client.name} not reachable, is correct URI specified?')
 
         if self.artifact_limit < 1 or self.artifact_limit > 256:
             raise ValueError('Artifact limit must be greater than 0 and cannot exceed contract limit of 256')
 
-        if self.auth_uri and not is_service_reachable(self.session, "{0}/communities/public".format(self.auth_uri)):
+        if self.auth_uri and not is_service_reachable(self.session, f"{self.auth_uri}/communities/public"):
             raise ValueError('API key service not reachable, is correct URI specified?')
 
         if self.require_api_key and not self.auth_uri:

@@ -77,7 +77,7 @@ class User(object):
         config = app.config['POLYSWARMD']
         session = app.config['REQUESTS_SESSION']
 
-        auth_uri = '{}/communities/{}/auth'.format(config.auth_uri, config.community)
+        auth_uri = f'{config.auth_uri}/communities/{config.community}/auth'
 
         r = get_auth(api_key, auth_uri)
         if r is None or r.status_code != 200:
@@ -124,12 +124,12 @@ def status():
 
     if config.auth_uri:
         ret['auth'] = {
-            'reachable': is_service_reachable(session, "{0}/communities/public".format(config.auth_uri)),
+            'reachable': is_service_reachable(session, f"{config.auth_uri}/communities/public"),
         }
 
     for name, chain in config.chains.items():
         ret[name] = {
-            'reachable': is_service_reachable(session, "{0}".format(chain.eth_uri)),
+            'reachable': is_service_reachable(session, f"{chain.eth_uri}"),
         }
 
         if ret[name]['reachable']:

@@ -57,9 +57,9 @@ def get_artifacts_identifier(identifier):
         return failure(e.response, e.status_code)
 
     if not arts:
-        return failure('Could not locate {0} resource'.format(config.artifact_client.name), 404)
+        return failure(f'Could not locate {config.artifact_client.name} resource', 404)
     if len(arts) > 256:
-        return failure('Invalid {0} resource, too many links'.format(config.artifact_client.name), 400)
+        return failure(f'Invalid {config.artifact_client.name} resource, too many links', 400)
 
     return success([{'name': a[0], 'hash': a[1]} for a in arts])
 

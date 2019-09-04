@@ -170,7 +170,7 @@ def post_transactions():
             errors = True
             results.append({
                 'is_error': True,
-                'message': 'Invalid transaction for tx {0}: only withdrawals allowed without an API key'.format(tx.hash.hex())
+                'message': f'Invalid transaction for tx {tx.hash.hex()}: only withdrawals allowed without an API key'
             })
             continue
 
@@ -179,7 +179,7 @@ def post_transactions():
             errors = True
             results.append({
                 'is_error': True,
-                'message': 'Invalid transaction sender for tx {0}: expected {1} got {2}'.format(tx.hash.hex(), account, sender)
+                'message': f'Invalid transaction sender for tx {tx.hash.hex()}: expected {account} got {sender}'
             })
             continue
 
@@ -189,7 +189,7 @@ def post_transactions():
             errors = True
             results.append({
                 'is_error': True,
-                'message':  'Invalid transaction recipient for tx {0}: {1}'.format(tx.hash.hex(), to)
+                'message': f'Invalid transaction recipient for tx {tx.hash.hex()}: {to}'
             })
             continue
 
@@ -203,7 +203,7 @@ def post_transactions():
             errors = True
             results.append({
                 'is_error': True,
-                'message': 'Invalid transaction error for tx {0}: {1}'.format(tx.hash.hex(), e)
+                'message': f'Invalid transaction error for tx {tx.hash.hex()}: {e}'
             })
     if errors:
         return failure(results, 400)
@@ -305,13 +305,13 @@ def events_from_transaction(txhash, chain):
         logging.exception('Transaction %s: timeout waiting for receipt', bytes(txhash).hex())
         return {
             'errors':
-                ['transaction {0}: timeout during wait for receipt'.format(bytes(txhash).hex())]
+                [f'transaction {bytes(txhash).hex()}: timeout during wait for receipt']
         }
     except Exception:
         logger.exception('Transaction %s: error while fetching transaction receipt', bytes(txhash).hex())
         return {
             'errors':
-                ['transaction {0}: unexpected error while fetching transaction receipt'.format(bytes(txhash).hex())]
+                [f'transaction {bytes(txhash).hex()}: unexpected error while fetching transaction receipt']
         }
     finally:
         timeout.cancel()
@@ -320,25 +320,23 @@ def events_from_transaction(txhash, chain):
     if not receipt:
         return {
             'errors':
-                ['transaction {0}: receipt not available'.format(txhash)]
+                [f'transaction {txhash}: receipt not available']
         }
     if receipt.gasUsed == MAX_GAS_LIMIT:
-        return {'errors': ['transaction {0}: out of gas'.format(txhash)]}
+        return {'errors': [f'transaction {txhash}: out of gas']}
     if receipt.status != 1:
         if trace_transactions:
             error = g.chain.w3.debug.getTransactionError(txhash)
             logger.error('Transaction %s failed with error message: %s', txhash, error)
             return {
                 'errors': [
-                    'transaction {0}: transaction failed at block {1}, error: {2}'.format(
-                        txhash, receipt.blockNumber, error)
+                    f'transaction {txhash}: transaction failed at block {receipt.blockNumber}, error: {error}'
                 ]
             }
         else:
             return {
                 'errors': [
-                    'transaction {0}: transaction failed at block {1}, check parameters'.format(
-                        txhash, receipt.blockNumber)
+                    f'transaction {txhash}: transaction failed at block {receipt.blockNumber}, check parameters'
                 ]
             }
 
