@@ -65,7 +65,7 @@ def list_artifacts(ipfshash):
     return []
 
 
-def post_to_ipfs(files, wrap_dir=False):
+def post_to_ipfs(files, wrap_dir=False, cache=False):
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
 
@@ -79,15 +79,33 @@ def post_to_ipfs(files, wrap_dir=False):
     except requests.exceptions.HTTPError as e:
         return e.response.status_code, None
 
-    return 201, json.loads(r.text.splitlines()[-1])['Hash']
+    h = json.loads(r.text.splitlines()[-1])['Hash']
+
+    if cache and config.redis:
+        config.redis.set(f'polyswarmd:{h}', files[0][1], ex=300)
+
+    return 201, h
 
 
-def get_from_ipfs(ipfs_uri, ipfs_root=None, session=None):
+def get_from_ipfs(ipfs_uri, ipfs_root=None, session=None, redis=None):
     if not ipfs_root:
         ipfs_root = app.config['POLYSWARMD'].ipfs_uri
 
     if not session:
         session = app.config['REQUESTS_SESSION']
+
+    if not redis:
+        try:
+            redis = app.config['POLYSWARMD'].redis
+
+            if redis:
+                result = redis.get(f'polyswarmd:{ipfs_uri}')
+
+                if result:
+                    return 201, result
+        except RuntimeError:
+            # happens if redis is not configured and websocket poller calls this
+            pass
 
     try:
         future = session.get(ipfs_root + '/api/v0/cat', params={'arg': ipfs_uri}, timeout=1)
@@ -127,7 +145,7 @@ def post_artifacts():
     if len(files) > config.artifact_limit:
         return failure('Too many artifacts', 400)
 
-    status_code, ipfshash = post_to_ipfs(files, wrap_dir=True)
+    status_code, ipfshash = post_to_ipfs(files, wrap_dir=True, cache=True)
     if status_code // 100 == 2:
         return success(ipfshash)
     else:

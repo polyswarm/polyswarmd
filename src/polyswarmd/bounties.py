@@ -53,7 +53,7 @@ def calculate_commitment(account, verdicts):
 
 
 @cache.memoize(30)
-def substitute_ipfs_metadata(ipfs_uri, validate=AssertionMetadata.validate, ipfs_root=None, session=None):
+def substitute_ipfs_metadata(ipfs_uri, validate=AssertionMetadata.validate, ipfs_root=None, session=None, redis=None):
     """
     Download metadata from IPFS and validate it against the schema.
 
@@ -61,12 +61,13 @@ def substitute_ipfs_metadata(ipfs_uri, validate=AssertionMetadata.validate, ipfs
     :param validate: Function that takes a loaded json blob and returns true if it matches the schema
     :param ipfs_root: Root uri for ipfs
     :param session: Requests session for ipfs request
+    :param redis: Redis connection object
     :return: Metadata from IPFS, or original metadata
     """
     if not is_valid_ipfshash(ipfs_uri):
         return ipfs_uri
 
-    status_code, content = get_from_ipfs(ipfs_uri, ipfs_root=ipfs_root, session=session)
+    status_code, content = get_from_ipfs(ipfs_uri, ipfs_root=ipfs_root, session=session, redis=redis)
     try:
         if status_code // 100 == 2 and validate(json.loads(content.decode('utf-8'))):
             return json.loads(content.decode('utf-8'))
@@ -271,7 +272,7 @@ def post_assertion_metadata():
         return failure('Invalid Assertion metadata', 400)
 
     try:
-        status_code, ipfshash = post_to_ipfs([('metadata', body)], wrap_dir=False)
+        status_code, ipfshash = post_to_ipfs([('metadata', body)], wrap_dir=False, cache=True)
         return success(ipfshash) if status_code // 100 == 2 else failure('Could not add metadata to IPFS', status_code)
     except Exception:
         logger.exception('Received error posting to IPFS got response')
