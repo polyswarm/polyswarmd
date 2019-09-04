@@ -211,15 +211,20 @@ def post_transactions():
     return success(results)
 
 
-def build_transaction(call, nonce):
-    # Only a problem for fresh chains
+def get_gas_limit():
     gas_limit = MAX_GAS_LIMIT
     if app.config['CHECK_BLOCK_LIMIT']:
         gas_limit = g.chain.w3.eth.getBlock('latest').gasLimit
 
-    if gas_limit >= MAX_GAS_LIMIT:
+    if app.config['CHECK_BLOCK_LIMIT'] and gas_limit >= MAX_GAS_LIMIT:
         app.config['CHECK_BLOCK_LIMIT'] = False
 
+    return gas_limit
+
+
+def build_transaction(call, nonce):
+    # Only a problem for fresh chains
+    gas_limit = get_gas_limit()
     options = {
         'nonce': nonce,
         'chainId': int(g.chain.chain_id),
@@ -236,7 +241,7 @@ def build_transaction(call, nonce):
             logger.debug('Error estimating gas, using default: %s', e)
 
     options['gas'] = min(gas_limit, gas)
-    logger.info('options: %s', options)
+    logger.debug('options: %s', options)
 
     return call.buildTransaction(options)
 
