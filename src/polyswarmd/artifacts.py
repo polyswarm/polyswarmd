@@ -95,13 +95,17 @@ def get_from_ipfs(ipfs_uri, ipfs_root=None, session=None, redis=None):
         session = app.config['REQUESTS_SESSION']
 
     if not redis:
-        redis = app.config['POLYSWARMD'].redis
+        try:
+            redis = app.config['POLYSWARMD'].redis
 
-        if redis:
-            result = redis.get(f'polyswarmd:{ipfs_uri}')
+            if redis:
+                result = redis.get(f'polyswarmd:{ipfs_uri}')
 
-            if result:
-                return 201, result
+                if result:
+                    return 201, result
+        except RuntimeError:
+            # happens if redis is not configured and websocket poller calls this
+            pass
 
     try:
         future = session.get(ipfs_root + '/api/v0/cat', params={'arg': ipfs_uri}, timeout=1)
