@@ -88,13 +88,14 @@ def post_to_ipfs(files, wrap_dir=False, cache=False):
 
 
 def get_from_ipfs(ipfs_uri, ipfs_root=None, session=None):
-    config = app.config['POLYSWARMD']
+    with app.app_context():
+        config = app.config['POLYSWARMD']
 
-    if not ipfs_root:
-        ipfs_root = config.ipfs_uri
+        if not ipfs_root:
+            ipfs_root = config.ipfs_uri
 
-    if not session:
-        session = app.config['REQUESTS_SESSION']
+        if not session:
+            session = app.config['REQUESTS_SESSION']
 
     if config.redis:
         result = config.redis.get(f'polyswarmd:{ipfs_uri}')
