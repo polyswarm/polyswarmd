@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 @click.option('--log-level', envvar='LOG_LEVEL', default='WARNING', help='Logging level')
 @click.option('--host', default='', help='Host to listen on')
 @click.option('--port', default=31337, help='Port to listen on')
-@click.option('--redis-uri', default=None, envvar='REDIS', help='Redis server to use for caching')
 def main(log_format, log_level, host, port, redis_uri):
     log_level = getattr(logging, log_level.upper(), None)
     if not isinstance(log_level, int):
@@ -26,8 +25,6 @@ def main(log_format, log_level, host, port, redis_uri):
     init_logging(log_format, log_level)
 
     from polyswarmd import app
-
-    app.config['REDIS'] = redis.Redis.from_url(redis_uri) if redis_uri else None
 
     server = pywsgi.WSGIServer((host, port), app, handler_class=WebSocketHandler)
 
