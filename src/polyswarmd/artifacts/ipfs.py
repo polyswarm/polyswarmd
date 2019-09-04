@@ -66,8 +66,12 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         stat = self._mfs_stat(directory, session)
         return stat.get('Hash', '')
 
-    def add_artifact(self, artifact, session):
-        return self._add(artifact, session)
+    def add_artifact(self, artifact, session, redis=None):
+        ipfs_uri = self._add(artifact, session)
+        if redis:
+            redis.set('polyswarmd:{0}'.format(ipfs_uri), artifact[1][1], ex=300)
+
+        return ipfs_uri
 
     # noinspection PyBroadException
     def check_uri(self, uri):
@@ -96,9 +100,18 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
 
         return stats
 
-    def get_artifact(self, uri, session, index=None, max_size=None):
+    def get_artifact(self, uri, session, index=None, max_size=None, redis=None):
         if not self.check_uri(uri):
             raise ArtifactServiceException(400, 'Invalid IPFS Hash')
+
+        if redis:
+            try:
+                result = redis.get('polyswarmd:{0}'.format(uri))
+                if result:
+                    return result
+            except RuntimeError:
+                # happens if redis is not configured and websocket poll calls this
+                pass
 
         if index is not None:
             artifacts = self.ls(uri, session)

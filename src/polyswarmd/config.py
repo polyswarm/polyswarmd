@@ -8,6 +8,7 @@ import requests
 from urllib.parse import urlparse
 
 import yaml
+import redis
 from consul import Consul
 from consul.base import Timeout
 from web3 import Web3, HTTPProvider
@@ -278,7 +279,7 @@ class Config(object):
     session = requests.Session()
 
     def __init__(self, community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config,
-                 sidechain_config, trace_transactions, profiler_enabled):
+                 sidechain_config, trace_transactions, profiler_enabled, redis_client):
         self.community = community
         # For now, there is no other option than IpfsServiceClient, but this will eventually be configurable
         self.artifact_client = IpfsServiceClient(ipfs_uri)
@@ -292,6 +293,7 @@ class Config(object):
         self.config_filename = ''
         self.trace_transactions = trace_transactions
         self.profiler_enabled = profiler_enabled
+        self.redis = redis_client
 
         self.__validate()
 
@@ -310,8 +312,10 @@ class Config(object):
         require_api_key = auth_uri is not None
         trace_transactions = config.get('trace_transactions', True)
         profiler_enabled = config.get('profiler_enabled', False)
+        redis_uri = config.get('redis_uri', os.environ.get('REDIS_URI', None))
+        redis_client = redis.Redis.from_url(redis_uri) if redis_uri else None
         return cls(commmunity, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
-                   trace_transactions, profiler_enabled)
+                   trace_transactions, profiler_enabled, redis_client)
 
     @classmethod
     def from_config_file_search(cls):
@@ -350,8 +354,11 @@ class Config(object):
         require_api_key = auth_uri is not None
         trace_transactions = config.get('trace_transactions', True)
         profiler_enabled = config.get('profiler_enabled', False)
+        redis_uri = config.get('redis_uri', os.environ.get('REDIS_URI', None))
+        redis_client = redis.Redis.from_url(redis_uri) if redis_uri else None
+
         ret = cls(community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
-                  trace_transactions, profiler_enabled)
+                  trace_transactions, profiler_enabled, redis_client)
 
         # Watch for key deletion, if config is deleted die and restart with new config
         def watch_for_config_deletion(consul_client, key):

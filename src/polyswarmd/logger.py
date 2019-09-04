@@ -43,7 +43,7 @@ class LoggerConfig:
         self.log_level = new_level
         logger = logging.getLogger()
         logger.setLevel(self.log_level)
-        logger.log(self.log_level, f'Changed log level')
+        logger.log(self.log_level, 'Changed log level')
 
     def __signal_handler(self, _signum, _frame):
         try:

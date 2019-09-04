@@ -31,12 +31,13 @@ class AbstractArtifactServiceClient(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def add_artifact(self, artifact, session):
+    def add_artifact(self, artifact, session, redis=None):
         """
         Add a list of artifacts to the service
 
-        :param artifact: list[tuple]: List of files to be added to the service.
+        :param artifact: List of files to be added to the service.
         :param session: connection session
+        :param redis: redis connection for caching contents
         :return: (str) URI for the added file
         :raises ArtifactServiceException: If service is unreachable or gives non-200 response
         """
@@ -65,13 +66,15 @@ class AbstractArtifactServiceClient(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def get_artifact(self, identifier, index, session):
+    def get_artifact(self, identifier, index, session, max_size=None, redis=None):
         """
         Get the artifact at the given identifer and index
 
         :param identifier: uri or other identifier for the artifact
         :param index: index of the artifact in a directory, or 0 if file is not a directory
         :param session: connection session
+        :param max_size: optional max size of files to get
+        :param redis: redis connection for reading from cache contents
         :return: (bytes) Byte content of the given file
         :raises ArtifactServiceException: If service is unreachable or gives non-200 response
         """

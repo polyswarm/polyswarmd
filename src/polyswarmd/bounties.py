@@ -65,7 +65,7 @@ def get_assertion(guid, index, num_artifacts):
 
 
 @cache.memoize(30)
-def substitute_metadata(ipfs_uri, validate=AssertionMetadata.validate, artifact_client=None, session=None):
+def substitute_metadata(ipfs_uri, validate=AssertionMetadata.validate, artifact_client=None, session=None, redis=None):
     """
     Download metadata from artifact service and validate it against the schema.
 
@@ -73,6 +73,7 @@ def substitute_metadata(ipfs_uri, validate=AssertionMetadata.validate, artifact_
     :param validate: Function that takes a loaded json blob and returns true if it matches the schema
     :param artifact_client: Artifact Client for accessing artifacts stored on a service
     :param session: Requests session for ipfs request
+    :param redis: Redis connection object
     :return: Metadata from artifact service, or original metadata
     """
     if not session:
@@ -83,7 +84,7 @@ def substitute_metadata(ipfs_uri, validate=AssertionMetadata.validate, artifact_
         artifact_client = config.artifact_client
 
     try:
-        content = artifact_client.get_artifact(ipfs_uri, session=session)
+        content = artifact_client.get_artifact(ipfs_uri, session=session, redis=redis)
         if validate(json.loads(content.decode('utf-8'))):
             return json.loads(content.decode('utf-8'))
     except json.JSONDecodeError:
@@ -289,8 +290,10 @@ def post_assertion_metadata():
         return failure('Invalid Assertion metadata', 400)
 
     try:
-        ipfshash = config.artifact_client.add_artifact(('metadata', body), session)
-        return success(ipfshash)
+        uri = config.artifact_client.add_artifact(('file', ('metadata', body, 'application/json')),
+                                                  session,
+                                                  redis=config.redis)
+        return success(uri)
     except Exception:
         logger.exception('Received error posting to IPFS got response')
         return failure('Could not add metadata to ipfs', 400)

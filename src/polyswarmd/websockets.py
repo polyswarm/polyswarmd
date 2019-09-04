@@ -35,7 +35,7 @@ class WebSocket:
         self.queue.put(message)
 
     def __repr__(self):
-        return f'<Websocket UUID={str(self.guid)}>'
+        return '<Websocket UUID={0}>'.format(str(self.guid))
 
     def __eq__(self, other):
         return isinstance(other, WebSocket) and \

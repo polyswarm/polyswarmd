@@ -75,7 +75,7 @@ class EthereumRpc:
             self.init_filter.get_new_entries()
 
     # noinspection PyBroadException
-    def poll(self, artifact_client):
+    def poll(self, artifact_client, redis):
         """
         Continually poll all Ethereum filters as long as there are WebSockets listening
         :param artifact_client: ArtifactClient for making requests to artifact service
@@ -124,7 +124,8 @@ class EthereumRpc:
                     if metadata:
                         bounty['data']['metadata'] = substitute_metadata(metadata, validate=BountyMetadata.validate,
                                                                          artifact_client=artifact_client,
-                                                                         session=self.session)
+                                                                         session=self.session,
+                                                                         redis=redis)
                     else:
                         bounty['data']['metadata'] = None
 
@@ -148,7 +149,8 @@ class EthereumRpc:
                     }
                     reveal['data']['metadata'] = substitute_metadata(reveal['data'].get('metadata', ''),
                                                                      artifact_client=artifact_client,
-                                                                     session=self.session)
+                                                                     session=self.session,
+                                                                     redis=redis)
 
                     self.broadcast(reveal)
 
@@ -238,7 +240,8 @@ class EthereumRpc:
             logger.debug('First WebSocket registered, starting greenlet')
             from polyswarmd import app
             artifact_client = app.config['POLYSWARMD'].artifact_client
-            gevent.spawn(self.poll, artifact_client)
+            redis = app.config['POLYSWARMD'].redis
+            gevent.spawn(self.poll, artifact_client, redis)
 
     def setup_filters(self):
         """
