@@ -56,6 +56,16 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
 
         return artifacts[index]
 
+    @staticmethod
+    def check_redis(uri, redis):
+        try:
+            result = redis.get('polyswarmd:{0}'.format(uri))
+            if result:
+                return result
+        except RuntimeError:
+            # happens if redis is not configured and websocket poll calls this
+            pass
+
     def add_artifacts(self, artifacts, session):
         directory = self._mfs_mkdir(session)
         for artifact in artifacts:
@@ -104,14 +114,9 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         if not self.check_uri(uri):
             raise ArtifactServiceException(400, 'Invalid IPFS Hash')
 
-        if redis:
-            try:
-                result = redis.get('polyswarmd:{0}'.format(uri))
-                if result:
-                    return result
-            except RuntimeError:
-                # happens if redis is not configured and websocket poll calls this
-                pass
+        redis_response = IpfsServiceClient.check_redis(uri, redis)
+        if redis_response:
+            return redis_response
 
         if index is not None:
             artifacts = self.ls(uri, session)
