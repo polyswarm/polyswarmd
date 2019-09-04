@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 misc = Blueprint('misc', __name__)
 
-MAX_GAS_LIMIT = 94000000
+MAX_GAS_LIMIT = 50000000
 GAS_MULTIPLIER = 1.5
 ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 TRANSFER_SIGNATURE_HASH = 'a9059cbb'
@@ -228,7 +228,15 @@ def build_transaction(call, nonce):
             logger.debug('Error estimating gas, using default: %s', e)
             gas = MAX_GAS_LIMIT
 
-    options['gas'] = min(MAX_GAS_LIMIT, gas)
+    # Only a problem for fresh chains
+    gas_limit = MAX_GAS_LIMIT
+    if app.config['CHECK_BLOCK_LIMIT']:
+        gas_limit = g.chain.w3.eth.getBlock('latest').gasLimit
+        if gas_limit >= MAX_GAS_LIMIT:
+            app.config['CHECK_BLOCK_LIMIT'] = False
+
+    options['gas'] = min(gas_limit, gas)
+    logger.critical('Gas for transaction: %s', options['gas'])
 
     logger.info('options: %s', options)
 
