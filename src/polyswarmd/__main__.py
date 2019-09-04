@@ -27,7 +27,7 @@ def main(log_format, log_level, host, port, redis_uri):
 
     from polyswarmd import app
 
-    app['REDIS'] = redis.Redis.from_url(redis_uri) if redis_uri else None
+    app.config['REDIS'] = redis.Redis.from_url(redis_uri) if redis_uri else None
 
     server = pywsgi.WSGIServer((host, port), app, handler_class=WebSocketHandler)
 
