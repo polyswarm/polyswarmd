@@ -105,7 +105,7 @@ def get_artifacts_identifier_id_stat(identifier, id_):
     session = app.config['REQUESTS_SESSION']
 
     try:
-        return config.artifact_client.details(identifier, id_, session)
+        return success(config.artifact_client.details(identifier, id_, session))
     except HTTPError as e:
         return failure(e.response.content, e.response.status_code)
     except InvalidUriException:
