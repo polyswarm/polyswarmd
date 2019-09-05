@@ -55,6 +55,9 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
 
     @staticmethod
     def check_redis(uri, redis):
+        if not redis:
+            return None
+
         try:
             result = redis.get(f'polyswarmd:{uri}')
             if result:
