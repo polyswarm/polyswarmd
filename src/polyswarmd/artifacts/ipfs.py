@@ -41,9 +41,6 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
 
     @staticmethod
     def check_ls(artifacts, index, max_size=None):
-        if not artifacts:
-            raise ArtifactNotFoundException('Could not locate IPFS resource')
-
         if index < 0 or index > 256 or index >= len(artifacts):
             raise ArtifactNotFoundException('Could not locate artifact ID')
 
@@ -124,6 +121,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         stats = self._stat(uri, session)
         ls = self._ls(uri, session)
 
+        # Return self if not directory
         if stats.get('NumLinks', 0) == 0:
             return [('', stats.get('Hash', ''), stats.get('DataSize'))]
 
@@ -136,7 +134,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
 
             return links
 
-        return []
+        raise ArtifactNotFoundException('Could not locate IPFS resource')
 
     def status(self, session):
         return {'online': self._sys(session)}

@@ -61,9 +61,7 @@ def get_artifacts_identifier(identifier):
     session = app.config['REQUESTS_SESSION']
     try:
         arts = config.artifact_client.ls(identifier, session)
-        if not arts:
-            response = failure(f'Could not locate {config.artifact_client.name} resource', 404)
-        elif len(arts) > 256:
+        if len(arts) > 256:
             response = failure(f'Invalid {config.artifact_client.name} resource, too many links', 400)
         else:
             response = success([{'name': a[0], 'hash': a[1]} for a in arts])
@@ -78,6 +76,7 @@ def get_artifacts_identifier(identifier):
         response = failure(e.message, 500)
 
     return response
+
 
 @artifacts.route('/<identifier>/<int:id_>', methods=['GET'])
 def get_artifacts_identifier_id(identifier, id_):
