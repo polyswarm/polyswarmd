@@ -46,71 +46,75 @@ def post_artifacts():
         return failure('Too many artifacts', 400)
 
     try:
-        return success(config.artifact_client.add_artifacts(files, session))
+        response = success(config.artifact_client.add_artifacts(files, session))
     except HTTPError as e:
-        return failure(e.response.content, e.response.status_code)
+        response = failure(e.response.content, e.response.status_code)
     except ArtifactException as e:
-        return failure(e.message, 500)
+        response = failure(e.message, 500)
+
+    return response
 
 
 @artifacts.route('/<identifier>', methods=['GET'])
 def get_artifacts_identifier(identifier):
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
-
     try:
         arts = config.artifact_client.ls(identifier, session)
+        if not arts:
+            return failure(f'Could not locate {config.artifact_client.name} resource', 404)
+        if len(arts) > 256:
+            return failure(f'Invalid {config.artifact_client.name} resource, too many links', 400)
+
+        response = success([{'name': a[0], 'hash': a[1]} for a in arts])
     except HTTPError as e:
-        return failure(e.response.content, e.response.status_code)
+        response = failure(e.response.content, e.response.status_code)
     except InvalidUriException:
-        return failure('Invalid artifact URI', 400)
+        response = failure('Invalid artifact URI', 400)
     except ArtifactNotFoundException:
-        return failure(f'Artifact with URI {identifier} not found', 404)
+        response = failure(f'Artifact with URI {identifier} not found', 404)
     except ArtifactException as e:
-        return failure(e.message, 500)
+        response = failure(e.message, 500)
 
-    if not arts:
-        return failure(f'Could not locate {config.artifact_client.name} resource', 404)
-    if len(arts) > 256:
-        return failure(f'Invalid {config.artifact_client.name} resource, too many links', 400)
-
-    return success([{'name': a[0], 'hash': a[1]} for a in arts])
+    return response
 
 
 @artifacts.route('/<identifier>/<int:id_>', methods=['GET'])
 def get_artifacts_identifier_id(identifier, id_):
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
-
     try:
-        return config.artifact_client.get_artifact(identifier,
-                                                   session,
-                                                   index=id_,
-                                                   max_size=g.user.max_artifact_size)
+        response = config.artifact_client.get_artifact(identifier,
+                                                       session,
+                                                       index=id_,
+                                                       max_size=g.user.max_artifact_size)
     except HTTPError as e:
-        return failure(e.response.content, e.response.status_code)
+        response = failure(e.response.content, e.response.status_code)
     except InvalidUriException:
-        return failure('Invalid artifact URI', 400)
+        response = failure('Invalid artifact URI', 400)
     except ArtifactNotFoundException:
-        return failure(f'Artifact with URI {identifier}/{id_} not found', 404)
+        response = failure(f'Artifact with URI {identifier}/{id_} not found', 404)
     except ArtifactSizeException:
-        return failure(f'Artifact with URI {identifier}/{id_} too large', 400)
+        response = failure(f'Artifact with URI {identifier}/{id_} too large', 400)
     except ArtifactException as e:
-        return failure(e.message, 500)
+        response = failure(e.message, 500)
+
+    return response
 
 
 @artifacts.route('/<identifier>/<int:id_>/stat', methods=['GET'])
 def get_artifacts_identifier_id_stat(identifier, id_):
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
-
     try:
-        return success(config.artifact_client.details(identifier, id_, session))
+        response = success(config.artifact_client.details(identifier, id_, session))
     except HTTPError as e:
-        return failure(e.response.content, e.response.status_code)
+        response = failure(e.response.content, e.response.status_code)
     except InvalidUriException:
-        return failure('Invalid artifact URI', 400)
+        response = failure('Invalid artifact URI', 400)
     except ArtifactNotFoundException:
-        return failure(f'Artifact with URI {identifier} not found', 404)
+        response = failure(f'Artifact with URI {identifier} not found', 404)
     except ArtifactException as e:
-        return failure(e.message, 500)
+        response = failure(e.message, 500)
+
+    return response
