@@ -62,9 +62,9 @@ def get_artifacts_identifier(identifier):
     try:
         arts = config.artifact_client.ls(identifier, session)
         if len(arts) > 256:
-            response = failure(f'Invalid {config.artifact_client.name} resource, too many links', 400)
-        else:
-            response = success([{'name': a[0], 'hash': a[1]} for a in arts])
+            return failure(f'Invalid {config.artifact_client.name} resource, too many links', 400)
+
+        response = success([{'name': a[0], 'hash': a[1]} for a in arts])
 
     except HTTPError as e:
         response = failure(e.response.content, e.response.status_code)
