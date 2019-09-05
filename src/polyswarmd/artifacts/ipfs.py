@@ -7,13 +7,11 @@ import uuid
 
 from requests import HTTPError
 
-from polyswarmd.artifacts.client import AbstractArtifactServiceClient, ArtifactServiceException
+from polyswarmd.artifacts.client import AbstractArtifactServiceClient
+from polyswarmd.artifacts.exceptions import ArtifactException, ArtifactSizeException, InvalidUriException, \
+    ArtifactNotFoundException
 
 logger = logging.getLogger(__name__)
-
-
-class InvalidIpfsHashException(Exception):
-    pass
 
 
 def catch_ipfs_errors(func):
@@ -21,12 +19,12 @@ def catch_ipfs_errors(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except HTTPError as e:
-            logger.exception('Failed to execute IPFS command %s', func.__name__)
-            raise ArtifactServiceException(e.response.status_code, e.response.content)
-        except Exception:
+        except Exception as e:
+            if isinstance(e, HTTPError) or isinstance(e, ArtifactException):
+                raise e
+
             logger.exception('Received error from IPFS')
-            raise ArtifactServiceException(500, f'Error executing IPFS command {func.__name__}')
+            raise ArtifactException(f'Error executing IPFS command {func.__name__}')
 
     return wrapper
 
@@ -45,14 +43,14 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
     @staticmethod
     def check_ls(artifacts, index, max_size=None):
         if not artifacts:
-            raise ArtifactServiceException(404, 'Could not locate IPFS resource')
+            raise ArtifactNotFoundException('Could not locate IPFS resource')
 
         if index < 0 or index > 256 or index >= len(artifacts):
-            raise ArtifactServiceException(404, 'Could not locate artifact ID')
+            raise ArtifactNotFoundException('Could not locate artifact ID')
 
         _, artifact, size = artifacts[index]
         if max_size and size > max_size:
-            raise ArtifactServiceException(400, 'Artifact size greater than maximum allowed')
+            raise ArtifactSizeException('Artifact size greater than maximum allowed')
 
         return artifacts[index]
 
@@ -89,13 +87,10 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         try:
             return len(uri) < 100 and base58.b58decode(uri)
         except Exception:
-            return False
+            raise InvalidUriException()
 
-    # noinspection PyBroadException
     def details(self, uri, index, session):
-        if not self.check_uri(uri):
-            raise ArtifactServiceException(400, 'Invalid IPFS Hash')
-
+        self.check_uri(uri)
         artifacts = self.ls(uri, session)
         name, artifact, _ = IpfsServiceClient.check_ls(artifacts, index)
 
@@ -111,9 +106,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         return stats
 
     def get_artifact(self, uri, session, index=None, max_size=None, redis=None):
-        if not self.check_uri(uri):
-            raise ArtifactServiceException(400, 'Invalid IPFS Hash')
-
+        self.check_uri(uri)
         redis_response = IpfsServiceClient.check_redis(uri, redis)
         if redis_response:
             return redis_response
@@ -124,11 +117,8 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
 
         return self._cat(uri, session)
 
-    # noinspection PyBroadException
     def ls(self, uri, session):
-        if not self.check_uri(uri):
-            raise ArtifactServiceException(400, 'Invalid IPFS Hash')
-
+        self.check_uri(uri)
         stats = self._stat(uri, session)
         ls = self._ls(uri, session)
 
@@ -146,7 +136,6 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
 
         return []
 
-    # noinspection PyBroadException
     def status(self, session):
         return {'online': self._sys(session)}
 
@@ -161,9 +150,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
 
     @catch_ipfs_errors
     def _cat(self, ipfs_uri, session):
-        if not self.check_uri(ipfs_uri):
-            raise InvalidIpfsHashException()
-
+        self.check_uri(ipfs_uri)
         future = session.get(self.base_uri + '/api/v0/cat', params={'arg': ipfs_uri}, timeout=1)
         r = future.result()
         r.raise_for_status()
@@ -178,9 +165,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
 
     @catch_ipfs_errors
     def _mfs_copy(self, directory, filename, ipfs_uri, session):
-        if not self.check_uri(ipfs_uri):
-            raise InvalidIpfsHashException()
-
+        self.check_uri(ipfs_uri)
         artifacts = self._mfs_ls(directory, session)
 
         if artifacts is not None and any((artifact for artifact in artifacts if artifact.get('Hash', '') == ipfs_uri)):

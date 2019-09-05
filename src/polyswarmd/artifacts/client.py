@@ -1,12 +1,6 @@
 from abc import ABC, abstractmethod
 
 
-class ArtifactServiceException(Exception):
-    def __init__(self, status_code, response):
-        self.status_code = status_code
-        self.response = response
-
-
 class AbstractArtifactServiceClient(ABC):
     """
     Abstract class that defines the interface all Artifact Service Clients must follow

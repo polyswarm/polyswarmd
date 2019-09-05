@@ -1,9 +1,11 @@
 import logging
 
 from flask import current_app as app, g, Blueprint, request
+from requests import HTTPError
 
+from polyswarmd.artifacts.exceptions import InvalidUriException, ArtifactNotFoundException, ArtifactException, \
+    ArtifactSizeException
 from polyswarmd.response import success, failure
-from polyswarmd.artifacts.client import ArtifactServiceException
 
 logger = logging.getLogger(__name__)
 artifacts = Blueprint('artifacts', __name__)
@@ -21,8 +23,11 @@ def get_artifacts_status():
 
     try:
         return success(config.artifact_client.status(session))
-    except ArtifactServiceException as e:
-        return failure(e.response, e.status_code)
+
+    except HTTPError as e:
+        return failure(e.response.content, e.response.status_code)
+    except ArtifactException as e:
+        return failure(e.message, 500)
 
 
 @artifacts.route('', methods=['POST'])
@@ -42,8 +47,10 @@ def post_artifacts():
 
     try:
         return success(config.artifact_client.add_artifacts(files, session))
-    except ArtifactServiceException as e:
-        return failure(e.response, e.status_code)
+    except HTTPError as e:
+        return failure(e.response.content, e.response.status_code)
+    except ArtifactException as e:
+        return failure(e.message, 500)
 
 
 @artifacts.route('/<identifier>', methods=['GET'])
@@ -53,8 +60,14 @@ def get_artifacts_identifier(identifier):
 
     try:
         arts = config.artifact_client.ls(identifier, session)
-    except ArtifactServiceException as e:
-        return failure(e.response, e.status_code)
+    except HTTPError as e:
+        return failure(e.response.content, e.response.status_code)
+    except InvalidUriException:
+        return failure('Invalid artifact URI', 400)
+    except ArtifactNotFoundException:
+        return failure(f'Artifact with URI {identifier} not found', 404)
+    except ArtifactException as e:
+        return failure(e.message, 500)
 
     if not arts:
         return failure(f'Could not locate {config.artifact_client.name} resource', 404)
@@ -74,8 +87,16 @@ def get_artifacts_identifier_id(identifier, id_):
                                                    session,
                                                    index=id_,
                                                    max_size=g.user.max_artifact_size)
-    except ArtifactServiceException as e:
-        return failure(e.response, e.status_code)
+    except HTTPError as e:
+        return failure(e.response.content, e.response.status_code)
+    except InvalidUriException:
+        return failure('Invalid artifact URI', 400)
+    except ArtifactNotFoundException:
+        return failure(f'Artifact with URI {identifier}/{id_} not found', 404)
+    except ArtifactSizeException:
+        return failure(f'Artifact with URI {identifier}/{id_} too large', 400)
+    except ArtifactException as e:
+        return failure(e.message, 500)
 
 
 @artifacts.route('/<identifier>/<int:id_>/stat', methods=['GET'])
@@ -85,5 +106,11 @@ def get_artifacts_identifier_id_stat(identifier, id_):
 
     try:
         return config.artifact_client.details(identifier, id_, session)
-    except ArtifactServiceException as e:
-        return failure(e.response, e.status_code)
+    except HTTPError as e:
+        return failure(e.response.content, e.response.status_code)
+    except InvalidUriException:
+        return failure('Invalid artifact URI', 400)
+    except ArtifactNotFoundException:
+        return failure(f'Artifact with URI {identifier} not found', 404)
+    except ArtifactException as e:
+        return failure(e.message, 500)

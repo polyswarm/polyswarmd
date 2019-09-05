@@ -8,9 +8,11 @@ from flask import Blueprint, g, request
 from jsonschema.exceptions import ValidationError
 from polyswarmartifact import ArtifactType
 from polyswarmartifact.schema import Assertion as AssertionMetadata, Bounty as BountyMetadata
+from requests import HTTPError
 
 from polyswarmd import eth, cache, app
 from polyswarmd.artifacts.client import ArtifactServiceException
+from polyswarmd.artifacts.exceptions import ArtifactException, InvalidUriException, ArtifactNotFoundException
 from polyswarmd.chains import chain
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
 from polyswarmd.eth import build_transaction, ZERO_ADDRESS
@@ -64,12 +66,13 @@ def get_assertion(guid, index, num_artifacts):
     return assertion
 
 
+# noinspection PyBroadException
 @cache.memoize(30)
-def substitute_metadata(ipfs_uri, validate=AssertionMetadata.validate, artifact_client=None, session=None, redis=None):
+def substitute_metadata(uri, validate=AssertionMetadata.validate, artifact_client=None, session=None, redis=None):
     """
     Download metadata from artifact service and validate it against the schema.
 
-    :param ipfs_uri: Potential IPFS uri string
+    :param uri: Potential artifact service uri string
     :param validate: Function that takes a loaded json blob and returns true if it matches the schema
     :param artifact_client: Artifact Client for accessing artifacts stored on a service
     :param session: Requests session for ipfs request
@@ -84,16 +87,16 @@ def substitute_metadata(ipfs_uri, validate=AssertionMetadata.validate, artifact_
         artifact_client = config.artifact_client
 
     try:
-        content = artifact_client.get_artifact(ipfs_uri, session=session, redis=redis)
+        content = artifact_client.get_artifact(uri, session=session, redis=redis)
         if validate(json.loads(content.decode('utf-8'))):
             return json.loads(content.decode('utf-8'))
     except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
         logger.warning('Metadata retrieved from IPFS does not match schema')
     except Exception:
-        logger.exception('Error getting metadata from IPFS')
+        logger.exception(f'Error getting metadata from {artifact_client.name}')
 
-    return ipfs_uri
+    return uri
 
 
 @bounties.route('', methods=['POST'])
@@ -274,6 +277,7 @@ def post_bounties_guid_settle(guid):
     return success({'transactions': transactions})
 
 
+# noinspection PyBroadException
 @bounties.route('/metadata', methods=['POST'])
 def post_assertion_metadata():
     config = app.config['POLYSWARMD']
@@ -294,9 +298,13 @@ def post_assertion_metadata():
                                                   session,
                                                   redis=config.redis)
         return success(uri)
+    except HTTPError as e:
+        return failure(e.response.content, e.response.status_code)
+    except ArtifactException as e:
+        return failure(e.message, 500)
     except Exception:
         logger.exception('Received error posting to IPFS got response')
-        return failure('Could not add metadata to ipfs', 400)
+        return failure('Could not add metadata to ipfs', 500)
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['POST'])
