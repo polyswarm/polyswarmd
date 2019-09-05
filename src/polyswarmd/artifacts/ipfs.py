@@ -19,10 +19,9 @@ def catch_ipfs_errors(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except Exception as e:
-            if isinstance(e, HTTPError) or isinstance(e, ArtifactException):
-                raise e
-
+        except (HTTPError, ArtifactException) as e:
+            raise e
+        except Exception:
             logger.exception('Received error from IPFS')
             raise ArtifactException(f'Error executing IPFS command {func.__name__}')
 

@@ -61,20 +61,21 @@ def get_artifacts_identifier(identifier):
     session = app.config['REQUESTS_SESSION']
     try:
         arts = config.artifact_client.ls(identifier, session)
-        if not arts:
-            return failure(f'Could not locate {config.artifact_client.name} resource', 404)
-        if len(arts) > 256:
-            return failure(f'Invalid {config.artifact_client.name} resource, too many links', 400)
-
-        response = success([{'name': a[0], 'hash': a[1]} for a in arts])
     except HTTPError as e:
-        response = failure(e.response.content, e.response.status_code)
+        return failure(e.response.content, e.response.status_code)
     except InvalidUriException:
-        response = failure('Invalid artifact URI', 400)
+        return failure('Invalid artifact URI', 400)
     except ArtifactNotFoundException:
-        response = failure(f'Artifact with URI {identifier} not found', 404)
+        return failure(f'Artifact with URI {identifier} not found', 404)
     except ArtifactException as e:
-        response = failure(e.message, 500)
+        return failure(e.message, 500)
+
+    if not arts:
+        response = failure(f'Could not locate {config.artifact_client.name} resource', 404)
+    elif len(arts) > 256:
+        response = failure(f'Invalid {config.artifact_client.name} resource, too many links', 400)
+    else:
+        response = success([{'name': a[0], 'hash': a[1]} for a in arts])
 
     return response
 

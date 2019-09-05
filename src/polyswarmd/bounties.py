@@ -11,8 +11,7 @@ from polyswarmartifact.schema import Assertion as AssertionMetadata, Bounty as B
 from requests import HTTPError
 
 from polyswarmd import eth, cache, app
-from polyswarmd.artifacts.client import ArtifactServiceException
-from polyswarmd.artifacts.exceptions import ArtifactException, InvalidUriException, ArtifactNotFoundException
+from polyswarmd.artifacts.exceptions import ArtifactException
 from polyswarmd.chains import chain
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
 from polyswarmd.eth import build_transaction, ZERO_ADDRESS
@@ -153,8 +152,11 @@ def post_bounties():
 
     try:
         arts = config.artifact_client.ls(artifact_uri, session)
-    except ArtifactServiceException as e:
-        return failure(e.response, e.status_code)
+    except HTTPError as e:
+        return failure(e.response.content, e.response.status_code)
+    except ArtifactException:
+        logger.exception('Failed to ls given artifact uri')
+        return failure(f'Failed to check artifact uri', 500)
 
     if amount < eth.bounty_amount_min(g.chain.bounty_registry.contract):
         return failure('Invalid bounty amount', 400)
@@ -297,14 +299,16 @@ def post_assertion_metadata():
         uri = config.artifact_client.add_artifact(('file', ('metadata', body, 'application/json')),
                                                   session,
                                                   redis=config.redis)
-        return success(uri)
+        response = success(uri)
     except HTTPError as e:
-        return failure(e.response.content, e.response.status_code)
+        response = failure(e.response.content, e.response.status_code)
     except ArtifactException as e:
-        return failure(e.message, 500)
+        response = failure(e.message, 500)
     except Exception:
         logger.exception('Received error posting to IPFS got response')
-        return failure('Could not add metadata to ipfs', 500)
+        response = failure('Could not add metadata to ipfs', 500)
+
+    return response
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['POST'])
