@@ -13,6 +13,7 @@ from flask import current_app as app, Blueprint, g, request
 from hexbytes import HexBytes
 from jsonschema.exceptions import ValidationError
 
+from polyswarmd import cache
 from polyswarmd.chains import chain
 from polyswarmd.response import success, failure
 
@@ -433,25 +434,31 @@ def events_from_transaction(txhash, chain):
     return ret
 
 
+@cache.memoize(1)
 def bounty_fee(bounty_registry):
     return bounty_registry.functions.bountyFee().call()
 
 
+@cache.memoize(1)
 def assertion_fee(bounty_registry):
     return bounty_registry.functions.assertionFee().call()
 
 
+@cache.memoize(1)
 def bounty_amount_min(bounty_registry):
     return bounty_registry.functions.BOUNTY_AMOUNT_MINIMUM().call()
 
 
+@cache.memoize(1)
 def assertion_bid_min(bounty_registry):
     return bounty_registry.functions.ASSERTION_BID_ARTIFACT_MINIMUM().call()
 
 
+@cache.memoize(1)
 def staking_total_max(arbiter_staking):
     return arbiter_staking.functions.MAXIMUM_STAKE().call()
 
 
+@cache.memoize(1)
 def staking_total_min(arbiter_staking):
     return arbiter_staking.functions.MINIMUM_STAKE().call()
