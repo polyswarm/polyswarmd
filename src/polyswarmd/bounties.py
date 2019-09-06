@@ -191,7 +191,7 @@ def get_bounty_parameters():
     assertion_bid_minimum = g.chain.bounty_registry.contract.functions.ASSERTION_BID_ARTIFACT_MINIMUM().call()
     arbiter_lookback_range = g.chain.bounty_registry.contract.functions.ARBITER_LOOKBACK_RANGE().call()
     max_duration = g.chain.bounty_registry.contract.functions.MAX_DURATION().call()
-    assertion_reveal_window = g.chain.bounty_registry.contract.functions.ASSERTION_REVEAL_WINDOW().call()
+    assertion_reveal_window = g.chain.bounty_registry.contract.functions.assertionRevealWindow().call()
     arbiter_vote_window = g.chain.bounty_registry.contract.functions.arbiterVoteWindow().call()
 
     return success({
