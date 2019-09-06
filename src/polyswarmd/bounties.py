@@ -58,8 +58,7 @@ def get_assertion(guid, index, num_artifacts):
         g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, index).call(),
         num_artifacts)
 
-    bid = [str(g.chain.bounty_registry.contract.functions.assertionBidByGuid(guid.int, index, j).call())
-           for j in range(0, len(assertion.get('mask', [])))]
+    bid = [str(b) for b in g.chain.bounty_registry.contract.functions.getBids(guid.int, index).call()]
     assertion['bid'] = bid
     assertion['metadata'] = substitute_metadata(assertion.get('metadata', ''))
     return assertion
