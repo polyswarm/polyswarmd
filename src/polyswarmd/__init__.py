@@ -18,6 +18,8 @@ from polyswarmd.response import success, failure, install_error_handlers
 
 logger = logging.getLogger(__name__)
 
+cache = Cache(config={"CACHE_TYPE": "simple", "CACHE_DEFAULT_TIMEOUT": 30})
+
 # Set up our app object
 app = Flask(__name__)
 app.config['POLYSWARMD'] = Config.auto()
@@ -30,7 +32,6 @@ session.request = functools.partial(session.request, timeout=10)
 app.config['REQUESTS_SESSION'] = session
 app.config['CHECK_BLOCK_LIMIT'] = True
 
-cache = Cache(config={"CACHE_TYPE": "simple", "CACHE_DEFAULT_TIMEOUT": 30})
 
 install_error_handlers(app)
 

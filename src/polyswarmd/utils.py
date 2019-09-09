@@ -9,8 +9,6 @@ from Crypto.Hash import keccak
 from flask import g
 from polyswarmartifact import ArtifactType
 
-from polyswarmd.eth import ZERO_ADDRESS
-
 logger = logging.getLogger(__name__)
 
 

@@ -16,7 +16,6 @@ from web3.exceptions import MismatchedABI
 from web3.middleware import geth_poa_middleware
 
 from polyswarmd.artifacts.ipfs import IpfsServiceClient
-from polyswarmd.eth import ZERO_ADDRESS
 from polyswarmd.utils import camel_case_to_snake_case
 from polyswarmd.rpc import EthereumRpc
 
@@ -93,6 +92,7 @@ class ContractConfig(object):
             self.bind(persistent=True)
 
     def bind(self, address=None, persistent=False):
+        from polyswarmd.eth import ZERO_ADDRESS
         if self.contract:
             return self.contract
 
