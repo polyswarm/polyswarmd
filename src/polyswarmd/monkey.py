@@ -1,8 +1,10 @@
+from concurrent.futures import ThreadPoolExecutor
+
 import web3
 from gevent import monkey
 from requests_futures.sessions import FuturesSession
 
-session = FuturesSession(adapter_kwargs={'max_retries': 5})
+session = FuturesSession(executor=ThreadPoolExecutor(16), adapter_kwargs={'max_retries': 5})
 
 
 def patch_all():
@@ -16,7 +18,7 @@ def patch_gevent():
 
 def patch_web3():
     def make_post_request(endpoint_uri, data, *args, **kwargs):
-        kwargs.setdefault('timeout', 1)
+        kwargs.setdefault('timeout', 10)
         future = session.post(endpoint_uri, data=data, *args, **kwargs)
         response = future.result()
         response.raise_for_status()

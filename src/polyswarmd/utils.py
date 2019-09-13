@@ -9,8 +9,6 @@ from Crypto.Hash import keccak
 from flask import g
 from polyswarmartifact import ArtifactType
 
-from polyswarmd.eth import ZERO_ADDRESS
-
 logger = logging.getLogger(__name__)
 
 
@@ -86,7 +84,6 @@ def new_bounty_event_to_dict(new_bounty_event):
 def assertion_to_dict(assertion, num_artifacts):
     return {
         'author': assertion[0],
-        'bid': str(assertion[1]),
         'mask': safe_int_to_bool_list(assertion[2], num_artifacts),
         'commitment': str(assertion[3]),
         'nonce': str(assertion[4]),
@@ -100,7 +97,7 @@ def new_assertion_event_to_dict(new_assertion_event):
         'bounty_guid': str(uuid.UUID(int=new_assertion_event.bountyGuid)),
         'author': new_assertion_event.author,
         'index': new_assertion_event.index,
-        'bid': str(new_assertion_event.bid),
+        'bid': [str(bid) for bid in new_assertion_event.bid],
         'mask': safe_int_to_bool_list(new_assertion_event.mask, new_assertion_event.numArtifacts),
         'commitment': str(new_assertion_event.commitment),
     }

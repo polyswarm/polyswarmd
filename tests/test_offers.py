@@ -5,7 +5,7 @@ import json
 
 from polyswarmd import utils, app
 from polyswarmd.eth import ZERO_ADDRESS
-from tests import client, test_account 
+from tests import client, test_account
 
 def test_post_to_state(client):
     token = app.config['POLYSWARMD'].chains['home'].nectar_token.address
@@ -36,7 +36,7 @@ def test_post_to_state(client):
         'meta_data': 'test'
     }
     rv = client.post(
-        '/offers/state?account={0}'.format(test_account),
+        f'/offers/state?account={test_account}',
         content_type='application/json',
         data=json.dumps(mock_state_dict)
     )

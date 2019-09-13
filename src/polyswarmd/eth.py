@@ -13,7 +13,7 @@ from flask import current_app as app, Blueprint, g, request
 from hexbytes import HexBytes
 from jsonschema.exceptions import ValidationError
 
-from polyswarmd.artifacts import is_valid_ipfshash
+from polyswarmd import cache
 from polyswarmd.chains import chain
 from polyswarmd.response import success, failure
 
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 misc = Blueprint('misc', __name__)
 
-MAX_GAS_LIMIT = 500000
+MAX_GAS_LIMIT = 50000000
 GAS_MULTIPLIER = 1.5
 ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 TRANSFER_SIGNATURE_HASH = 'a9059cbb'
@@ -78,6 +78,7 @@ def get_nonce():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     return success(g.chain.w3.eth.getTransactionCount(account, 'pending'))
 
+
 @misc.route('/transactions', methods=['GET'])
 @chain
 def get_transactions():
@@ -115,6 +116,7 @@ def get_transactions():
         return failure(ret, 400)
     return success(ret)
 
+
 @misc.route('/transactions', methods=['POST'])
 @chain
 def post_transactions():
@@ -135,7 +137,6 @@ def post_transactions():
                 'items': {
                     'type': 'string',
                     'minLength': 1,
-                    'maxLength': 4096,
                     'pattern': r'^[0-9a-fA-F]+$',
                 }
             },
@@ -170,7 +171,7 @@ def post_transactions():
             errors = True
             results.append({
                 'is_error': True,
-                'message': 'Invalid transaction for tx {0}: only withdrawals allowed without an API key'.format(tx.hash.hex())
+                'message': f'Invalid transaction for tx {tx.hash.hex()}: only withdrawals allowed without an API key'
             })
             continue
 
@@ -179,7 +180,7 @@ def post_transactions():
             errors = True
             results.append({
                 'is_error': True,
-                'message': 'Invalid transaction sender for tx {0}: expected {1} got {2}'.format(tx.hash.hex(), account, sender)
+                'message': f'Invalid transaction sender for tx {tx.hash.hex()}: expected {account} got {sender}'
             })
             continue
 
@@ -189,7 +190,7 @@ def post_transactions():
             errors = True
             results.append({
                 'is_error': True,
-                'message':  'Invalid transaction recipient for tx {0}: {1}'.format(tx.hash.hex(), to)
+                'message': f'Invalid transaction recipient for tx {tx.hash.hex()}: {to}'
             })
             continue
 
@@ -203,7 +204,7 @@ def post_transactions():
             errors = True
             results.append({
                 'is_error': True,
-                'message': 'Invalid transaction error for tx {0}: {1}'.format(tx.hash.hex(), e)
+                'message': f'Invalid transaction error for tx {tx.hash.hex()}: {e}'
             })
     if errors:
         return failure(results, 400)
@@ -211,26 +212,37 @@ def post_transactions():
     return success(results)
 
 
+def get_gas_limit():
+    gas_limit = MAX_GAS_LIMIT
+    if app.config['CHECK_BLOCK_LIMIT']:
+        gas_limit = g.chain.w3.eth.getBlock('latest').gasLimit
+
+    if app.config['CHECK_BLOCK_LIMIT'] and gas_limit >= MAX_GAS_LIMIT:
+        app.config['CHECK_BLOCK_LIMIT'] = False
+
+    return gas_limit
+
+
 def build_transaction(call, nonce):
+    # Only a problem for fresh chains
+    gas_limit = get_gas_limit()
     options = {
         'nonce': nonce,
         'chainId': int(g.chain.chain_id),
-        'gas': MAX_GAS_LIMIT,
+        'gas': gas_limit,
     }
 
+    gas = gas_limit
     if g.chain.free:
         options["gasPrice"] = 0
-        gas = MAX_GAS_LIMIT
     else:
         try:
             gas = int(call.estimateGas({'from': g.eth_address, **options}) * GAS_MULTIPLIER)
         except ValueError as e:
             logger.debug('Error estimating gas, using default: %s', e)
-            gas = MAX_GAS_LIMIT
 
-    options['gas'] = min(MAX_GAS_LIMIT, gas)
-
-    logger.info('options: %s', options)
+    options['gas'] = min(gas_limit, gas)
+    logger.debug('options: %s', options)
 
     return call.buildTransaction(options)
 
@@ -268,7 +280,8 @@ def events_from_transaction(txhash, chain):
         new_vote_event_to_dict, revealed_assertion_event_to_dict, \
         transfer_event_to_dict, new_withdrawal_event_to_dict, new_deposit_event_to_dict
 
-    trace_transactions = app.config['POLYSWARMD'].trace_transactions
+    config = app.config['POLYSWARMD']
+    trace_transactions = config.trace_transactions
     if trace_transactions:
         try:
             Debug.attach(g.chain.w3, 'debug')
@@ -293,13 +306,13 @@ def events_from_transaction(txhash, chain):
         logging.exception('Transaction %s: timeout waiting for receipt', bytes(txhash).hex())
         return {
             'errors':
-                ['transaction {0}: timeout during wait for receipt'.format(bytes(txhash).hex())]
+                [f'transaction {bytes(txhash).hex()}: timeout during wait for receipt']
         }
     except Exception:
         logger.exception('Transaction %s: error while fetching transaction receipt', bytes(txhash).hex())
         return {
             'errors':
-                ['transaction {0}: unexpected error while fetching transaction receipt'.format(bytes(txhash).hex())]
+                [f'transaction {bytes(txhash).hex()}: unexpected error while fetching transaction receipt']
         }
     finally:
         timeout.cancel()
@@ -308,25 +321,23 @@ def events_from_transaction(txhash, chain):
     if not receipt:
         return {
             'errors':
-                ['transaction {0}: receipt not available'.format(txhash)]
+                [f'transaction {txhash}: receipt not available']
         }
     if receipt.gasUsed == MAX_GAS_LIMIT:
-        return {'errors': ['transaction {0}: out of gas'.format(txhash)]}
+        return {'errors': [f'transaction {txhash}: out of gas']}
     if receipt.status != 1:
         if trace_transactions:
             error = g.chain.w3.debug.getTransactionError(txhash)
             logger.error('Transaction %s failed with error message: %s', txhash, error)
             return {
                 'errors': [
-                    'transaction {0}: transaction failed at block {1}, error: {2}'.format(
-                        txhash, receipt.blockNumber, error)
+                    f'transaction {txhash}: transaction failed at block {receipt.blockNumber}, error: {error}'
                 ]
             }
         else:
             return {
                 'errors': [
-                    'transaction {0}: transaction failed at block {1}, check parameters'.format(
-                        txhash, receipt.blockNumber)
+                    f'transaction {txhash}: transaction failed at block {receipt.blockNumber}, check parameters'
                 ]
             }
 
@@ -344,7 +355,7 @@ def events_from_transaction(txhash, chain):
     if processed:
         bounty = new_bounty_event_to_dict(processed[0]['args'])
 
-        if is_valid_ipfshash(bounty['uri']):
+        if config.artifact_client.check_uri(bounty['uri']):
             ret['bounties'] = ret.get('bounties', []) + [bounty]
 
     processed = g.chain.bounty_registry.contract.events.NewAssertion().processReceipt(
@@ -423,25 +434,31 @@ def events_from_transaction(txhash, chain):
     return ret
 
 
+@cache.memoize(1)
 def bounty_fee(bounty_registry):
     return bounty_registry.functions.bountyFee().call()
 
 
+@cache.memoize(1)
 def assertion_fee(bounty_registry):
     return bounty_registry.functions.assertionFee().call()
 
 
+@cache.memoize(1)
 def bounty_amount_min(bounty_registry):
     return bounty_registry.functions.BOUNTY_AMOUNT_MINIMUM().call()
 
 
+@cache.memoize(1)
 def assertion_bid_min(bounty_registry):
-    return bounty_registry.functions.ASSERTION_BID_MINIMUM().call()
+    return bounty_registry.functions.ASSERTION_BID_ARTIFACT_MINIMUM().call()
 
 
+@cache.memoize(1)
 def staking_total_max(arbiter_staking):
     return arbiter_staking.functions.MAXIMUM_STAKE().call()
 
 
+@cache.memoize(1)
 def staking_total_min(arbiter_staking):
     return arbiter_staking.functions.MINIMUM_STAKE().call()

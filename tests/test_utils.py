@@ -48,7 +48,7 @@ def test_state_to_dict(client):
             'meta_data': 'test'
         }
         rv = client.post(
-            '/offers/state?account={0}'.format(test_account),
+            f'/offers/state?account={test_account}',
             content_type='application/json',
             data=json.dumps(mock_state_dict)
             )
@@ -68,4 +68,4 @@ def test_state_to_dict(client):
         }
 
         assert utils.state_to_dict(state) == expected
- 
+

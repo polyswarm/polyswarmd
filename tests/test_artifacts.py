@@ -45,7 +45,7 @@ def test_post_artifacts(client):
     with requests_mock.Mocker() as mock:
         setup_mocks(mock)
         rv = client.post(
-            '/artifacts?account={0}'.format(test_account),
+            f'/artifacts?account={test_account}',
             content_type='multipart/form-data',
             data={
                 'bar': io.BytesIO(b'bar'),
@@ -60,7 +60,7 @@ def test_get_artifacts_ipfshash(client):
     with requests_mock.Mocker() as mock:
         setup_mocks(mock)
         rv = client.get(
-            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU?account={0}'.format(test_account))
+            f'/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU?account={test_account}')
         assert rv.data == expected
 
 
@@ -69,12 +69,11 @@ def test_get_artifacts_ipfshash_id(client):
     with requests_mock.Mocker() as mock:
         setup_mocks(mock)
         rv = client.get(
-            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/0?account={0}'.format(test_account))
+            f'/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/0?account={test_account}')
         assert rv.data == expected[0]
         rv = client.get(
-            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/1?account={0}'.format(test_account))
+            f'/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/1?account={test_account}')
         assert rv.data == expected[1]
-
 
 
 def test_get_artifacts_ipfshash_id_stat(client):
@@ -85,8 +84,8 @@ def test_get_artifacts_ipfshash_id_stat(client):
     with requests_mock.Mocker() as mock:
         setup_mocks(mock)
         rv = client.get(
-            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/0/stat?account={0}'.format(test_account))
+            f'/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/0/stat?account={test_account}')
         assert rv.data == expected[0]
         rv = client.get(
-            '/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/1/stat?account={0}'.format(test_account))
+            f'/artifacts/QmV32WjiHoYMC5xTuiwZMcEFx686M7qKJmbMQ1cSEwkXvU/1/stat?account={test_account}')
         assert rv.data == expected[1]
