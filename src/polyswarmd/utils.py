@@ -84,11 +84,11 @@ def new_bounty_event_to_dict(new_bounty_event):
 def assertion_to_dict(assertion, num_artifacts):
     return {
         'author': assertion[0],
-        'mask': safe_int_to_bool_list(assertion[2], num_artifacts),
-        'commitment': str(assertion[3]),
-        'nonce': str(assertion[4]),
-        'verdicts': safe_int_to_bool_list(assertion[5], num_artifacts),
-        'metadata': assertion[6],
+        'mask': safe_int_to_bool_list(assertion[1], num_artifacts),
+        'commitment': str(assertion[2]),
+        'nonce': str(assertion[3]),
+        'verdicts': safe_int_to_bool_list(assertion[4], num_artifacts),
+        'metadata': assertion[5],
     }
 
 
