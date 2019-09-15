@@ -118,7 +118,7 @@ def status():
     ret['community'] = config.community
 
     ret['artifact_services'] = {
-        config.artifact_client: {
+        config.artifact_client.name.lower(): {
             'reachable': is_service_reachable(session, config.artifact_client.reachable_endpoint),
         }
     }
