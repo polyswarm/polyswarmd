@@ -248,7 +248,7 @@ class ChainConfig(object):
         return cls.from_contract_configs(name, eth_uri, chain_id, w3, contract_configs, free)
 
     def __validate(self):
-        if not is_service_reachable(self.session, self.eth_uri, True):
+        if not is_service_reachable(self.session, self.eth_uri, is_ethereum=True):
             raise ValueError('Ethereum not reachable, is correct URI specified?')
 
         if self.chain_id != int(self.w3.version.network):
