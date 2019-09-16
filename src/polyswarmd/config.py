@@ -40,7 +40,7 @@ def is_service_reachable(session, uri, is_ethereum=False):
         r = session.post(uri)
     else:
         r = session.get(uri)
-        
+
     # check if futures session or normal
     if hasattr(r, "result"):
         r = r.result()
