@@ -73,7 +73,7 @@ def post_to_ipfs(files, wrap_dir=False, cache=False):
         future = session.post(
             config.ipfs_uri + '/api/v0/add',
             files=files,
-            params={'wrap-with-directory': wrap_dir})
+            params={'wrap-with-directory': wrap_dir, 'pin': 'false'})
         r = future.result()
         r.raise_for_status()
     except requests.exceptions.HTTPError as e:
