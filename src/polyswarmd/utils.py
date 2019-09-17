@@ -25,7 +25,8 @@ def safe_int_to_bool_list(num, max):
     if int(num) == 0:
         return [False] * int(max)
     else:
-        return int_to_bool_list(num)
+        converted = int_to_bool_list(num)
+        return ([False] * (max - len(converted))) + converted
 
 
 def uint256_list_to_hex_string(us):
