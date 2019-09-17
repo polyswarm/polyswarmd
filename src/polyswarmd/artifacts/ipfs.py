@@ -143,6 +143,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
     def _add(self, file, session):
         future = session.post(
             self.base_uri + '/api/v0/add',
+            params={'pin': False},
             files=[file])
         r = future.result()
         r.raise_for_status()
