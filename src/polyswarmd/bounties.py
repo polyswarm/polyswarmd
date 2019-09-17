@@ -54,13 +54,14 @@ def calculate_commitment(account, verdicts):
 
 
 def get_assertion(guid, index, num_artifacts):
+    config = app.config['POLYSWARMD']
     assertion = assertion_to_dict(
         g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, index).call(),
         num_artifacts)
 
     bid = [str(b) for b in g.chain.bounty_registry.contract.functions.getBids(guid.int, index).call()]
     assertion['bid'] = bid
-    assertion['metadata'] = substitute_metadata(assertion.get('metadata', ''))
+    assertion['metadata'] = substitute_metadata(assertion.get('metadata', ''), redis=config.redis)
     return assertion
 
 
@@ -214,7 +215,7 @@ def get_bounties_guid(guid):
         g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
     metadata = bounty.get('metadata', None)
     if metadata:
-        metadata = substitute_metadata(metadata, validate=BountyMetadata.validate)
+        metadata = substitute_metadata(metadata, validate=BountyMetadata.validate, redis=config.redis)
     else:
         metadata = None
     bounty['metadata'] = metadata
