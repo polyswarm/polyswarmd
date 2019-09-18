@@ -138,7 +138,7 @@ def status():
 
 @app.before_request
 def before_request():
-    g.user = User()
+    g.user = User(FALLBACK_MAX_ARTIFACT_SIZE)
 
     config = app.config['POLYSWARMD']
 
