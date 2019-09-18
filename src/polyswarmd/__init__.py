@@ -67,7 +67,7 @@ def get_auth(api_key, auth_uri):
 
 
 class User(object):
-    def __init__(self, max_artifact_size, authorized=False, user_id=None):
+    def __init__(self, authorized=False, user_id=None, max_artifact_size=FALLBACK_MAX_ARTIFACT_SIZE):
         self.authorized = authorized
         self.max_artifact_size = max_artifact_size
         self.user_id = user_id if authorized else None
@@ -81,19 +81,19 @@ class User(object):
 
         r = get_auth(api_key, auth_uri)
         if r is None or r.status_code != 200:
-            return cls(FALLBACK_MAX_ARTIFACT_SIZE, authorized=False, user_id=None)
+            return cls(authorized=False, user_id=None, max_artifact_size=FALLBACK_MAX_ARTIFACT_SIZE)
 
         try:
             j = r.json()
         except ValueError:
             logger.exception('Invalid response from API key management service, received: %s', r.content)
-            return cls(FALLBACK_MAX_ARTIFACT_SIZE, authorized=False, user_id=None)
+            return cls(authorized=False, user_id=None, max_artifact_size=FALLBACK_MAX_ARTIFACT_SIZE)
 
         anonymous = j.get('anonymous', True)
         user_id = j.get('user_id') if not anonymous else None
         max_artifact_size = j.get('max_artifact_size', FALLBACK_MAX_ARTIFACT_SIZE)
 
-        return cls(max_artifact_size, authorized=True, user_id=user_id)
+        return cls(authorized=True, user_id=user_id, max_artifact_size=max_artifact_size, )
 
     @property
     def anonymous(self):
@@ -138,7 +138,7 @@ def status():
 
 @app.before_request
 def before_request():
-    g.user = User(FALLBACK_MAX_ARTIFACT_SIZE)
+    g.user = User()
 
     config = app.config['POLYSWARMD']
 
