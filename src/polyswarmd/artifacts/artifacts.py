@@ -10,10 +10,8 @@ from polyswarmd.response import success, failure
 logger = logging.getLogger(__name__)
 artifacts = Blueprint('artifacts', __name__)
 
-# 100MB limit
-# TODO: Should this be configurable in config file?
-MAX_ARTIFACT_SIZE_REGULAR = 32 * 1024 * 1024
-MAX_ARTIFACT_SIZE_ANONYMOUS = 10 * 1024 * 1024
+# 10 MB Fallback limit
+FALLBACK_MAX_ARTIFACT_SIZE = 10 * 1024 * 1024
 
 
 @artifacts.route('/status', methods=['GET'])
@@ -35,6 +33,7 @@ def post_artifacts():
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
 
+    # Since we aren't using MAX_CONTENT_LENGTH anymore, we have to check each.
     files = [('file', (f.filename, f, 'application/octet-stream')) for f in request.files.getlist(key='file')
              if f.content_length <= g.user.max_artifact_size]
     if len(files) < len(request.files.getlist(key='file')):
