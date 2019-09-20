@@ -18,7 +18,7 @@ def patch_gevent():
 
 def patch_web3():
     def make_post_request(endpoint_uri, data, *args, **kwargs):
-        kwargs.setdefault('timeout', 10)
+        kwargs.setdefault('timeout', 1)
         future = session.post(endpoint_uri, data=data, *args, **kwargs)
         response = future.result()
         response.raise_for_status()
