@@ -130,7 +130,7 @@ def status():
 
     for name, chain in config.chains.items():
         ret[name] = {
-            'reachable': is_service_reachable(session, f"{chain.eth_uri}"),
+            'reachable': is_service_reachable(session, f"{chain.eth_uri}", is_ethereum=True),
         }
 
         if ret[name]['reachable']:

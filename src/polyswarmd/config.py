@@ -32,8 +32,14 @@ SUPPORTED_CONTRACT_VERSIONS = {
 }
 
 
-def is_service_reachable(session, uri):
-    r = session.get(uri)
+def is_service_reachable(session, uri, is_ethereum=False):
+    if is_ethereum:
+        # parity does not support GET, so use POST.
+        # Using application/json is to cover geth as well.
+        session.headers.update({'Content-Type': 'application/json'})
+        r = session.post(uri)
+    else:
+        r = session.get(uri)
 
     # check if futures session or normal
     if hasattr(r, "result"):
@@ -244,7 +250,7 @@ class ChainConfig(object):
         return cls.from_contract_configs(name, eth_uri, chain_id, w3, contract_configs, free)
 
     def __validate(self):
-        if not is_service_reachable(self.session, self.eth_uri):
+        if not is_service_reachable(self.session, self.eth_uri, is_ethereum=True):
             raise ValueError('Ethereum not reachable, is correct URI specified?')
 
         if self.chain_id != int(self.w3.version.network):
