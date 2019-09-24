@@ -1,23 +1,22 @@
-import functools
 import json
+import jsonschema
 import logging
 import os
-import jsonschema
 import uuid
 
-from ethereum.utils import sha3
 from flask import Blueprint, g, request
 from jsonschema.exceptions import ValidationError
 from polyswarmartifact import ArtifactType
 from polyswarmartifact.schema import Assertion as AssertionMetadata, Bounty as BountyMetadata
+from requests import HTTPError
 
-from polyswarmd import eth, cache
-from polyswarmd.artifacts import is_valid_ipfshash, list_artifacts, post_to_ipfs, get_from_ipfs
+from polyswarmd import eth, cache, app
+from polyswarmd.artifacts.exceptions import ArtifactException
 from polyswarmd.chains import chain
 from polyswarmd.bloom import BloomFilter, FILTER_BITS
 from polyswarmd.eth import build_transaction, ZERO_ADDRESS
 from polyswarmd.response import success, failure
-from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, vote_to_dict, bloom_to_dict
+from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, vote_to_dict, bloom_to_dict, sha3
 
 logger = logging.getLogger(__name__)
 bounties = Blueprint('bounties', __name__)
@@ -54,33 +53,56 @@ def calculate_commitment(account, verdicts):
     return int_from_bytes(nonce), int_from_bytes(commitment)
 
 
-@functools.lru_cache(maxsize=256)
-def substitute_ipfs_metadata(ipfs_uri, validate=AssertionMetadata.validate):
-    """Download metadata from IPFS and validate it against the schema.
+def get_assertion(guid, index, num_artifacts):
+    config = app.config['POLYSWARMD']
+    assertion = assertion_to_dict(
+        g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, index).call(),
+        num_artifacts)
 
-    :param ipfs_uri: Potential IPFS uri string
-    :param validate: Function that takes a loaded json blob and returns true if it matches the schema
-    :return: Metadata from IPFS, or original metadata
+    bid = [str(b) for b in g.chain.bounty_registry.contract.functions.getBids(guid.int, index).call()]
+    assertion['bid'] = bid
+    assertion['metadata'] = substitute_metadata(assertion.get('metadata', ''), redis=config.redis)
+    return assertion
+
+
+# noinspection PyBroadException
+@cache.memoize(30)
+def substitute_metadata(uri, validate=AssertionMetadata.validate, artifact_client=None, session=None, redis=None):
     """
-    if not is_valid_ipfshash(ipfs_uri):
-        return ipfs_uri
+    Download metadata from artifact service and validate it against the schema.
 
-    status_code, content = get_from_ipfs(ipfs_uri)
+    :param uri: Potential artifact service uri string
+    :param validate: Function that takes a loaded json blob and returns true if it matches the schema
+    :param artifact_client: Artifact Client for accessing artifacts stored on a service
+    :param session: Requests session for ipfs request
+    :param redis: Redis connection object
+    :return: Metadata from artifact service, or original metadata
+    """
+    if not session:
+        session = app.config['REQUESTS_SESSION']
+
+    if not artifact_client:
+        config = app.config['POLYSWARMD']
+        artifact_client = config.artifact_client
+
     try:
-        if status_code // 100 == 2 and validate(json.loads(content.decode('utf-8'))):
+        content = artifact_client.get_artifact(uri, session=session, redis=redis)
+        if validate(json.loads(content.decode('utf-8'))):
             return json.loads(content.decode('utf-8'))
     except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
         logger.warning('Metadata retrieved from IPFS does not match schema')
     except Exception:
-        logger.exception('Error getting metadata from IPFS')
+        logger.exception(f'Error getting metadata from {artifact_client.name}')
 
-    return ipfs_uri
+    return uri
 
 
 @bounties.route('', methods=['POST'])
 @chain
 def post_bounties():
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
 
@@ -128,19 +150,19 @@ def post_bounties():
     duration_blocks = body['duration']
     metadata = body.get('metadata', '')
 
+    try:
+        arts = config.artifact_client.ls(artifact_uri, session)
+    except HTTPError as e:
+        return failure(e.response.content, e.response.status_code)
+    except ArtifactException:
+        logger.exception('Failed to ls given artifact uri')
+        return failure(f'Failed to check artifact uri', 500)
+
     if amount < eth.bounty_amount_min(g.chain.bounty_registry.contract):
         return failure('Invalid bounty amount', 400)
 
-    if not is_valid_ipfshash(artifact_uri):
-        return failure('Invalid artifact URI (should be IPFS hash)', 400)
-
-    if metadata and not is_valid_ipfshash(metadata):
+    if metadata and not config.artifact_client.check_uri(metadata):
         return failure('Invalid bounty metadata URI (should be IPFS hash)', 400)
-
-    arts = list_artifacts(artifact_uri)
-    if not arts:
-        return failure('Invalid artifact URI (could not retrieve artifacts)',
-                       400)
 
     num_artifacts = len(arts)
     bloom = calculate_bloom(arts)
@@ -161,15 +183,16 @@ def post_bounties():
 
 
 @bounties.route('/parameters', methods=['GET'])
+@cache.memoize(1)
 @chain
 def get_bounty_parameters():
     bounty_fee = g.chain.bounty_registry.contract.functions.bountyFee().call()
     assertion_fee = g.chain.bounty_registry.contract.functions.assertionFee().call()
     bounty_amount_minimum = g.chain.bounty_registry.contract.functions.BOUNTY_AMOUNT_MINIMUM().call()
-    assertion_bid_minimum = g.chain.bounty_registry.contract.functions.ASSERTION_BID_MINIMUM().call()
+    assertion_bid_minimum = g.chain.bounty_registry.contract.functions.ASSERTION_BID_ARTIFACT_MINIMUM().call()
     arbiter_lookback_range = g.chain.bounty_registry.contract.functions.ARBITER_LOOKBACK_RANGE().call()
     max_duration = g.chain.bounty_registry.contract.functions.MAX_DURATION().call()
-    assertion_reveal_window = g.chain.bounty_registry.contract.functions.ASSERTION_REVEAL_WINDOW().call()
+    assertion_reveal_window = g.chain.bounty_registry.contract.functions.assertionRevealWindow().call()
     arbiter_vote_window = g.chain.bounty_registry.contract.functions.arbiterVoteWindow().call()
 
     return success({
@@ -187,16 +210,17 @@ def get_bounty_parameters():
 @bounties.route('/<uuid:guid>', methods=['GET'])
 @chain
 def get_bounties_guid(guid):
+    config = app.config['POLYSWARMD']
     bounty = bounty_to_dict(
         g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
     metadata = bounty.get('metadata', None)
     if metadata:
-        metadata = substitute_ipfs_metadata(metadata, validate=BountyMetadata.validate)
+        metadata = substitute_metadata(metadata, validate=BountyMetadata.validate, redis=config.redis)
     else:
         metadata = None
     bounty['metadata'] = metadata
-    if not is_valid_ipfshash(bounty['uri']):
-        return failure('Invalid IPFS hash in URI', 400)
+    if not config.artifact_client.check_uri(bounty['uri']):
+        return failure(f'Invalid {config.artifact_client.name} URI', 400)
     if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
 
@@ -255,8 +279,11 @@ def post_bounties_guid_settle(guid):
     return success({'transactions': transactions})
 
 
+# noinspection PyBroadException
 @bounties.route('/metadata', methods=['POST'])
 def post_assertion_metadata():
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
     body = request.get_json()
 
     loaded_body = json.loads(body)
@@ -269,11 +296,19 @@ def post_assertion_metadata():
         return failure('Invalid Assertion metadata', 400)
 
     try:
-        status_code, ipfshash = post_to_ipfs([('metadata', body)], wrap_dir=False)
-        return success(ipfshash) if status_code // 100 == 2 else failure('Could not add metadata to IPFS', status_code)
+        uri = config.artifact_client.add_artifact(('file', ('metadata', body, 'application/json')),
+                                                  session,
+                                                  redis=config.redis)
+        response = success(uri)
+    except HTTPError as e:
+        response = failure(e.response.content, e.response.status_code)
+    except ArtifactException as e:
+        response = failure(e.message, 500)
     except Exception:
         logger.exception('Received error posting to IPFS got response')
-        return failure('Could not add metadata to ipfs', 400)
+        response = failure('Could not add metadata to ipfs', 500)
+
+    return response
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['POST'])
@@ -286,10 +321,15 @@ def post_bounties_guid_assertions(guid):
         'type': 'object',
         'properties': {
             'bid': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 100,
-                'pattern': r'^\d+$',
+                'type': 'array',
+                'minItems': 0,
+                'maxItems': 256,
+                'items': {
+                    'type': 'string',
+                    'minLength': 1,
+                    'maxLength': 100,
+                    'pattern': r'^\d+$',
+                }
             },
             'mask': {
                 'type': 'array',
@@ -321,19 +361,23 @@ def post_bounties_guid_assertions(guid):
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
-    bid = int(body['bid'])
+    bid = [int(b) for b in body['bid']]
     mask = bool_list_to_int(body['mask'])
+    verdict_count = len([m for m in body['mask'] if m])
 
     commitment = body.get('commitment')
     verdicts = body.get('verdicts')
 
     if commitment is None and verdicts is None:
-        return failure('Require verdicts or a commitment', 400)
+        return failure('Require verdicts and bid_portions or a commitment', 400)
 
-    if bid < eth.assertion_bid_min(g.chain.bounty_registry.contract):
+    if not bid or len(bid) != verdict_count:
+        return failure('bid_portions must be equal in length to the number of true mask values', 400)
+
+    if any((b < eth.assertion_bid_min(g.chain.bounty_registry.contract) for b in bid)):
         return failure('Invalid assertion bid', 400)
 
-    approveAmount = bid + eth.assertion_fee(g.chain.bounty_registry.contract)
+    approve_amount = sum(bid) + eth.assertion_fee(g.chain.bounty_registry.contract)
 
     nonce = None
     if commitment is None:
@@ -344,7 +388,7 @@ def post_bounties_guid_assertions(guid):
     ret = {'transactions': [
         build_transaction(
             g.chain.nectar_token.contract.functions.approve(g.chain.bounty_registry.contract.address,
-                                                            approveAmount), base_nonce),
+                                                            approve_amount), base_nonce),
         build_transaction(g.chain.bounty_registry.contract.functions.postAssertion(guid.int, bid, mask, commitment),
                           base_nonce + 1),
     ]}
@@ -405,7 +449,6 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 
 
 @bounties.route('/<uuid:guid>/assertions', methods=['GET'])
-@cache.memoize(30)
 @chain
 def get_bounties_guid_assertions(guid):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
@@ -413,17 +456,13 @@ def get_bounties_guid_assertions(guid):
         return failure('Bounty not found', 404)
 
     num_assertions = g.chain.bounty_registry.contract.functions.getNumberOfAssertions(guid.int).call()
-
     assertions = []
     for i in range(num_assertions):
         try:
-            assertion = assertion_to_dict(
-                g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, i).call(),
-                bounty['num_artifacts'])
+            assertion = get_assertion(guid, i, bounty['num_artifacts'])
             # Nonce is 0 when a reveal did not occur
             if assertion['nonce'] == "0":
                 assertion['verdicts'] = [None] * bounty['num_artifacts']
-            assertion['metadata'] = substitute_ipfs_metadata(assertion.get('metadata', ''))
             assertions.append(assertion)
         except Exception:
             logger.exception('Could not retrieve assertion')
@@ -433,7 +472,6 @@ def get_bounties_guid_assertions(guid):
 
 
 @bounties.route('/<uuid:guid>/assertions/<int:id_>', methods=['GET'])
-@cache.memoize(30)
 @chain
 def get_bounties_guid_assertions_id(guid, id_):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
@@ -441,10 +479,7 @@ def get_bounties_guid_assertions_id(guid, id_):
         return failure('Bounty not found', 404)
 
     try:
-        assertion = assertion_to_dict(g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, id_).call(),
-                                      bounty['num_artifacts'])
-        assertion['metadata'] = substitute_ipfs_metadata(assertion.get('metadata', ''))
-
+        assertion = get_assertion(guid, id_, bounty['num_artifacts'])
         return success(assertion)
     except:
         return failure('Assertion not found', 404)
@@ -489,6 +524,7 @@ def get_bounties_guid_votes_id(guid, id_):
 
 
 @bounties.route('/<uuid:guid>/bloom', methods=['GET'])
+@cache.memoize(30)
 @chain
 def get_bounties_guid_bloom(guid):
     bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())

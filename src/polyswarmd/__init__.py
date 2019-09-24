@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+from requests_futures.sessions import FuturesSession
 from polyswarmd.monkey import patch_all
 
 patch_all()
@@ -8,8 +10,6 @@ import functools
 
 from flask import Flask, g, request
 from flask_caching import Cache
-from requests_futures.sessions import FuturesSession
-from concurrent.futures import ThreadPoolExecutor
 
 from polyswarmd.config import Config, is_service_reachable
 from polyswarmd.logger import init_logging
@@ -18,24 +18,26 @@ from polyswarmd.response import success, failure, install_error_handlers
 
 logger = logging.getLogger(__name__)
 
+cache = Cache(config={"CACHE_TYPE": "simple", "CACHE_DEFAULT_TIMEOUT": 30})
+
 # Set up our app object
 app = Flask(__name__)
 app.config['POLYSWARMD'] = Config.auto()
 
-session = FuturesSession(executor=ThreadPoolExecutor(16),
-                         adapter_kwargs={'max_retries': 3})
+session = FuturesSession(executor=ThreadPoolExecutor(4),
+                         adapter_kwargs={'max_retries': 2})
 
-session.request = functools.partial(session.request, timeout=3)
+session.request = functools.partial(session.request, timeout=10)
 
 app.config['REQUESTS_SESSION'] = session
+app.config['CHECK_BLOCK_LIMIT'] = True
 
-cache = Cache(config={"CACHE_TYPE": "simple", "CACHE_DEFAULT_TIMEOUT": 30})
 
 install_error_handlers(app)
 
 from polyswarmd.eth import misc
 from polyswarmd.utils import bool_list_to_int, int_to_bool_list
-from polyswarmd.artifacts import artifacts, MAX_ARTIFACT_SIZE_REGULAR, MAX_ARTIFACT_SIZE_ANONYMOUS
+from polyswarmd.artifacts.artifacts import artifacts, MAX_ARTIFACT_SIZE_REGULAR, MAX_ARTIFACT_SIZE_ANONYMOUS
 from polyswarmd.balances import balances
 from polyswarmd.bounties import bounties
 from polyswarmd.relay import relay
@@ -43,7 +45,7 @@ from polyswarmd.offers import offers
 from polyswarmd.staking import staking
 from polyswarmd.websockets import init_websockets
 
-app.config['MAX_CONTENT_LENGTH'] = MAX_ARTIFACT_SIZE_REGULAR
+app.config['MAX_CONTENT_LENGTH'] = MAX_ARTIFACT_SIZE_REGULAR * 256
 
 app.register_blueprint(misc, url_prefix='/')
 app.register_blueprint(artifacts, url_prefix='/artifacts')
@@ -60,6 +62,12 @@ cache.init_app(app)
 AUTH_WHITELIST = {'/status', '/relay/withdrawal', '/transactions'}
 
 
+@cache.memoize(30)
+def get_auth(api_key, auth_uri):
+    future = session.get(auth_uri, headers={'Authorization': api_key})
+    return future.result()
+
+
 class User(object):
     def __init__(self, authorized=False, user_id=None):
         self.authorized = authorized
@@ -70,10 +78,9 @@ class User(object):
         config = app.config['POLYSWARMD']
         session = app.config['REQUESTS_SESSION']
 
-        auth_uri = '{}/communities/{}/auth'.format(config.auth_uri, config.community)
+        auth_uri = f'{config.auth_uri}/communities/{config.community}/auth'
 
-        future = session.get(auth_uri, headers={'Authorization': api_key})
-        r = future.result()
+        r = get_auth(api_key, auth_uri)
         if r is None or r.status_code != 200:
             return cls(authorized=False, user_id=None)
 
@@ -110,8 +117,10 @@ def status():
 
     ret['community'] = config.community
 
-    ret['ipfs'] = {
-        'reachable': is_service_reachable(session, f"{config.ipfs_uri}/api/v0/bootstrap"),
+    ret['artifact_services'] = {
+        config.artifact_client.name.lower(): {
+            'reachable': is_service_reachable(session, config.artifact_client.reachable_endpoint),
+        }
     }
 
     if config.auth_uri:

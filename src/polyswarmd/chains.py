@@ -7,8 +7,10 @@ from polyswarmd.response import failure
 
 logger = logging.getLogger(__name__)
 
+
 def chain(_func=None, chain_name=None, account_required=True):
-    """This decorator takes the chain passed as a request arg and modifies a set of globals.
+    """
+    This decorator takes the chain passed as a request arg and modifies a set of globals.
        There are a few guarantees made by this function.
 
        If any of the values for the given chain are missing, the decorator will skip the function and return an error to the user. (500)
@@ -31,7 +33,7 @@ def chain(_func=None, chain_name=None, account_required=True):
             chain = app.config['POLYSWARMD'].chains.get(c)
             if not chain:
                 chain_options = ", ".join(app.config['POLYSWARMD'].chains)
-                return failure('Chain must one of {0}'.format(chain_options), 400)
+                return failure(f'Chain must one of {chain_options}', 400)
 
             g.chain = chain
             return func(*args, **kwargs)

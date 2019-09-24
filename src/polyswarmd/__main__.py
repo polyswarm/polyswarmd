@@ -1,6 +1,7 @@
 import click
 import logging
 import sys
+import redis
 
 from gevent import pywsgi
 from geventwebsocket.handler import WebSocketHandler
@@ -24,6 +25,7 @@ def main(log_format, log_level, host, port):
     init_logging(log_format, log_level)
 
     from polyswarmd import app
+
     server = pywsgi.WSGIServer((host, port), app, handler_class=WebSocketHandler)
 
     logger.critical("polyswarmd is ready!")

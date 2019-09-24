@@ -3,12 +3,11 @@ import logging
 import string
 import re
 import uuid
-from typing import AnyStr, Union
+from typing import Union
+from Crypto.Hash import keccak
 
 from flask import g
 from polyswarmartifact import ArtifactType
-
-from polyswarmd.eth import ZERO_ADDRESS
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +25,8 @@ def safe_int_to_bool_list(num, max):
     if int(num) == 0:
         return [False] * int(max)
     else:
-        return int_to_bool_list(num)
+        converted = int_to_bool_list(num)
+        return converted + [False] * (max - len(converted))
 
 
 def uint256_list_to_hex_string(us):
@@ -85,12 +85,11 @@ def new_bounty_event_to_dict(new_bounty_event):
 def assertion_to_dict(assertion, num_artifacts):
     return {
         'author': assertion[0],
-        'bid': str(assertion[1]),
-        'mask': safe_int_to_bool_list(assertion[2], num_artifacts),
-        'commitment': str(assertion[3]),
-        'nonce': str(assertion[4]),
-        'verdicts': safe_int_to_bool_list(assertion[5], num_artifacts),
-        'metadata': assertion[6],
+        'mask': safe_int_to_bool_list(assertion[1], num_artifacts),
+        'commitment': str(assertion[2]),
+        'nonce': str(assertion[3]),
+        'verdicts': safe_int_to_bool_list(assertion[4], num_artifacts),
+        'metadata': assertion[5],
     }
 
 
@@ -99,7 +98,7 @@ def new_assertion_event_to_dict(new_assertion_event):
         'bounty_guid': str(uuid.UUID(int=new_assertion_event.bountyGuid)),
         'author': new_assertion_event.author,
         'index': new_assertion_event.index,
-        'bid': str(new_assertion_event.bid),
+        'bid': [str(bid) for bid in new_assertion_event.bid],
         'mask': safe_int_to_bool_list(new_assertion_event.mask, new_assertion_event.numArtifacts),
         'commitment': str(new_assertion_event.commitment),
     }
@@ -243,7 +242,8 @@ def camel_case_to_snake_case(s):
 
 
 def to_padded_hex(val: Union[str, bool, int, bytes]) -> str:
-    """Convert an argument to a hexadecimal string and zero-extend to 64 width"""
+    """
+    Convert an argument to a hexadecimal string and zero-extend to 64 width"""
     def encode_hex(xs: bytes) -> str:
         return codecs.encode(xs, "hex").decode("ascii") # type: ignore
 
@@ -336,3 +336,9 @@ def validate_ws_url(uri):
         r'(?:/?|[/?]\S+)$', re.IGNORECASE)
 
     return re.match(regex, uri) is not None
+
+
+def sha3(data):
+    h = keccak.new(digest_bits=256)
+    h.update(data)
+    return h.digest()

@@ -1,8 +1,6 @@
-import contextlib
 import json
 import logging
 import os
-import socket
 import threading
 import time
 import requests
@@ -10,14 +8,16 @@ import requests
 from urllib.parse import urlparse
 
 import yaml
+import redis
 from consul import Consul
 from consul.base import Timeout
 from web3 import Web3, HTTPProvider
 from web3.exceptions import MismatchedABI
 from web3.middleware import geth_poa_middleware
 
-from polyswarmd.eth import ZERO_ADDRESS
+from polyswarmd.artifacts.ipfs import IpfsServiceClient
 from polyswarmd.utils import camel_case_to_snake_case
+from polyswarmd.rpc import EthereumRpc
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ CONFIG_LOCATIONS = ['/etc/polyswarmd', '~/.config/polyswarmd']
 # Allow interfacing with contract versions in this range
 SUPPORTED_CONTRACT_VERSIONS = {
     'ArbiterStaking': ((1, 2, 0), (1, 3, 0)),
-    'BountyRegistry': ((1, 2, 0), (1, 4, 0)),
+    'BountyRegistry': ((1, 2, 0), (1, 5, 0)),
     'ERC20Relay': ((1, 1, 0), (1, 3, 0)),
     'OfferRegistry': ((1, 2, 0), (1, 3, 0)),
 }
@@ -98,6 +98,7 @@ class ContractConfig(object):
             self.bind(persistent=True)
 
     def bind(self, address=None, persistent=False):
+        from polyswarmd.eth import ZERO_ADDRESS
         if self.contract:
             return self.contract
 
@@ -159,6 +160,7 @@ class ChainConfig(object):
         self.erc20_relay = erc20_relay
         self.offer_registry = offer_registry
         self.offer_multisig = offer_multisig
+        self.rpc = EthereumRpc(self)
 
         self.free = free
         self.config_filename = ''
@@ -208,7 +210,7 @@ class ChainConfig(object):
     def from_consul(cls, consul_client, name, key):
         config = fetch_from_consul_or_wait(consul_client, key).get('Value')
         if config is None:
-            raise ValueError('Invalid chain config for chain {0}'.format(name))
+            raise ValueError(f'Invalid chain config for chain {name}')
 
         config = json.loads(config.decode('utf-8'))
 
@@ -283,9 +285,10 @@ class Config(object):
     session = requests.Session()
 
     def __init__(self, community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config,
-                 sidechain_config, trace_transactions, profiler_enabled):
+                 sidechain_config, trace_transactions, profiler_enabled, redis_client):
         self.community = community
-        self.ipfs_uri = ipfs_uri
+        # For now, there is no other option than IpfsServiceClient, but this will eventually be configurable
+        self.artifact_client = IpfsServiceClient(ipfs_uri)
         self.artifact_limit = artifact_limit
         self.auth_uri = auth_uri
         self.require_api_key = require_api_key
@@ -296,6 +299,7 @@ class Config(object):
         self.config_filename = ''
         self.trace_transactions = trace_transactions
         self.profiler_enabled = profiler_enabled
+        self.redis = redis_client
 
         self.__validate()
 
@@ -314,8 +318,10 @@ class Config(object):
         require_api_key = auth_uri is not None
         trace_transactions = config.get('trace_transactions', True)
         profiler_enabled = config.get('profiler_enabled', False)
+        redis_uri = config.get('redis_uri', os.environ.get('REDIS_URI', None))
+        redis_client = redis.Redis.from_url(redis_uri) if redis_uri else None
         return cls(commmunity, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
-                   trace_transactions, profiler_enabled)
+                   trace_transactions, profiler_enabled, redis_client)
 
     @classmethod
     def from_config_file_search(cls):
@@ -338,10 +344,10 @@ class Config(object):
         consul_client = Consul(host=u.hostname, port=u.port, scheme=u.scheme, token=consul_token)
 
         community = os.environ['POLY_COMMUNITY_NAME']
-        homechain_config = ChainConfig.from_consul(consul_client, 'home', 'chain/{0}/homechain'.format(community))
-        sidechain_config = ChainConfig.from_consul(consul_client, 'side', 'chain/{0}/sidechain'.format(community))
+        homechain_config = ChainConfig.from_consul(consul_client, 'home', f'chain/{community}/homechain')
+        sidechain_config = ChainConfig.from_consul(consul_client, 'side', f'chain/{community}/sidechain')
 
-        base_key = 'chain/{0}'.format(community)
+        base_key = f'chain/{community}'
         config = fetch_from_consul_or_wait(consul_client, base_key + '/config').get('Value')
         if config is None:
             raise ValueError('Invalid global config')
@@ -354,8 +360,11 @@ class Config(object):
         require_api_key = auth_uri is not None
         trace_transactions = config.get('trace_transactions', True)
         profiler_enabled = config.get('profiler_enabled', False)
+        redis_uri = config.get('redis_uri', os.environ.get('REDIS_URI', None))
+        redis_client = redis.Redis.from_url(redis_uri) if redis_uri else None
+
         ret = cls(community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
-                  trace_transactions, profiler_enabled)
+                  trace_transactions, profiler_enabled, redis_client)
 
         # Watch for key deletion, if config is deleted die and restart with new config
         def watch_for_config_deletion(consul_client, key):
@@ -379,8 +388,8 @@ class Config(object):
 
     def __validate(self):
         # We expect IPFS and API key service to be up already
-        if not is_service_reachable(self.session, f"{self.ipfs_uri}/api/v0/bootstrap"):
-            raise ValueError('IPFS not reachable, is correct URI specified?')
+        if not is_service_reachable(self.session, self.artifact_client.reachable_endpoint):
+            raise ValueError(f'{self.artifact_client.name} not reachable, is correct URI specified?')
 
         if self.artifact_limit < 1 or self.artifact_limit > 256:
             raise ValueError('Artifact limit must be greater than 0 and cannot exceed contract limit of 256')
