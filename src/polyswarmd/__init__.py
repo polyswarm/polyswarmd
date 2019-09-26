@@ -91,9 +91,12 @@ class User(object):
 
         anonymous = j.get('anonymous', True)
         user_id = j.get('user_id') if not anonymous else None
-        max_artifact_size = j.get('max_artifact_size', FALLBACK_MAX_ARTIFACT_SIZE)
+        max_artifact_size = next(
+            (f['base_uses'] for f in j.get('features', []) if f['tag'] == 'max_artifact_size'),
+            FALLBACK_MAX_ARTIFACT_SIZE
+        )
 
-        return cls(authorized=True, user_id=user_id, max_artifact_size=max_artifact_size, )
+        return cls(authorized=True, user_id=user_id, max_artifact_size=max_artifact_size)
 
     @property
     def anonymous(self):
