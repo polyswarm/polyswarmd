@@ -34,7 +34,8 @@ def post_artifacts():
     session = app.config['REQUESTS_SESSION']
 
     # Since we aren't using MAX_CONTENT_LENGTH anymore, we have to check each.
-    files = [('file', (f.filename, f, 'application/octet-stream')) for f in request.files.getlist(key='file')
+    files = [('file', (f'{i:06d}', f, 'application/octet-stream'))
+             for i, f in enumerate(request.files.getlist(key='file'))
              if f.content_length <= g.user.max_artifact_size]
     if len(files) < len(request.files.getlist(key='file')):
         return failure('Some artifact exceeds max file size', 413)

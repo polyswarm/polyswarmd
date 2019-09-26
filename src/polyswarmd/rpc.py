@@ -79,6 +79,7 @@ class EthereumRpc:
         """
         Continually poll all Ethereum filters as long as there are WebSockets listening
         :param artifact_client: ArtifactClient for making requests to artifact service
+        :param redis: Redis client with cached metadata
         """
         self.setup_filters()
         from polyswarmd.bounties import substitute_metadata
@@ -213,8 +214,8 @@ class EthereumRpc:
             except Exception:
                 logger.exception('Exception in filter checks, restarting greenlet')
                 # Creates a new greenlet with all new filters and let's this one die.
-                gevent.spawn(self.poll, artifact_client)
-                break
+                gevent.spawn(self.poll, artifact_client, redis)
+                return
 
     def register(self, ws):
         """
