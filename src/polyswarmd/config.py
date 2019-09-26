@@ -31,6 +31,8 @@ SUPPORTED_CONTRACT_VERSIONS = {
     'OfferRegistry': ((1, 2, 0), (1, 3, 0)),
 }
 
+FALLBACK_MAX_ARTIFACT_SIZE = 10 * 1024 * 1024
+
 
 def is_service_reachable(session, uri):
     r = session.get(uri)
@@ -279,7 +281,7 @@ class Config(object):
     session = requests.Session()
 
     def __init__(self, community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config,
-                 sidechain_config, trace_transactions, profiler_enabled, redis_client):
+                 sidechain_config, trace_transactions, profiler_enabled, redis_client, fallback_max_artifact_size):
         self.community = community
         # For now, there is no other option than IpfsServiceClient, but this will eventually be configurable
         self.artifact_client = IpfsServiceClient(ipfs_uri)
@@ -294,6 +296,7 @@ class Config(object):
         self.trace_transactions = trace_transactions
         self.profiler_enabled = profiler_enabled
         self.redis = redis_client
+        self.fallback_max_artifact_size = fallback_max_artifact_size
 
         self.__validate()
 
@@ -314,8 +317,9 @@ class Config(object):
         profiler_enabled = config.get('profiler_enabled', False)
         redis_uri = config.get('redis_uri', os.environ.get('REDIS_URI', None))
         redis_client = redis.Redis.from_url(redis_uri) if redis_uri else None
+        fallback_max_artifact_size = config.get('fallback_max_artifact_size', FALLBACK_MAX_ARTIFACT_SIZE)
         return cls(commmunity, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
-                   trace_transactions, profiler_enabled, redis_client)
+                   trace_transactions, profiler_enabled, redis_client, fallback_max_artifact_size)
 
     @classmethod
     def from_config_file_search(cls):
@@ -356,9 +360,10 @@ class Config(object):
         profiler_enabled = config.get('profiler_enabled', False)
         redis_uri = config.get('redis_uri', os.environ.get('REDIS_URI', None))
         redis_client = redis.Redis.from_url(redis_uri) if redis_uri else None
+        fallback_max_artifact_size = config.get('fallback_max_artifact_size', FALLBACK_MAX_ARTIFACT_SIZE)
 
         ret = cls(community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
-                  trace_transactions, profiler_enabled, redis_client)
+                  trace_transactions, profiler_enabled, redis_client, fallback_max_artifact_size)
 
         # Watch for key deletion, if config is deleted die and restart with new config
         def watch_for_config_deletion(consul_client, key):
@@ -393,6 +398,9 @@ class Config(object):
 
         if self.require_api_key and not self.auth_uri:
             raise ValueError('API keys required but no API key service URI specified')
+
+        if self.fallback_max_artifact_size < 1:
+            raise ValueError('Fall back max artifact size must be greater than 0')
 
         if not self.community:
             raise ValueError('No community specified')

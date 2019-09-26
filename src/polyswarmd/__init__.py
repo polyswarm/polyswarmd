@@ -37,7 +37,7 @@ install_error_handlers(app)
 
 from polyswarmd.eth import misc
 from polyswarmd.utils import bool_list_to_int, int_to_bool_list
-from polyswarmd.artifacts.artifacts import artifacts, FALLBACK_MAX_ARTIFACT_SIZE
+from polyswarmd.artifacts.artifacts import artifacts
 from polyswarmd.balances import balances
 from polyswarmd.bounties import bounties
 from polyswarmd.relay import relay
@@ -67,7 +67,7 @@ def get_auth(api_key, auth_uri):
 
 
 class User(object):
-    def __init__(self, authorized=False, user_id=None, max_artifact_size=FALLBACK_MAX_ARTIFACT_SIZE):
+    def __init__(self, authorized=False, user_id=None, max_artifact_size=1):
         self.authorized = authorized
         self.max_artifact_size = max_artifact_size
         self.user_id = user_id if authorized else None
@@ -81,19 +81,19 @@ class User(object):
 
         r = get_auth(api_key, auth_uri)
         if r is None or r.status_code != 200:
-            return cls(authorized=False, user_id=None, max_artifact_size=FALLBACK_MAX_ARTIFACT_SIZE)
+            return cls(authorized=False, user_id=None, max_artifact_size=config.fallback_max_artifact_size)
 
         try:
             j = r.json()
         except ValueError:
             logger.exception('Invalid response from API key management service, received: %s', r.content)
-            return cls(authorized=False, user_id=None, max_artifact_size=FALLBACK_MAX_ARTIFACT_SIZE)
+            return cls(authorized=False, user_id=None, max_artifact_size=config.fallback_max_artifact_size)
 
         anonymous = j.get('anonymous', True)
         user_id = j.get('user_id') if not anonymous else None
         max_artifact_size = next(
             (f['base_uses'] for f in j.get('features', []) if f['tag'] == 'max_artifact_size'),
-            FALLBACK_MAX_ARTIFACT_SIZE
+            config.fallback_max_artifact_size
         )
 
         return cls(authorized=True, user_id=user_id, max_artifact_size=max_artifact_size)

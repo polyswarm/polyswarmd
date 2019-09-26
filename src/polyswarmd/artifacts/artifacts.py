@@ -10,9 +10,6 @@ from polyswarmd.response import success, failure
 logger = logging.getLogger(__name__)
 artifacts = Blueprint('artifacts', __name__)
 
-# 10 MB Fallback limit
-FALLBACK_MAX_ARTIFACT_SIZE = 10 * 1024 * 1024
-
 
 @artifacts.route('/status', methods=['GET'])
 def get_artifacts_status():
