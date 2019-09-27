@@ -31,7 +31,7 @@ SUPPORTED_CONTRACT_VERSIONS = {
     'OfferRegistry': ((1, 2, 0), (1, 3, 0)),
 }
 
-FALLBACK_MAX_ARTIFACT_SIZE = 10 * 1024 * 1024
+DEFAULT_FALLBACK_SIZE = 10 * 1024 * 1024
 
 
 def is_service_reachable(session, uri):
@@ -317,7 +317,7 @@ class Config(object):
         profiler_enabled = config.get('profiler_enabled', False)
         redis_uri = config.get('redis_uri', os.environ.get('REDIS_URI', None))
         redis_client = redis.Redis.from_url(redis_uri) if redis_uri else None
-        fallback_max_artifact_size = config.get('fallback_max_artifact_size', FALLBACK_MAX_ARTIFACT_SIZE)
+        fallback_max_artifact_size = config.get('fallback_max_artifact_size', DEFAULT_FALLBACK_SIZE)
         return cls(commmunity, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
                    trace_transactions, profiler_enabled, redis_client, fallback_max_artifact_size)
 
@@ -360,7 +360,7 @@ class Config(object):
         profiler_enabled = config.get('profiler_enabled', False)
         redis_uri = config.get('redis_uri', os.environ.get('REDIS_URI', None))
         redis_client = redis.Redis.from_url(redis_uri) if redis_uri else None
-        fallback_max_artifact_size = config.get('fallback_max_artifact_size', FALLBACK_MAX_ARTIFACT_SIZE)
+        fallback_max_artifact_size = config.get('fallback_max_artifact_size', DEFAULT_FALLBACK_SIZE)
 
         ret = cls(community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
                   trace_transactions, profiler_enabled, redis_client, fallback_max_artifact_size)

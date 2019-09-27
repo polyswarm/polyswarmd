@@ -11,7 +11,7 @@ import functools
 from flask import Flask, g, request
 from flask_caching import Cache
 
-from polyswarmd.config import Config, is_service_reachable
+from polyswarmd.config import Config, is_service_reachable, DEFAULT_FALLBACK_SIZE
 from polyswarmd.logger import init_logging
 from polyswarmd.profiler import setup_profiler
 from polyswarmd.response import success, failure, install_error_handlers
@@ -67,10 +67,11 @@ def get_auth(api_key, auth_uri):
 
 
 class User(object):
-    def __init__(self, authorized=False, user_id=None, max_artifact_size=1):
+    def __init__(self, authorized=False, user_id=None, max_artifact_size=DEFAULT_FALLBACK_SIZE):
         self.authorized = authorized
         self.max_artifact_size = max_artifact_size
         self.user_id = user_id if authorized else None
+        logger.critical('MAX SIZE IS %s', max_artifact_size)
 
     @classmethod
     def from_api_key(cls, api_key):
@@ -78,6 +79,8 @@ class User(object):
         session = app.config['REQUESTS_SESSION']
 
         auth_uri = f'{config.auth_uri}/communities/{config.community}/auth'
+
+        logger.critical('FALLBACK IS %s', config.fallback_max_artifact_size)
 
         r = get_auth(api_key, auth_uri)
         if r is None or r.status_code != 200:
