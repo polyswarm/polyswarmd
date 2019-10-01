@@ -11,7 +11,7 @@ import functools
 from flask import Flask, g, request
 from flask_caching import Cache
 
-from polyswarmd.config import Config, is_service_reachable
+from polyswarmd.config import Config, is_service_reachable, DEFAULT_FALLBACK_SIZE
 from polyswarmd.logger import init_logging
 from polyswarmd.profiler import setup_profiler
 from polyswarmd.response import success, failure, install_error_handlers
@@ -37,15 +37,13 @@ install_error_handlers(app)
 
 from polyswarmd.eth import misc
 from polyswarmd.utils import bool_list_to_int, int_to_bool_list
-from polyswarmd.artifacts.artifacts import artifacts, MAX_ARTIFACT_SIZE_REGULAR, MAX_ARTIFACT_SIZE_ANONYMOUS
+from polyswarmd.artifacts.artifacts import artifacts
 from polyswarmd.balances import balances
 from polyswarmd.bounties import bounties
 from polyswarmd.relay import relay
 from polyswarmd.offers import offers
 from polyswarmd.staking import staking
 from polyswarmd.websockets import init_websockets
-
-app.config['MAX_CONTENT_LENGTH'] = MAX_ARTIFACT_SIZE_REGULAR * 256
 
 app.register_blueprint(misc, url_prefix='/')
 app.register_blueprint(artifacts, url_prefix='/artifacts')
@@ -69,9 +67,11 @@ def get_auth(api_key, auth_uri):
 
 
 class User(object):
-    def __init__(self, authorized=False, user_id=None):
+    def __init__(self, authorized=False, user_id=None, max_artifact_size=DEFAULT_FALLBACK_SIZE):
         self.authorized = authorized
+        self.max_artifact_size = max_artifact_size
         self.user_id = user_id if authorized else None
+        logger.critical('MAX SIZE IS %s', max_artifact_size)
 
     @classmethod
     def from_api_key(cls, api_key):
@@ -80,28 +80,30 @@ class User(object):
 
         auth_uri = f'{config.auth_uri}/communities/{config.community}/auth'
 
+        logger.critical('FALLBACK IS %s', config.fallback_max_artifact_size)
+
         r = get_auth(api_key, auth_uri)
         if r is None or r.status_code != 200:
-            return cls(authorized=False, user_id=None)
+            return cls(authorized=False, user_id=None, max_artifact_size=config.fallback_max_artifact_size)
 
         try:
             j = r.json()
         except ValueError:
             logger.exception('Invalid response from API key management service, received: %s', r.content)
-            return cls(authorized=False, user_id=None)
+            return cls(authorized=False, user_id=None, max_artifact_size=config.fallback_max_artifact_size)
 
         anonymous = j.get('anonymous', True)
         user_id = j.get('user_id') if not anonymous else None
+        max_artifact_size = next(
+            (f['base_uses'] for f in j.get('features', []) if f['tag'] == 'max_artifact_size'),
+            config.fallback_max_artifact_size
+        )
 
-        return cls(authorized=True, user_id=user_id)
+        return cls(authorized=True, user_id=user_id, max_artifact_size=max_artifact_size)
 
     @property
     def anonymous(self):
         return self.user_id is None
-
-    @property
-    def max_artifact_size(self):
-        return MAX_ARTIFACT_SIZE_ANONYMOUS if self.anonymous else MAX_ARTIFACT_SIZE_REGULAR
 
     def __bool__(self):
         config = app.config['POLYSWARMD']
@@ -162,7 +164,7 @@ def before_request():
             return whitelist_check(request.path)
 
     size = request.content_length
-    if size is not None and size > g.user.max_artifact_size:
+    if size is not None and size > g.user.max_artifact_size * 256:
         return failure('Payload too large', 413)
 
 
