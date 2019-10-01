@@ -71,7 +71,6 @@ class User(object):
         self.authorized = authorized
         self.max_artifact_size = max_artifact_size
         self.user_id = user_id if authorized else None
-        logger.critical('MAX SIZE IS %s', max_artifact_size)
 
     @classmethod
     def from_api_key(cls, api_key):
@@ -79,8 +78,6 @@ class User(object):
         session = app.config['REQUESTS_SESSION']
 
         auth_uri = f'{config.auth_uri}/communities/{config.community}/auth'
-
-        logger.critical('FALLBACK IS %s', config.fallback_max_artifact_size)
 
         r = get_auth(api_key, auth_uri)
         if r is None or r.status_code != 200:
