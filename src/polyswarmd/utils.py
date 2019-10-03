@@ -167,10 +167,8 @@ def new_withdrawal_event_to_dict(withdrawal_event):
     }
 
 
-def deprecated_event_to_dict(deprecate_event):
-    return {
-        'address': deprecate_event['bountyRegistry']
-    }
+def deprecated_event_to_dict():
+    return {}
 
 
 def channel_to_dict(channel_data):
