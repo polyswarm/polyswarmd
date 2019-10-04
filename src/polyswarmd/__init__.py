@@ -66,6 +66,16 @@ def get_auth(api_key, auth_uri):
     return future.result()
 
 
+def check_auth_response(api_response):
+    if api_response is None or api_response.status_code // 100 != 2:
+        return None
+    try:
+        return api_response.json()
+    except ValueError:
+        logger.exception('Invalid response from API key management service, received: %s', r.content)
+        return None
+
+
 class User(object):
     def __init__(self, authorized=False, user_id=None, max_artifact_size=DEFAULT_FALLBACK_SIZE):
         self.authorized = authorized
@@ -80,17 +90,20 @@ class User(object):
         auth_uri = f'{config.auth_uri}/communities/{config.community}/auth'
 
         r = get_auth(api_key, auth_uri)
-        if r is None or r.status_code != 200:
-            return cls(authorized=False, user_id=None, max_artifact_size=config.fallback_max_artifact_size)
-
-        try:
-            j = r.json()
-        except ValueError:
-            logger.exception('Invalid response from API key management service, received: %s', r.content)
+        j = check_auth_response(r)
+        if j is None:
             return cls(authorized=False, user_id=None, max_artifact_size=config.fallback_max_artifact_size)
 
         anonymous = j.get('anonymous', True)
         user_id = j.get('user_id') if not anonymous else None
+
+        # Get account features
+        account_uri = f'{config.auth_uri}/accounts'
+        r = get_auth(api_key, account_uri)
+        j = check_auth_response(r)
+        if j is None:
+            return cls(authorized=True, user_id=user_id, max_artifact_size=config.fallback_max_artifact_size)
+
         max_artifact_size = next(
             (f['base_uses'] for f in j.get('features', []) if f['tag'] == 'max_artifact_size'),
             config.fallback_max_artifact_size
