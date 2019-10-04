@@ -22,10 +22,10 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
     def __init__(self, base_uri):
         self.base_uri = base_uri
         reachable_endpoint = f"{self.base_uri}{'/api/v0/bootstrap'}"
-        url = urllib3.util.parse_url(self.base_uri)
-        client_connect_url = f'/dns/{url.host}/tcp/{url.port}/{url.scheme}'
-        self.client = ipfshttpclient.connect(client_connect_url, session=True)
         super().__init__('IPFS', reachable_endpoint)
+        # Create IPFS client
+        url = urllib3.util.parse_url(self.base_uri)
+        self.client = ipfshttpclient.connect(f'/dns/{url.host}/tcp/{url.port}/{url.scheme}', session=True)
 
     @staticmethod
     def check_ls(artifacts, index, max_size=None):
@@ -64,7 +64,11 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         return stat.get('Hash', '')
 
     def add_artifact(self, artifact, session, redis=None):
+        # We cannot add a string using client.add, it will take a string or b-string and tries to load a file
         ipfs_uri = self.client.add_str(artifact)
+        # add_str does not accept any way to set pin=False, so we have to remove in a second call
+        self.client.pin.rm(ipfs_uri)
+
         if redis:
             redis.set(f'polyswarmd:{ipfs_uri}', artifact, ex=300)
 
