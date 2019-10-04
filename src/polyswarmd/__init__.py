@@ -66,6 +66,12 @@ def get_auth(api_key, auth_uri):
     return future.result()
 
 
+@cache.memoize(30)
+def get_account(api_key, auth_uri):
+    future = session.get(auth_uri, params={'api_key': api_key})
+    return future.result()
+
+
 def check_auth_response(api_response):
     if api_response is None or api_response.status_code // 100 != 2:
         return None
@@ -99,13 +105,13 @@ class User(object):
 
         # Get account features
         account_uri = f'{config.auth_uri}/accounts'
-        r = get_auth(api_key, account_uri)
+        r = get_account(api_key, account_uri)
         j = check_auth_response(r)
         if j is None:
             return cls(authorized=True, user_id=user_id, max_artifact_size=config.fallback_max_artifact_size)
 
         max_artifact_size = next(
-            (f['base_uses'] for f in j.get('features', []) if f['tag'] == 'max_artifact_size'),
+            (f['base_uses'] for f in j.get('account', {}).get('features', []) if f['tag'] == 'max_artifact_size'),
             config.fallback_max_artifact_size
         )
 
