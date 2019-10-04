@@ -1,6 +1,7 @@
 base58==0.2.5
 python-consul==1.1.0
 click==7.0
+ipfshttpclient==0.4.12
 gevent==1.2.2
 gevent-websocket==0.10.1
 jsonschema==2.6.0

@@ -296,7 +296,7 @@ def post_assertion_metadata():
         return failure('Invalid Assertion metadata', 400)
 
     try:
-        uri = config.artifact_client.add_artifact(('file', ('metadata', body, 'application/json')),
+        uri = config.artifact_client.add_artifact(body,
                                                   session,
                                                   redis=config.redis)
         response = success(uri)
