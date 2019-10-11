@@ -85,11 +85,9 @@ def substitute_metadata(uri, validate=AssertionMetadata.validate, artifact_clien
         config = app.config['POLYSWARMD']
         artifact_client = config.artifact_client
 
-    if validate(json.loads(uri)):
-        return json.loads(uri)
-
     try:
-        content = artifact_client.get_artifact(uri, session=session, redis=redis).decode('utf-8')
+        content = artifact_client.get_artifact(uri, session=session, redis=redis).decode('utf-8') \
+            if artifact_client.check_uri(uri) else uri
         if validate(json.loads(content)):
             return json.loads(content)
 
