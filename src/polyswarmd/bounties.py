@@ -86,11 +86,13 @@ def substitute_metadata(uri, validate=AssertionMetadata.validate, artifact_clien
         artifact_client = config.artifact_client
 
     try:
-        content = artifact_client.get_artifact(uri, session=session, redis=redis).decode('utf-8') \
-            if artifact_client.check_uri(uri) else uri
-        loaded = json.loads(content)
-        if validate(loaded):
-            return loaded
+        if artifact_client.check_uri(uri):
+            content = json.loads(artifact_client.get_artifact(uri, session=session, redis=redis).decode('utf-8'))
+        else:
+            content = json.loads(uri)
+
+        if validate(content):
+            return content
 
     except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
