@@ -123,9 +123,10 @@ class EthereumRpc:
                     }
                     metadata = bounty['data'].get('metadata', None)
                     if metadata:
-                        bounty['data']['metadata'] = substitute_metadata(metadata, validate=BountyMetadata.validate,
-                                                                         artifact_client=artifact_client,
-                                                                         session=self.session,
+                        bounty['data']['metadata'] = substitute_metadata(metadata,
+                                                                         artifact_client,
+                                                                         self.session,
+                                                                         validate=BountyMetadata.validate,
                                                                          redis=redis)
                     else:
                         bounty['data']['metadata'] = None
@@ -149,8 +150,8 @@ class EthereumRpc:
                         'txhash': event.transactionHash.hex(),
                     }
                     reveal['data']['metadata'] = substitute_metadata(reveal['data'].get('metadata', ''),
-                                                                     artifact_client=artifact_client,
-                                                                     session=self.session,
+                                                                     artifact_client,
+                                                                     self.session,
                                                                      redis=redis)
 
                     self.broadcast(reveal)
