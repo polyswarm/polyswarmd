@@ -85,11 +85,11 @@ def substitute_metadata(uri, validate=AssertionMetadata.validate, artifact_clien
         config = app.config['POLYSWARMD']
         artifact_client = config.artifact_client
 
-    content = uri
-    try:
-        if artifact_client.check_uri(uri):
-            content = artifact_client.get_artifact(uri, session=session, redis=redis).decode('utf-8')
+    if validate(json.loads(uri)):
+        return json.loads(uri)
 
+    try:
+        content = artifact_client.get_artifact(uri, session=session, redis=redis).decode('utf-8')
         if validate(json.loads(content)):
             return json.loads(content)
 
@@ -99,7 +99,7 @@ def substitute_metadata(uri, validate=AssertionMetadata.validate, artifact_clien
     except Exception:
         logger.exception(f'Error getting metadata from {artifact_client.name}')
 
-    return content
+    return uri
 
 
 @bounties.route('', methods=['POST'])
