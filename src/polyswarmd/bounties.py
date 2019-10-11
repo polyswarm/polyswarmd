@@ -71,7 +71,7 @@ def substitute_metadata(uri, validate=AssertionMetadata.validate, artifact_clien
     """
     Download metadata from artifact service and validate it against the schema.
 
-    :param uri: Potential artifact service uri string
+    :param uri: Potential artifact service uri string (or metadata string)
     :param validate: Function that takes a loaded json blob and returns true if it matches the schema
     :param artifact_client: Artifact Client for accessing artifacts stored on a service
     :param session: Requests session for ipfs request
@@ -85,17 +85,21 @@ def substitute_metadata(uri, validate=AssertionMetadata.validate, artifact_clien
         config = app.config['POLYSWARMD']
         artifact_client = config.artifact_client
 
+    content = uri
     try:
-        content = artifact_client.get_artifact(uri, session=session, redis=redis)
-        if validate(json.loads(content.decode('utf-8'))):
-            return json.loads(content.decode('utf-8'))
+        if artifact_client.check_uri(uri):
+            content = artifact_client.get_artifact(uri, session=session, redis=redis).decode('utf-8')
+
+        if validate(json.loads(content)):
+            return json.loads(content)
+
     except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
         logger.warning('Metadata retrieved from IPFS does not match schema')
     except Exception:
         logger.exception(f'Error getting metadata from {artifact_client.name}')
 
-    return uri
+    return content
 
 
 @bounties.route('', methods=['POST'])
