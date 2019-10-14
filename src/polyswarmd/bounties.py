@@ -55,40 +55,40 @@ def calculate_commitment(account, verdicts):
 
 def get_assertion(guid, index, num_artifacts):
     config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
     assertion = assertion_to_dict(
         g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, index).call(),
         num_artifacts)
 
     bid = [str(b) for b in g.chain.bounty_registry.contract.functions.getBids(guid.int, index).call()]
     assertion['bid'] = bid
-    assertion['metadata'] = substitute_metadata(assertion.get('metadata', ''), redis=config.redis)
+    assertion['metadata'] = substitute_metadata(assertion.get('metadata', ''), config.artifact_client, session,
+                                                redis=config.redis)
     return assertion
 
 
 # noinspection PyBroadException
 @cache.memoize(30)
-def substitute_metadata(uri, validate=AssertionMetadata.validate, artifact_client=None, session=None, redis=None):
+def substitute_metadata(uri, artifact_client, session, validate=AssertionMetadata.validate, redis=None):
     """
     Download metadata from artifact service and validate it against the schema.
 
-    :param uri: Potential artifact service uri string
-    :param validate: Function that takes a loaded json blob and returns true if it matches the schema
+    :param uri: Potential artifact service uri string (or metadata string)
     :param artifact_client: Artifact Client for accessing artifacts stored on a service
     :param session: Requests session for ipfs request
+    :param validate: Function that takes a loaded json blob and returns true if it matches the schema
     :param redis: Redis connection object
     :return: Metadata from artifact service, or original metadata
     """
-    if not session:
-        session = app.config['REQUESTS_SESSION']
-
-    if not artifact_client:
-        config = app.config['POLYSWARMD']
-        artifact_client = config.artifact_client
-
     try:
-        content = artifact_client.get_artifact(uri, session=session, redis=redis)
-        if validate(json.loads(content.decode('utf-8'))):
-            return json.loads(content.decode('utf-8'))
+        if artifact_client.check_uri(uri):
+            content = json.loads(artifact_client.get_artifact(uri, session=session, redis=redis).decode('utf-8'))
+        else:
+            content = json.loads(uri)
+
+        if validate(content):
+            return content
+
     except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
         logger.warning('Metadata retrieved from IPFS does not match schema')
@@ -211,11 +211,13 @@ def get_bounty_parameters():
 @chain
 def get_bounties_guid(guid):
     config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
     bounty = bounty_to_dict(
         g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
     metadata = bounty.get('metadata', None)
     if metadata:
-        metadata = substitute_metadata(metadata, validate=BountyMetadata.validate, redis=config.redis)
+        metadata = substitute_metadata(metadata, config.artifact_client, session, validate=BountyMetadata.validate,
+                                       redis=config.redis)
     else:
         metadata = None
     bounty['metadata'] = metadata
