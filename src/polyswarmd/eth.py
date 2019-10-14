@@ -77,7 +77,6 @@ def get_syncing():
 def get_nonce():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     if 'ignore_pending' in request.args.keys():
-        logger.critical('Ignored')
         return success(g.chain.w3.eth.getTransactionCount(account))
     else:
         return success(g.chain.w3.eth.getTransactionCount(account, 'pending'))
