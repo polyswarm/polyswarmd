@@ -115,7 +115,7 @@ def get_transactions():
             ret[k].extend(v)
 
     if ret['errors']:
-        logging.exception('Got transaction errors: %s', ret['errors'])
+        logging.error('Got transaction errors: %s', ret['errors'])
         return failure(ret, 400)
     return success(ret)
 
@@ -301,12 +301,12 @@ def events_from_transaction(txhash, chain):
             receipt = g.chain.w3.eth.getTransactionReceipt(txhash)
             if receipt is not None:
                 break
-            gevent.sleep(0.5)
+            gevent.sleep(1)
 
     except gevent.Timeout as t:
         if t is not timeout:
             raise
-        logging.exception('Transaction %s: timeout waiting for receipt', bytes(txhash).hex())
+        logging.error('Transaction %s: timeout waiting for receipt', bytes(txhash).hex())
         return {
             'errors':
                 [f'transaction {bytes(txhash).hex()}: timeout during wait for receipt']
