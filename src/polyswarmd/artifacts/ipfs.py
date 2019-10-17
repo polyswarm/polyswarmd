@@ -67,7 +67,12 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         # We cannot add a string using client.add, it will take a string or b-string and tries to load a file
         ipfs_uri = self.client.add_str(artifact)
         # add_str does not accept any way to set pin=False, so we have to remove in a second call
-        self.client.pin.rm(ipfs_uri)
+        try:
+            self.client.pin.rm(ipfs_uri)
+        except ipfshttpclient.exceptions.ErrorResponse as e:
+            logger.warning('Got error when removing pin: %s', e)
+            # Only seen when the pin didn't exist, not a big deal
+            pass
 
         if redis:
             redis.set(f'polyswarmd:{ipfs_uri}', artifact, ex=300)
