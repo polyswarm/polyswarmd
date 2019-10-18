@@ -321,7 +321,7 @@ def events_from_transaction(txhash, chain):
             receipt = g.chain.w3.eth.getTransactionReceipt(txhash)
             if receipt is not None:
                 break
-            gevent.sleep(.5)
+            gevent.sleep(5)
 
     except gevent.Timeout as t:
         if t is not timeout:
