@@ -317,11 +317,13 @@ def events_from_transaction(txhash, chain):
     timeout.start()
 
     try:
+        attempts = 1
         while True:
             receipt = g.chain.w3.eth.getTransactionReceipt(txhash)
             if receipt is not None:
                 break
-            gevent.sleep(5)
+            gevent.sleep(attempts * attempts)
+            attempts += 1
 
     except gevent.Timeout as t:
         if t is not timeout:
