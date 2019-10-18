@@ -85,7 +85,7 @@ def get_nonce():
 @misc.route('/pending', methods=['GET'])
 @chain
 def get_pending_nonces():
-    tx_pool = g.chain.w3.txpool.inspect
+    tx_pool = get_txpool()
     logger.debug('Got txpool response from Ethereum node: %s', tx_pool)
     transactions = dict()
     for key in tx_pool.keys():
@@ -230,6 +230,11 @@ def post_transactions():
     return success(results)
 
 
+@cache.memoize(1)
+def get_txpool():
+    return g.chain.w3.txpool.inspect
+
+
 def get_gas_limit():
     gas_limit = MAX_GAS_LIMIT
     if app.config['CHECK_BLOCK_LIMIT']:
@@ -316,7 +321,7 @@ def events_from_transaction(txhash, chain):
             receipt = g.chain.w3.eth.getTransactionReceipt(txhash)
             if receipt is not None:
                 break
-            gevent.sleep(1)
+            gevent.sleep(3)
 
     except gevent.Timeout as t:
         if t is not timeout:
