@@ -258,11 +258,11 @@ def build_transaction(call, nonce):
     gas = gas_limit
     if g.chain.free:
         options["gasPrice"] = 0
-    else:
-        try:
-            gas = int(call.estimateGas({'from': g.eth_address, **options}) * GAS_MULTIPLIER)
-        except ValueError as e:
-            logger.debug('Error estimating gas, using default: %s', e)
+
+    try:
+        gas = int(call.estimateGas({'from': g.eth_address, **options}) * GAS_MULTIPLIER)
+    except ValueError as e:
+        logger.debug('Error estimating gas, using default: %s', e)
 
     options['gas'] = min(gas_limit, gas)
     logger.debug('options: %s', options)
