@@ -478,6 +478,10 @@ def bounty_amount_min(bounty_registry):
 def assertion_bid_min(bounty_registry):
     return bounty_registry.functions.ASSERTION_BID_ARTIFACT_MINIMUM().call()
 
+@cache.memoize(1)
+def assertion_bid_max(bounty_registry):
+    return bounty_registry.functions.ASSERTION_BID_ARTIFACT_MAXIMUM().call()
+
 
 @cache.memoize(1)
 def staking_total_max(arbiter_staking):

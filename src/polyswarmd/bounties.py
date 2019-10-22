@@ -114,10 +114,15 @@ def post_bounties():
                 'enum': [name.lower() for name, value in ArtifactType.__members__.items()]
             },
             'amount': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 100,
-                'pattern': r'^\d+$',
+                'type': 'array',
+                "minItems": 1,
+                "maxItems": 256,
+                'items': {
+                    'type': 'string',
+                    'minLength': 1,
+                    'maxLength': 100,
+                    'pattern': r'^\d+$',
+                },
             },
             'uri': {
                 'type': 'string',
@@ -145,7 +150,7 @@ def post_bounties():
 
     guid = uuid.uuid4()
     artifact_type = ArtifactType.from_string(body['artifact_type'])
-    amount = int(body['amount'])
+    amounts = [int(amount) for amount in body['amount']]
     artifact_uri = body['uri']
     duration_blocks = body['duration']
     metadata = body.get('metadata', '')
@@ -158,23 +163,26 @@ def post_bounties():
         logger.exception('Failed to ls given artifact uri')
         return failure(f'Failed to check artifact uri', 500)
 
-    if amount < eth.bounty_amount_min(g.chain.bounty_registry.contract):
+    if any({amount for amount in amounts if amount < eth.bounty_amount_min(g.chain.bounty_registry.contract)}):
         return failure('Invalid bounty amount', 400)
 
     if metadata and not config.artifact_client.check_uri(metadata):
         return failure('Invalid bounty metadata URI (should be IPFS hash)', 400)
 
+    if len(amounts) != len(arts):
+        return failure('Invalid bounty amount, does not match number of artifacts', 400)
+
     num_artifacts = len(arts)
     bloom = calculate_bloom(arts)
 
-    approve_amount = amount + eth.bounty_fee(g.chain.bounty_registry.contract)
+    approve_amount = sum(amounts) + eth.bounty_fee(g.chain.bounty_registry.contract)
 
     transactions = [
         build_transaction(
             g.chain.nectar_token.contract.functions.approve(g.chain.bounty_registry.contract.address, approve_amount),
             base_nonce),
         build_transaction(
-            g.chain.bounty_registry.contract.functions.postBounty(guid.int, artifact_type.value, amount, artifact_uri,
+            g.chain.bounty_registry.contract.functions.postBounty(guid.int, artifact_type.value, amounts, artifact_uri,
                                                                   num_artifacts, duration_blocks, bloom, metadata),
             base_nonce + 1),
     ]
@@ -190,6 +198,7 @@ def get_bounty_parameters():
     assertion_fee = g.chain.bounty_registry.contract.functions.assertionFee().call()
     bounty_amount_minimum = g.chain.bounty_registry.contract.functions.BOUNTY_AMOUNT_MINIMUM().call()
     assertion_bid_minimum = g.chain.bounty_registry.contract.functions.ASSERTION_BID_ARTIFACT_MINIMUM().call()
+    assertion_bid_maximum = g.chain.bounty_registry.contract.functions.ASSERTION_BID_ARTIFACT_MAXIMUM().call()
     arbiter_lookback_range = g.chain.bounty_registry.contract.functions.ARBITER_LOOKBACK_RANGE().call()
     max_duration = g.chain.bounty_registry.contract.functions.MAX_DURATION().call()
     assertion_reveal_window = g.chain.bounty_registry.contract.functions.assertionRevealWindow().call()
@@ -199,6 +208,7 @@ def get_bounty_parameters():
         'bounty_fee': bounty_fee,
         'assertion_fee': assertion_fee,
         'bounty_amount_minimum': bounty_amount_minimum,
+        'assertion_bid_maximum': assertion_bid_maximum,
         'assertion_bid_minimum': assertion_bid_minimum,
         'arbiter_lookback_range': arbiter_lookback_range,
         'max_duration': max_duration,
@@ -214,6 +224,8 @@ def get_bounties_guid(guid):
     session = app.config['REQUESTS_SESSION']
     bounty = bounty_to_dict(
         g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
+    amount = [str(a) for a in g.chain.bounty_registry.contract.functions.amountsByGuid(guid.int).call()]
+    bounty.update({'amount': amount})
     metadata = bounty.get('metadata', None)
     if metadata:
         metadata = substitute_metadata(metadata, config.artifact_client, session, validate=BountyMetadata.validate,
@@ -376,7 +388,9 @@ def post_bounties_guid_assertions(guid):
     if not bid or len(bid) != verdict_count:
         return failure('bid_portions must be equal in length to the number of true mask values', 400)
 
-    if any((b < eth.assertion_bid_min(g.chain.bounty_registry.contract) for b in bid)):
+    max_bid = eth.assertion_bid_max(g.chain.bounty_registry.contract)
+    min_bid = eth.assertion_bid_min(g.chain.bounty_registry.contract)
+    if any((b for b in bid if max_bid < b < min_bid)):
         return failure('Invalid assertion bid', 400)
 
     approve_amount = sum(bid) + eth.assertion_fee(g.chain.bounty_registry.contract)

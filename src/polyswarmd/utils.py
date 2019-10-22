@@ -38,15 +38,14 @@ def bounty_to_dict(bounty):
         'guid': str(uuid.UUID(int=bounty[0])),
         'artifact_type': ArtifactType.to_string(ArtifactType(bounty[1])),
         'author': bounty[2],
-        'amount': str(bounty[3]),
-        'uri': bounty[4],
-        'num_artifacts': bounty[5],
-        'expiration': bounty[6],
-        'assigned_arbiter': bounty[7],
-        'quorum_reached': bounty[8],
-        'quorum_reached_block': bounty[9],
-        'quorum_mask': safe_int_to_bool_list(bounty[10], bounty[5]),
-        'metadata': bounty[11]
+        'uri': bounty[3],
+        'num_artifacts': bounty[4],
+        'expiration': bounty[5],
+        'assigned_arbiter': bounty[6],
+        'quorum_reached': bounty[7],
+        'quorum_reached_block': bounty[8],
+        'quorum_mask': safe_int_to_bool_list(bounty[9], bounty[4]),
+        'metadata': bounty[10]
     }
 
 
@@ -75,7 +74,7 @@ def new_bounty_event_to_dict(new_bounty_event):
         'guid': str(uuid.UUID(int=new_bounty_event.guid)),
         'artifact_type': ArtifactType.to_string(ArtifactType(new_bounty_event.artifactType)),
         'author': new_bounty_event.author,
-        'amount': str(new_bounty_event.amount),
+        'amount': [str(amount) for amount in new_bounty_event.amount],
         'uri': new_bounty_event.artifactURI,
         'expiration': str(new_bounty_event.expirationBlock),
         'metadata': str(new_bounty_event.metadata),
