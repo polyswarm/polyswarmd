@@ -224,7 +224,7 @@ def get_bounties_guid(guid):
     session = app.config['REQUESTS_SESSION']
     bounty = bounty_to_dict(
         g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
-    amount = [str(a) for a in g.chain.bounty_registry.contract.functions.amountsByGuid(guid.int).call()]
+    amount = [str(a) for a in g.chain.bounty_registry.contract.functions.getAmounts(guid.int).call()]
     bounty.update({'amount': amount})
     metadata = bounty.get('metadata', None)
     if metadata:
