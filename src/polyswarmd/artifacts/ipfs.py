@@ -5,6 +5,7 @@ import re
 import uuid
 
 import urllib3
+from requests import Timeout
 
 from polyswarmd.artifacts.client import AbstractArtifactServiceClient
 from polyswarmd.artifacts.exceptions import ArtifactSizeException, InvalidUriException, \
@@ -92,7 +93,11 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         artifacts = self.ls(uri, session)
         name, artifact, _ = IpfsServiceClient.check_ls(artifacts, index)
 
-        stat = self.client.object.stat(artifact, session, timeout=1)
+        try:
+            stat = self.client.object.stat(artifact, session, timeout=1)
+        except Timeout:
+            raise ArtifactNotFoundException('Could not locate artifact ID')
+
         logger.info(f'Got artifact details {stat}')
 
         # Convert stats to snake_case
@@ -114,7 +119,10 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
             artifacts = self.ls(uri, session)
             _, uri, _ = IpfsServiceClient.check_ls(artifacts, index, max_size)
 
-        return self.client.cat(uri, timeout=1)
+        try:
+            return self.client.cat(uri, timeout=1)
+        except Timeout:
+            raise ArtifactNotFoundException('Could not locate artifact ID')
 
     def ls(self, uri, session):
         self.check_uri(uri)
