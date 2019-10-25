@@ -117,7 +117,7 @@ def post_bounties():
                 'type': 'string',
                 'minLength': 1,
                 'maxLength': 100,
-                'pattern': r'^\d+$',
+                'pattern': r'^\d+$'
             },
             'uri': {
                 'type': 'string',
@@ -158,7 +158,7 @@ def post_bounties():
         logger.exception('Failed to ls given artifact uri')
         return failure(f'Failed to check artifact uri', 500)
 
-    if amount < eth.bounty_amount_min(g.chain.bounty_registry.contract):
+    if amount < eth.bounty_amount_min(g.chain.bounty_registry.contract) * len(arts):
         return failure('Invalid bounty amount', 400)
 
     if metadata and not config.artifact_client.check_uri(metadata):
@@ -190,6 +190,7 @@ def get_bounty_parameters():
     assertion_fee = g.chain.bounty_registry.contract.functions.assertionFee().call()
     bounty_amount_minimum = g.chain.bounty_registry.contract.functions.BOUNTY_AMOUNT_MINIMUM().call()
     assertion_bid_minimum = g.chain.bounty_registry.contract.functions.ASSERTION_BID_ARTIFACT_MINIMUM().call()
+    assertion_bid_maximum = g.chain.bounty_registry.contract.functions.ASSERTION_BID_ARTIFACT_MAXIMUM().call()
     arbiter_lookback_range = g.chain.bounty_registry.contract.functions.ARBITER_LOOKBACK_RANGE().call()
     max_duration = g.chain.bounty_registry.contract.functions.MAX_DURATION().call()
     assertion_reveal_window = g.chain.bounty_registry.contract.functions.assertionRevealWindow().call()
@@ -199,6 +200,7 @@ def get_bounty_parameters():
         'bounty_fee': bounty_fee,
         'assertion_fee': assertion_fee,
         'bounty_amount_minimum': bounty_amount_minimum,
+        'assertion_bid_maximum': assertion_bid_maximum,
         'assertion_bid_minimum': assertion_bid_minimum,
         'arbiter_lookback_range': arbiter_lookback_range,
         'max_duration': max_duration,
@@ -376,7 +378,9 @@ def post_bounties_guid_assertions(guid):
     if not bid or len(bid) != verdict_count:
         return failure('bid_portions must be equal in length to the number of true mask values', 400)
 
-    if any((b < eth.assertion_bid_min(g.chain.bounty_registry.contract) for b in bid)):
+    max_bid = eth.assertion_bid_max(g.chain.bounty_registry.contract)
+    min_bid = eth.assertion_bid_min(g.chain.bounty_registry.contract)
+    if any((b for b in bid if max_bid < b < min_bid)):
         return failure('Invalid assertion bid', 400)
 
     approve_amount = sum(bid) + eth.assertion_fee(g.chain.bounty_registry.contract)
