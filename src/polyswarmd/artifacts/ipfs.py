@@ -8,7 +8,7 @@ import urllib3
 
 from polyswarmd.artifacts.client import AbstractArtifactServiceClient
 from polyswarmd.artifacts.exceptions import ArtifactSizeException, InvalidUriException, \
-    ArtifactNotFoundException
+    ArtifactNotFoundException, ArtifactException
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +68,8 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         ipfs_uri = self.client.add_str(artifact)
         # add_str does not accept any way to set pin=False, so we have to remove in a second call
         try:
-            self.client.pin.rm(ipfs_uri)
-        except ipfshttpclient.exceptions.ErrorResponse as e:
+            self.client.pin.rm(ipfs_uri, timeout=1)
+        except (ipfshttpclient.exceptions.ErrorResponse, ipfshttpclient.exceptions.TimeoutError) as e:
             logger.warning('Got error when removing pin: %s', e)
             # Only seen when the pin didn't exist, not a big deal
             pass
@@ -92,7 +92,11 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         artifacts = self.ls(uri, session)
         name, artifact, _ = IpfsServiceClient.check_ls(artifacts, index)
 
-        stat = self.client.object.stat(artifact, session)
+        try:
+            stat = self.client.object.stat(artifact, session, timeout=1)
+        except ipfshttpclient.exceptions.TimeoutError:
+            raise ArtifactNotFoundException('Could not locate artifact ID')
+
         logger.info(f'Got artifact details {stat}')
 
         # Convert stats to snake_case
@@ -114,12 +118,18 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
             artifacts = self.ls(uri, session)
             _, uri, _ = IpfsServiceClient.check_ls(artifacts, index, max_size)
 
-        return self.client.cat(uri)
+        try:
+            return self.client.cat(uri, timeout=1)
+        except ipfshttpclient.exceptions.TimeoutError:
+            raise ArtifactNotFoundException('Could not locate artifact ID')
 
     def ls(self, uri, session):
         self.check_uri(uri)
-        stats = self.client.object.stat(uri)
-        ls = self.client.object.links(uri)
+        try:
+            stats = self.client.object.stat(uri, timeout=1)
+            ls = self.client.object.links(uri, timeout=1)
+        except ipfshttpclient.exceptions.TimeoutError:
+            raise ArtifactException('Timeout running ls')
 
         # Return self if not directory
         if stats.get('NumLinks', 0) == 0:
@@ -143,10 +153,15 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
             directory_name = f'/{str(uuid.uuid4())}'
             # Try again if name is taken (Should never happen)
             try:
-                if self.client.files.ls(directory_name):
+                if self.client.files.ls(directory_name, timeout=1):
                     logger.critical('Got collision on names. Some assumptions were wrong')
                     continue
-            except ipfshttpclient.exceptions.ErrorResponse:
+            except (ipfshttpclient.exceptions.ErrorResponse, ipfshttpclient.exceptions.TimeoutError):
                 # Raises error if it doesn't exists, so we want to continue in this case.
-                self.client.files.mkdir(directory_name)
-                return directory_name
+                break
+
+        try:
+            self.client.files.mkdir(directory_name, timeout=1)
+            return directory_name
+        except ipfshttpclient.exceptions.TimeoutError:
+            raise ArtifactException('Timeout running ls')
