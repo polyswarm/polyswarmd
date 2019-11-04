@@ -27,8 +27,7 @@ MAX_GAS_LIMIT = 50000000
 GAS_MULTIPLIER = 1.5
 ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 TRANSFER_SIGNATURE_HASH = 'a9059cbb'
-HOME_TIMEOUT = 60
-SIDE_TIMEOUT = 10
+TIMEOUT = 60
 
 
 class Debug(Module):
@@ -313,17 +312,15 @@ def events_from_transaction(txhash, chain):
             pass
 
     # TODO: Check for out of gas, other
-    timeout = gevent.Timeout(HOME_TIMEOUT if chain == 'home' else SIDE_TIMEOUT)
+    timeout = gevent.Timeout(seconds=TIMEOUT)
     timeout.start()
 
     try:
-        attempts = 1
         while True:
             receipt = g.chain.w3.eth.getTransactionReceipt(txhash)
             if receipt is not None:
                 break
-            gevent.sleep(attempts * attempts)
-            attempts += 1
+            gevent.sleep(1)
 
     except gevent.Timeout as t:
         if t is not timeout:
