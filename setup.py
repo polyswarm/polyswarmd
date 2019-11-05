@@ -5,7 +5,7 @@ def parse_requirements():
         return [r for r in f.read().splitlines() if not r.startswith('git') and not r.startswith('.')]
 
 setup(name='polyswarmd',
-      version='2.0.0',
+      version='2.1.0',
       description='Daemon for interacting with the PolySwarm marketplace',
       author = 'PolySwarm Developers',
       author_email = 'info@polyswarm.io',
