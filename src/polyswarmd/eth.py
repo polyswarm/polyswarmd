@@ -175,14 +175,24 @@ def post_transactions():
 
     errors = False
     results = []
+    decoded_txs = []
     try:
         future = threadpool_executor.submit(decode_all, body['transactions'])
         decoded_txs = future.result()
     except ValueError as e:
-        return failure(f'Invalid transaction: {e}', 400)
+        logger.critical('Invalid transaction: %s', e)
+        errors = True
+        results.append({
+            'is_error': True,
+            'message': f'Invalid transaction: {e}'
+        })
     except Exception:
         logger.exception('Unexpected exception while parsing transaction')
-        return failure('Unexpected exception while parsing transaction', 500)
+        errors = True
+        results.append({
+            'is_error': True,
+            'message': 'Unexpected exception while parsing transaction'
+        })
 
     for raw_tx, tx in zip(body['transactions'], decoded_txs):
         if withdrawal_only and not is_withdrawal(tx):
