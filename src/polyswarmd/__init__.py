@@ -1,15 +1,15 @@
+from concurrent.futures import ThreadPoolExecutor
 from requests_futures.sessions import FuturesSession
 from polyswarmd.monkey import patch_all
 
 patch_all()
 
 import datetime
-import logging
 import functools
+import logging
 
 from flask import Flask, g, request
 from flask_caching import Cache
-from gevent.threadpool import ThreadPoolExecutor
 
 from polyswarmd.config import Config, is_service_reachable, DEFAULT_FALLBACK_SIZE
 from polyswarmd.logger import init_logging
@@ -31,7 +31,7 @@ session.request = functools.partial(session.request, timeout=10)
 
 app.config['REQUESTS_SESSION'] = session
 app.config['CHECK_BLOCK_LIMIT'] = True
-app.config['GEVENT_THREADPOOL'] = ThreadPoolExecutor(None)
+app.config['THREADPOOL'] = ThreadPoolExecutor()
 
 
 install_error_handlers(app)
