@@ -5,8 +5,8 @@ from polyswarmd.monkey import patch_all
 patch_all()
 
 import datetime
-import logging
 import functools
+import logging
 
 from flask import Flask, g, request
 from flask_caching import Cache
@@ -31,6 +31,7 @@ session.request = functools.partial(session.request, timeout=10)
 
 app.config['REQUESTS_SESSION'] = session
 app.config['CHECK_BLOCK_LIMIT'] = True
+app.config['THREADPOOL'] = ThreadPoolExecutor()
 
 
 install_error_handlers(app)

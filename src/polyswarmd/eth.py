@@ -137,6 +137,7 @@ def get_transactions():
 @misc.route('/transactions', methods=['POST'])
 @chain
 def post_transactions():
+    threadpool_executor = app.config['THREADPOOL']
     account = g.chain.w3.toChecksumAddress(g.eth_address)
 
     # Does not include offer_multisig contracts, need to loosen validation for those
@@ -174,16 +175,26 @@ def post_transactions():
 
     errors = False
     results = []
-    for raw_tx in body['transactions']:
-        try:
-            tx = rlp.decode(bytes.fromhex(raw_tx), ConstantinopleTransaction)
-        except ValueError as e:
-            logger.error('Invalid transaction: %s', e)
-            continue
-        except Exception:
-            logger.exception('Unexpected exception while parsing transaction')
-            continue
+    decoded_txs = []
+    try:
+        future = threadpool_executor.submit(decode_all, body['transactions'])
+        decoded_txs = future.result()
+    except ValueError as e:
+        logger.critical('Invalid transaction: %s', e)
+        errors = True
+        results.append({
+            'is_error': True,
+            'message': f'Invalid transaction: {e}'
+        })
+    except Exception:
+        logger.exception('Unexpected exception while parsing transaction')
+        errors = True
+        results.append({
+            'is_error': True,
+            'message': 'Unexpected exception while parsing transaction'
+        })
 
+    for raw_tx, tx in zip(body['transactions'], decoded_txs):
         if withdrawal_only and not is_withdrawal(tx):
             errors = True
             results.append({
@@ -267,6 +278,10 @@ def build_transaction(call, nonce):
     logger.debug('options: %s', options)
 
     return call.buildTransaction(options)
+
+
+def decode_all(raw_txs):
+    return [rlp.decode(bytes.fromhex(raw_tx), sedes=ConstantinopleTransaction) for raw_tx in raw_txs]
 
 
 def is_withdrawal(tx):
