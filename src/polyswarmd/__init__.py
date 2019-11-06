@@ -31,7 +31,7 @@ session.request = functools.partial(session.request, timeout=10)
 
 app.config['REQUESTS_SESSION'] = session
 app.config['CHECK_BLOCK_LIMIT'] = True
-app.config['GEVENT_THREADPOOL'] = ThreadPoolExecutor()
+app.config['GEVENT_THREADPOOL'] = ThreadPoolExecutor(None)
 
 
 install_error_handlers(app)
