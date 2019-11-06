@@ -137,7 +137,7 @@ def get_transactions():
 @misc.route('/transactions', methods=['POST'])
 @chain
 def post_transactions():
-    threadpool_executor = app.config['GEVENT_THREADPOOL']
+    threadpool_executor = app.config['THREADPOOL']
     account = g.chain.w3.toChecksumAddress(g.eth_address)
 
     # Does not include offer_multisig contracts, need to loosen validation for those
