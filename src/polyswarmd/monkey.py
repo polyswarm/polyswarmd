@@ -1,10 +1,11 @@
 from concurrent.futures import ThreadPoolExecutor
 
 import web3
+import os
 from gevent import monkey
 from requests_futures.sessions import FuturesSession
 
-session = FuturesSession(executor=ThreadPoolExecutor(16), adapter_kwargs={'max_retries': 5})
+session = FuturesSession(executor=ThreadPoolExecutor(), adapter_kwargs={'max_retries': 5})
 
 
 def patch_all():
