@@ -16,5 +16,6 @@ RUN set -x && pip install ujson wsaccel gunicorn
 COPY . .
 RUN set -x && pip install .
 
-
-CMD ["gunicorn", "--bind", "0.0.0.0:31337", "-k", "flask_sockets.worker", "-t", "600", "-w", "4", "polyswarmd.wsgi:app()"]
+# You can set log format and level in command line by e.g. `polyswarmd.wsgi:app(log_format='text', log_level='WARNING')`
+ENV GUNICORN_CMD_ARGS="--bind 0.0.0.0:31337 -k flask_sockets.worker -t 600 -w 4"
+CMD ["gunicorn", "polyswarmd.wsgi:app()"]
