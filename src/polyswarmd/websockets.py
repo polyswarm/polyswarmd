@@ -1,5 +1,8 @@
 import gevent
-import json
+try:
+    import ujson as json
+except ImportError:
+    import json
 import jsonschema
 import time
 
