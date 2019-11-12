@@ -10,12 +10,32 @@ from requests.exceptions import ConnectionError
 import gevent
 from gevent.queue import Empty, Queue
 from polyswarmd.chains import chain
-from polyswarmd.utils import (channel_to_dict, g, logging,
-                              new_cancel_agreement_event_to_dict,
-                              new_settle_challenged_event,
-                              new_settle_started_event, state_to_dict, uuid)
+from polyswarmd.filter_manager import (ClosedAgreement, FilterManager,
+                                       SettleStateChanged, StartedSettle)
+from polyswarmd.utils import (channel_to_dict, g, logging, state_to_dict, uuid)
 
 logger = logging.getLogger(__name__)
+
+
+class WebsocketMessage(object):
+    "Represent a message that can be handled by polyswarm-client"
+    # This is the identifier used when building a websocket event identifier.
+    _ws_event = 'websocket'
+    __slots__ = ('data')
+
+    @property
+    def event(self):
+        return self._ws_event
+
+    def __init__(self, data={}):
+        self.data = data
+
+    def as_dict(self):
+        "`as_dict' should return an object representing the websocket message that the client will consume"
+        return {'event': self.event, 'data': self.data}
+
+    def __str__(self):
+        return json.dumps(self.as_dict())
 
 
 class WebSocket:
@@ -46,6 +66,10 @@ class WebSocket:
                other.guid == self.guid
 
 
+class Connected(WebsocketMessage):
+    _ws_event = 'connected'
+
+
 def init_websockets(app):
     sockets = Sockets(app)
     start_time = time.time()
@@ -55,12 +79,7 @@ def init_websockets(app):
     @chain(account_required=False)
     def events(ws):
         rpc = g.chain.rpc
-        ws.send(json.dumps({
-            'event': 'connected',
-            'data': {
-                'start_time': str(start_time),
-            }
-        }))
+        ws.send(Connected({'start_time': str(start_time)}))
 
         wrapper = WebSocket(ws)
 
@@ -90,43 +109,16 @@ def init_websockets(app):
         offer_channel = channel_to_dict(g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
         msig_address = offer_channel['msig_address']
         offer_msig = g.chain.offer_multisig.bind(msig_address)
+        fmanager = FilterManager()
 
-        filters_initialized = False
         while not ws.closed:
             try:
-                if not filters_initialized:
-                    closed_agreement_filter = offer_msig.eventFilter('ClosedAgreement')
-                    settle_started_filter = offer_msig.eventFilter('StartedSettle')
-                    settle_challenged_filter = offer_msig.eventFilter('SettleStateChallenged')
+                if not fmanager.has_registered():
+                    for evt in [ClosedAgreement, StartedSettle, SettleStateChanged]:
+                        fmanager.register(offer_msig.eventFilter(evt.filter_id), evt)
 
-                    filters_initialized = True
-
-                for event in closed_agreement_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'closed_agreement',
-                            'data': new_cancel_agreement_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in settle_started_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'settle_started',
-                            'data': new_settle_started_event(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in settle_challenged_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'settle_challenged',
-                            'data': new_settle_challenged_event(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
+                for event in fmanager.new_ws_events():
+                    ws.send(event)
 
                 gevent.sleep(1)
             except WebSocketError:
@@ -134,11 +126,11 @@ def init_websockets(app):
                 break
             except ConnectionError:
                 logger.exception('ConnectionError in offer /events (is geth down?)')
-                filters_initialized = False
+                fmanager.unregister_all()
                 continue
             except Exception:
                 logger.exception('Exception in /events, resetting filters')
-                filters_initialized = False
+                fmanager.unregister_all()
                 continue
 
     # for receiving messages about offers that might need to be signed

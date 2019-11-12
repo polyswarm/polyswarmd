@@ -56,86 +56,11 @@ def bloom_to_dict(bloom):
     }
 
 
-def fee_update_event_to_dict(fee_update_event):
-    return {
-        'bounty_fee': fee_update_event.bountyFee,
-        'assertion_fee': fee_update_event.assertionFee,
-    }
-
-
-def window_update_event_to_dict(window_update_event):
-    return {
-        'assertion_reveal_window': window_update_event.assertionRevealWindow,
-        'arbiter_vote_window': window_update_event.arbiterVoteWindow,
-    }
-
-
-def new_bounty_event_to_dict(new_bounty_event):
-    return {
-        'guid': str(uuid.UUID(int=new_bounty_event.guid)),
-        'artifact_type': ArtifactType.to_string(ArtifactType(new_bounty_event.artifactType)),
-        'author': new_bounty_event.author,
-        'amount': str(new_bounty_event.amount),
-        'uri': new_bounty_event.artifactURI,
-        'expiration': str(new_bounty_event.expirationBlock),
-        'metadata': str(new_bounty_event.metadata),
-    }
-
-
-def assertion_to_dict(assertion, num_artifacts):
-    return {
-        'author': assertion[0],
-        'mask': safe_int_to_bool_list(assertion[1], num_artifacts),
-        'commitment': str(assertion[2]),
-        'nonce': str(assertion[3]),
-        'verdicts': safe_int_to_bool_list(assertion[4], num_artifacts),
-        'metadata': assertion[5],
-    }
-
-
-def new_assertion_event_to_dict(new_assertion_event):
-    return {
-        'bounty_guid': str(uuid.UUID(int=new_assertion_event.bountyGuid)),
-        'author': new_assertion_event.author,
-        'index': new_assertion_event.index,
-        'bid': [str(bid) for bid in new_assertion_event.bid],
-        'mask': safe_int_to_bool_list(new_assertion_event.mask, new_assertion_event.numArtifacts),
-        'commitment': str(new_assertion_event.commitment),
-    }
-
-
-def revealed_assertion_event_to_dict(revealed_assertion_event):
-    return {
-        'bounty_guid': str(uuid.UUID(int=revealed_assertion_event.bountyGuid)),
-        'author': revealed_assertion_event.author,
-        'index': revealed_assertion_event.index,
-        'nonce': str(revealed_assertion_event.nonce),
-        'verdicts': safe_int_to_bool_list(revealed_assertion_event.verdicts, revealed_assertion_event.numArtifacts),
-        'metadata': revealed_assertion_event.metadata,
-    }
-
-
 def vote_to_dict(vote, num_artifacts):
     return {
         'voter': vote[0],
         'votes': safe_int_to_bool_list(vote[1], num_artifacts),
         'valid_bloom': vote[2],
-    }
-
-
-def new_vote_event_to_dict(new_vote_event):
-    return {
-        'bounty_guid': str(uuid.UUID(int=new_vote_event.bountyGuid)),
-        'votes': safe_int_to_bool_list(new_vote_event.votes, new_vote_event.numArtifacts),
-        'voter': new_vote_event.voter,
-    }
-
-
-def settled_bounty_event_to_dict(new_settled_event):
-    return {
-        'bounty_guid': str(uuid.UUID(int=new_settled_event.bountyGuid)),
-        'settler': new_settled_event.settler,
-        'payout': new_settled_event.payout,
     }
 
 
@@ -165,8 +90,6 @@ def new_withdrawal_event_to_dict(withdrawal_event):
         'to': withdrawal_event['to'],
         'value': withdrawal_event['value'],
     }
-
-
 def deprecated_event_to_dict():
     return {}
 
@@ -210,29 +133,6 @@ def new_init_channel_event_to_dict(new_init_event):
     }
 
 
-def new_settle_challenged_event(new_event):
-    return {
-        'challenger': new_event.challenger,
-        'nonce': new_event.sequence,
-        'settle_period_end': new_event.settlementPeriodEnd,
-    }
-
-
-def new_settle_started_event(new_event):
-    return {
-        'initiator': new_event.initiator,
-        'nonce': new_event.sequence,
-        'settle_period_end': new_event.settlementPeriodEnd,
-    }
-
-
-def new_cancel_agreement_event_to_dict(new_event):
-    return {
-        'expert': new_event._expert,
-        'ambassador': new_event._ambassador,
-    }
-
-
 # https://stackoverflow.com/questions/1175208/elegant-python-function-to-convert-camelcase-to-snake-case
 def camel_case_to_snake_case(s):
     s1 = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', s)
@@ -243,7 +143,7 @@ def to_padded_hex(val: Union[str, bool, int, bytes]) -> str:
     """
     Convert an argument to a hexadecimal string and zero-extend to 64 width"""
     def encode_hex(xs: bytes) -> str:
-        return codecs.encode(xs, "hex").decode("ascii") # type: ignore
+        return codecs.encode(xs, "hex").decode("ascii")  # type: ignore
 
     if isinstance(val, str):
         if val.startswith('0x'):
@@ -296,8 +196,7 @@ def dict_to_state(state_dict):
         state_str = state_str + to_padded_hex('')
 
     if 'engagement_deadline' in state_dict:
-        state_str = state_str + to_padded_hex(
-            state_dict['engagement_deadline'])
+        state_str = state_str + to_padded_hex(state_dict['engagement_deadline'])
     else:
         state_str = state_str + to_padded_hex('')
 
@@ -331,7 +230,8 @@ def validate_ws_url(uri):
         r'localhost|'  # localhost...
         r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
         r'(?::\d+)?'  # optional port
-        r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+        r'(?:/?|[/?]\S+)$',
+        re.IGNORECASE)
 
     return re.match(regex, uri) is not None
 
