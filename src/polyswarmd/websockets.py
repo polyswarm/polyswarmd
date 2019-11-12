@@ -1,15 +1,19 @@
-import gevent
 import json
-import jsonschema
 import time
 
+import jsonschema
 from flask_sockets import Sockets
-from gevent.queue import Queue, Empty
 from geventwebsocket import WebSocketError
 from jsonschema.exceptions import ValidationError
 from requests.exceptions import ConnectionError
+
+import gevent
+from gevent.queue import Empty, Queue
 from polyswarmd.chains import chain
-from polyswarmd.utils import *
+from polyswarmd.utils import (channel_to_dict, g, logging,
+                              new_cancel_agreement_event_to_dict,
+                              new_settle_challenged_event,
+                              new_settle_started_event, state_to_dict, uuid)
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +55,12 @@ def init_websockets(app):
     @chain(account_required=False)
     def events(ws):
         rpc = g.chain.rpc
-        ws.send(
-            json.dumps({
-                'event': 'connected',
-                'data': {
-                    'start_time': str(start_time),
-                }
-            }))
+        ws.send(json.dumps({
+            'event': 'connected',
+            'data': {
+                'start_time': str(start_time),
+            }
+        }))
 
         wrapper = WebSocket(ws)
 
@@ -195,11 +198,7 @@ def init_websockets(app):
 
                 state_dict = state_to_dict(body['state'])
                 state_dict['guid'] = guid.int
-                ret = {
-                    'type': body['type'],
-                    'raw_state': body['state'],
-                    'state': state_dict
-                }
+                ret = {'type': body['type'], 'raw_state': body['state'], 'state': state_dict}
 
                 if 'r' in body:
                     ret['r'] = body['r']
@@ -221,8 +220,7 @@ def init_websockets(app):
 
                 for message_websocket in message_sockets[guid]:
                     if not message_websocket.closed:
-                        message_websocket.send(
-                            json.dumps(ret))
+                        message_websocket.send(json.dumps(ret))
 
                 gevent.sleep(1)
             except WebSocketError:

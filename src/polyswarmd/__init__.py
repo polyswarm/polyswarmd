@@ -12,7 +12,6 @@ from flask import Flask, g, request
 from flask_caching import Cache
 
 from polyswarmd.config import Config, is_service_reachable, DEFAULT_FALLBACK_SIZE
-from polyswarmd.logger import init_logging
 from polyswarmd.profiler import setup_profiler
 from polyswarmd.response import success, failure, install_error_handlers
 
@@ -37,7 +36,6 @@ app.config['THREADPOOL'] = ThreadPoolExecutor()
 install_error_handlers(app)
 
 from polyswarmd.eth import misc
-from polyswarmd.utils import bool_list_to_int, int_to_bool_list
 from polyswarmd.artifacts.artifacts import artifacts
 from polyswarmd.balances import balances
 from polyswarmd.bounties import bounties
@@ -92,7 +90,6 @@ class User(object):
     @classmethod
     def from_api_key(cls, api_key):
         config = app.config['POLYSWARMD']
-        session = app.config['REQUESTS_SESSION']
 
         auth_uri = f'{config.auth_uri}/communities/{config.community}/auth'
 

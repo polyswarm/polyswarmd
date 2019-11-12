@@ -1,13 +1,21 @@
-import time
-import gevent
 import json
+import time
 
-from gevent.lock import BoundedSemaphore
 from requests.exceptions import ConnectionError
-from polyswarmartifact.schema import Bounty as BountyMetadata
-from requests_futures.sessions import FuturesSession
 
-from polyswarmd.utils import *
+import gevent
+from gevent.lock import BoundedSemaphore
+from polyswarmartifact.schema import Bounty as BountyMetadata
+from polyswarmd.utils import (deprecated_event_to_dict,
+                              fee_update_event_to_dict, logger,
+                              new_assertion_event_to_dict,
+                              new_bounty_event_to_dict,
+                              new_init_channel_event_to_dict,
+                              new_quorum_event_to_dict, new_vote_event_to_dict,
+                              revealed_assertion_event_to_dict,
+                              settled_bounty_event_to_dict,
+                              window_update_event_to_dict)
+from requests_futures.sessions import FuturesSession
 
 
 class EthereumRpc:

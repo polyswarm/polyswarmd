@@ -1,11 +1,9 @@
-import io
-
-import polyswarmd
 import json
 
-from polyswarmd import utils, app
+from polyswarmd import app
 from polyswarmd.eth import ZERO_ADDRESS
-from tests import client, test_account
+from tests import test_account
+
 
 def test_post_to_state(client):
     token = app.config['POLYSWARMD'].chains['home'].nectar_token.address
