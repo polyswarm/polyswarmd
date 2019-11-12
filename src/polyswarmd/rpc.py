@@ -1,6 +1,10 @@
 import time
 import gevent
-import json
+
+try:
+    import ujson as json
+except ImportError:
+    import json
 
 from gevent.lock import BoundedSemaphore
 from requests.exceptions import ConnectionError
@@ -52,10 +56,11 @@ class EthereumRpc:
         :param message: dict to be converted to json and sent
         """
         logger.debug('Sending: %s', message)
+        msg = json.dumps(message)
         with self.websockets_lock:
             for ws in self.websockets:
                 logger.debug('Sending WebSocket %s %s', ws, message)
-                ws.send(json.dumps(message))
+                ws.send(msg)
 
     def flush_filters(self):
         """
