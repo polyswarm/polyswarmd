@@ -77,7 +77,7 @@ def check_auth_response(api_response):
     try:
         return api_response.json()
     except ValueError:
-        logger.exception('Invalid response from API key management service, received: %s', r.content)
+        logger.exception('Invalid response from API key management service, received: %s', api_response.encode())
         return None
 
 
