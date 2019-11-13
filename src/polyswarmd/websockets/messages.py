@@ -4,32 +4,32 @@ except ImportError:
     import json
 
 import uuid
-
-from web3.utils import Event
-from typing import List, Callable, Optional, TypeVar, Generic, Any
-from polyswarmartifact import ArtifactType
-
-from types import MappingProxyType
-from requests_futures.sessions import FuturesSession
-
-from polyswarmd import app
-from polyswarmd.bounties import substitute_metadata
-from polyswarmd.artifacts.ipfs import IpfsServiceClient
-
 from functools import lru_cache
+from types import MappingProxyType
+from typing import Any, Dict, List
+
+from polyswarmartifact import ArtifactType
+from polyswarmd import app
+from polyswarmd.artifacts.ipfs import IpfsServiceClient
+from polyswarmd.bounties import substitute_metadata
 from redis import redis
+from requests_futures.sessions import FuturesSession
+from web3.utils import Event
 
 
-class WebsocketMessage(object):
+class WebsocketMessage():
     "Represent a message that can be handled by polyswarm-client"
     # This is the identifier used when building a websocket event identifier.
-    _ws_event = 'websocket'
+    _ws_event: str
+    __slots__ = ('data')
 
     @property
-    def event(self):
+    def event(self) -> str:
         return self._ws_event
 
     def __init__(self, data={}):
+        if not self._ws_event:
+            raise ValueError("This class has no websocket event name")
         self.data = data
 
     def as_dict(self):
@@ -44,23 +44,26 @@ class Connected(WebsocketMessage):
     _ws_event = 'connected'
 
 
-def json_schema_extractor(schema, source):
+JSONSchema = Any
+
+
+def json_schema_extractor(schema: JSONSchema, source: Any) -> Dict[str, Any]:
     """Extract and format fields from a `source' object with jsonschema
 
     It extends jsonschema with several special keys that control extraction from `source`:
 
-        $fetch - Run a function with args=[source, key, property_schema]
-        $src - Extract this key from `source'
+        $#fetch - Run a function with args=[source, key, property_schema]
+        $#src - Extract this key from `source'
 
         If neither of these are present, it copies the value of source[key].
 
     Any properties with a `type` parameter will be converted to that type.
     """
     for key, pschema in schema['properties'].items():
-        if '$src' in pschema:
-            value = source[pschema['$src']], pschema
-        elif '$fetch' in pschema:
-            fn = pschema['$fetch']
+        if '$#src' in pschema:
+            value = source[pschema['$#src']], pschema
+        elif '$#fetch' in pschema:
+            fn = pschema['$#fetch']
             value = fn(source, key, pschema)
         else:
             value = source[pschema[key]]
@@ -68,7 +71,7 @@ def json_schema_extractor(schema, source):
         yield {key: format_type(value, pschema)}
 
 
-def format_type(value, schema):
+def format_type(value: Any, schema: JSONSchema) -> Any:
     result = value
 
     def as_uuid() -> uuid.UUID:
@@ -93,32 +96,36 @@ def format_type(value, schema):
 
 class WebsocketEventlogMessage(WebsocketMessage):
     """Websocket message interface for etherem event entries. """
-    def __init__(self, event):
+
+    _ws_event: str
+    _ws_schema: JSONSchema
+
+    def __init__(self, event: Event):
         self.data = json_schema_extractor(self._ws_schema, MappingProxyType(event))
 
     def as_dict(self):
-        return {
-            'event': self.name,
-            'data': self.data,
-            'block_number': self.block_number,
-            'txhash': self.txhash
-        }
+        return {'event': self.event_name, 'data': self.data, 'block_number': self.block_number, 'txhash': self.txhash}
 
     @property
-    def block_number(self):
-        return self.event.blockNumber
-
-    @property
-    def txhash(self):
-        return self.event.transactionHash.hex()
-
-    @property
-    def event_name(self):
+    def filter_event(self) -> str:
         "The event name used by web3 (e.g 'Transfer' or 'FeesUpdated')"
         return self.__class__.__name__
 
+    @property
+    def event_name(self):
+        return self._ws_event
+
+    @property
+    def block_number(self) -> int:
+        return self.event.blockNumber
+
+    @property
+    def txhash(self) -> str:
+        return self.event.transactionHash.hex()
+
     def __repr__(self):
         return f'<WebsocketEventlogMessage name={self._ws_event}>'
+
 
 session = FuturesSession(adapter_kwargs={'max_retries': 3})
 
@@ -126,7 +133,6 @@ session = FuturesSession(adapter_kwargs={'max_retries': 3})
 @lru_cache(15)
 def fetch_metadata(uri: str,
                    validate=None,
-                   session: FuturesSession = session,
                    artifact_client: IpfsServiceClient = app.config['POLYSWARMD'].artifact_client,
                    redis: redis = app.config['POLYSWARMD'].redis):
     return substitute_metadata(uri, artifact_client, session, validate, redis)
@@ -142,7 +148,8 @@ guid = {
     'format': 'uuid',
 }
 
-bounty_guid = {'type': 'string', 'format': 'uuid', '$from': 'bountyGuid'}
+# bounty_guid = { '$ref': '#/defs/bounty_guid }
+bounty_guid = {'type': 'string', 'format': 'uuid', '$#from': 'bountyGuid'}
 
 
 class FeesUpdated(WebsocketEventlogMessage):
@@ -165,11 +172,11 @@ class WindowsUpdated(WebsocketEventlogMessage):
         'properties': {
             'assertion_reveal_window': {
                 'type': 'integer',
-                '$src': 'assertionRevealWindow'
+                '$#src': 'assertionRevealWindow'
             },
             'arbiter_vote_window': {
                 'type': 'integer',
-                '$src': 'arbiterVoteWindow'
+                '$#src': 'arbiterVoteWindow'
             }
         }
     }
@@ -178,29 +185,31 @@ class WindowsUpdated(WebsocketEventlogMessage):
 class NewBounty(WebsocketEventlogMessage):
     _ws_event = 'bounty'
     _ws_schema = {
-        'guid': guid,
-        'artifact_type': {
-            'type': 'string',
-            'enum': ['file', 'url'],
-            '$fetch': lambda e: ArtifactType.to_string(ArtifactType(e.artifactType))
-        },
-        'author': {
-            'type': 'string',
-        },
-        'amount': {
-            'type': 'string'
-        },
-        'uri': {
-            'type': 'string',
-            '$from': 'artifactURI'
-        },
-        'expiration': {
-            'type': 'string',
-            '$from': 'expirationBlock'
-        },
-        'metadata': {
-            'type': 'string',
-            '$fetch': lambda e, k, _: fetch_metadata(e['metadata'])
+        'properties': {
+            'guid': guid,
+            'artifact_type': {
+                'type': 'string',
+                'enum': ['file', 'url'],
+                '$#fetch': lambda e: ArtifactType.to_string(ArtifactType(e.artifactType))
+            },
+            'author': {
+                'type': 'string',
+            },
+            'amount': {
+                'type': 'string'
+            },
+            'uri': {
+                'type': 'string',
+                '$#from': 'artifactURI'
+            },
+            'expiration': {
+                'type': 'string',
+                '$#from': 'expirationBlock'
+            },
+            'metadata': {
+                'type': 'string',
+                '$#fetch': lambda e, k, _: fetch_metadata(e['metadata'])
+            }
         }
     }
 
@@ -223,7 +232,7 @@ class NewAssertion(WebsocketEventlogMessage):
             'mask': {
                 'type': 'array',
                 'items': 'bool',
-                '$fetch': as_bv
+                '$#fetch': as_bv
             },
             'commitment': {
                 'type': 'string'
@@ -249,11 +258,11 @@ class RevealedAssertion(WebsocketEventlogMessage):
             'verdicts': {
                 'type': 'array',
                 'items': 'boolean',
-                '$fetch': as_bv
+                '$#fetch': as_bv
             },
             'metadata': {
                 'type': 'object',
-                '$fetch': lambda e, k, _: fetch_metadata(e['metadata'])
+                '$#fetch': lambda e, k, _: fetch_metadata(e['metadata'])
             }
         }
     }
@@ -268,7 +277,7 @@ class NewVote(WebsocketEventlogMessage):
                 'type': 'string'
             },
             'votes': {
-                '$fetch': as_bv,
+                '$#fetch': as_bv,
                 'items': 'bool',
                 'type': 'array'
             }
@@ -278,7 +287,7 @@ class NewVote(WebsocketEventlogMessage):
 
 class QuorumReached(WebsocketEventlogMessage):
     _ws_event = 'quorum'
-    _ws_schema = {'bounty_guid': bounty_guid, 'to': {'type': 'string'}, 'from': {'type': 'string'}}
+    _ws_schema = {'properties': {'bounty_guid': bounty_guid, 'to': {'type': 'string'}, 'from': {'type': 'string'}}}
 
 
 class SettledBounty(WebsocketEventlogMessage):
@@ -299,6 +308,9 @@ class SettledBounty(WebsocketEventlogMessage):
 class Deprecated(WebsocketEventlogMessage):
     _ws_event = 'deprecated'
 
+    def __init__(self, *args):
+        self.data = {}
+
 
 class InitializedChannel(WebsocketEventlogMessage):
     _ws_event = 'initialized_channel'
@@ -312,7 +324,7 @@ class InitializedChannel(WebsocketEventlogMessage):
             },
             'guid': guid,
             'multi_signature': {
-                '$from': 'msig',
+                '$#from': 'msig',
                 'type': 'string'
             }
         }
@@ -321,7 +333,7 @@ class InitializedChannel(WebsocketEventlogMessage):
 
 class LatestEvent(WebsocketEventlogMessage):
     _ws_event = 'block'
-    event_name = 'latest'
+    filter_event = 'latest'
 
     def as_dict(self):
         return {'event': self.name, 'data': {'number': self.block_number}}
@@ -332,11 +344,11 @@ class ClosedAgreement(WebsocketEventlogMessage):
     _ws_schema = {
         'properties': {
             'ambassador': {
-                '$from': '_ambassador',
+                '$#from': '_ambassador',
                 'type': 'string'
             },
             'expert': {
-                '$from': '_expert',
+                '$#from': '_expert',
                 'type': 'string'
             }
         }
@@ -351,11 +363,11 @@ class StartedSettle(WebsocketEventlogMessage):
                 'type': 'string'
             },
             'nonce': {
-                '$from': 'sequence',
+                '$#from': 'sequence',
                 'type': 'string'
             },
             'settle_period_end': {
-                '$from': 'settlementPeriodEnd',
+                '$#from': 'settlementPeriodEnd',
                 'type': 'string'
             }
         }
@@ -364,18 +376,17 @@ class StartedSettle(WebsocketEventlogMessage):
 
 class SettleStateChallenged(WebsocketEventlogMessage):
     _ws_event = 'settle_challenged'
-
     _ws_schema = {
         'properties': {
             'challenger': {
                 'type': 'string'
             },
             'nonce': {
-                '$from': 'sequence',
+                '$#from': 'sequence',
                 'type': 'string'
             },
             'settle_period_end': {
-                '$from': 'settlementPeriodEnd',
+                '$#from': 'settlementPeriodEnd',
                 'type': 'string'
             }
         }

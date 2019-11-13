@@ -1,18 +1,22 @@
-from typing import Optional, Type, Container, Callable, Any, Collection
+import weakref
+from collections import namedtuple
+from typing import Any, Callable, Collection, Container, Type
 
-import web3.eth
-from web3.utils import Filter
 from requests.exceptions import ConnectionError
 
-from collections import namedtuple
 import gevent
+import web3.eth
 from gevent.lock import BoundedSemaphore
 from gevent.pool import Pool
 from polyswarmd.utils import logging
-from polyswarmd.websockets.messages import (WebsocketEventlogMessage, Deprecated, FeesUpdated, InitializedChannel,
-                                            LatestEvent, NewAssertion, NewBounty, NewVote, QuorumReached,
-                                            RevealedAssertion, SettledBounty, WindowsUpdated)
-import weakref
+from polyswarmd.websockets.messages import (Deprecated, FeesUpdated,
+                                            InitializedChannel, LatestEvent,
+                                            NewAssertion, NewBounty, NewVote,
+                                            QuorumReached, RevealedAssertion,
+                                            SettledBounty,
+                                            WebsocketEventlogMessage,
+                                            WindowsUpdated)
+from web3.utils import Filter
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +182,7 @@ class EthereumRpc:
             self.filter_manager = FilterManager()
 
             bounty_contract = self.chain.bounty_registry.contract
-            self.filter_manager.register(NewBounty, bounty_contract.eventFilter(NewBounty.event_name), wait=None)
+            self.filter_manager.register(NewBounty, bounty_contract.eventFilter(NewBounty.filter_event), wait=None)
 
             filter_events = [
                 FeesUpdated, WindowsUpdated, NewAssertion, NewVote, QuorumReached, SettledBounty, RevealedAssertion,
@@ -186,13 +190,13 @@ class EthereumRpc:
             ]
 
             for cls in filter_events:
-                self.filter_manager.register(cls, bounty_contract.eventFilter(cls.event_name))
+                self.filter_manager.register(cls, bounty_contract.eventFilter(cls.filter_event))
 
             self.filter_manager.register(LatestEvent, self.chain.w3.eth.filter('latest'))
 
             offer_registry_contract = self.chain.offer_registry.contract
             if offer_registry_contract:
-                self.filter_manager.register(InitializedChannel, offer_registry_contract.eventFilter(cls.event_name))
+                self.filter_manager.register(InitializedChannel, offer_registry_contract.eventFilter(cls.filter_event))
 
             logger.debug('First WebSocket registered, starting greenlet')
             gevent.spawn(self.poll)

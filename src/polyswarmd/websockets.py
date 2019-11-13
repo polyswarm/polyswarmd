@@ -87,7 +87,7 @@ def init_websockets(app):
         offer_msig = g.chain.offer_multisig.bind(msig_address)
         fmanager = FilterManager()
         for evt in [ClosedAgreement, StartedSettle, SettleStateChanged]:
-            fmanager.register(offer_msig.eventFilter(evt.event_name), evt)
+            fmanager.register(offer_msig.eventFilter(evt.filter_event), evt)
 
         def send(msg):
             if ws.closed:
