@@ -53,18 +53,17 @@ def json_schema_extractor(schema: JSONSchema, source: Any) -> Dict[str, Any]:
     It extends jsonschema with several special keys that control extraction from `source`:
 
         $#fetch - Run a function with args=[source, key, property_schema]
-        $#src - Extract this key from `source'
+        $#from - Extract this key from `source'
 
         If neither of these are present, it copies the value of source[key].
 
     Any properties with a `type` parameter will be converted to that type.
     """
     for key, pschema in schema['properties'].items():
-        if '$#src' in pschema:
-            value = source[pschema['$#src']], pschema
+        if '$#from' in pschema:
+            value = source[pschema['$#from']]
         elif '$#fetch' in pschema:
-            fn = pschema['$#fetch']
-            value = fn(source, key, pschema)
+            value = pschema['$#fetch'](source, key, pschema)
         else:
             value = source[pschema[key]]
 
@@ -172,11 +171,11 @@ class WindowsUpdated(WebsocketEventlogMessage):
         'properties': {
             'assertion_reveal_window': {
                 'type': 'integer',
-                '$#src': 'assertionRevealWindow'
+                '$#from': 'assertionRevealWindow'
             },
             'arbiter_vote_window': {
                 'type': 'integer',
-                '$#src': 'arbiterVoteWindow'
+                '$#from': 'arbiterVoteWindow'
             }
         }
     }
@@ -190,7 +189,7 @@ class NewBounty(WebsocketEventlogMessage):
             'artifact_type': {
                 'type': 'string',
                 'enum': ['file', 'url'],
-                '$#fetch': lambda e: ArtifactType.to_string(ArtifactType(e.artifactType))
+                '$#fetch': lambda e, *_: ArtifactType.to_string(ArtifactType(e.artifactType))
             },
             'author': {
                 'type': 'string',
@@ -208,7 +207,7 @@ class NewBounty(WebsocketEventlogMessage):
             },
             'metadata': {
                 'type': 'string',
-                '$#fetch': lambda e, k, _: fetch_metadata(e['metadata'])
+                '$#fetch': lambda e, k, *_: fetch_metadata(e[k])
             }
         }
     }
