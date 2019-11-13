@@ -1,10 +1,10 @@
-import time
-from typing import Optional
+from typing import Optional, Type, Container, Callable, Any, Collection
 
 import web3.eth
 from web3.utils import Filter
 from requests.exceptions import ConnectionError
 
+from collections import namedtuple
 import gevent
 from gevent.lock import BoundedSemaphore
 from gevent.pool import Pool
@@ -12,40 +12,62 @@ from polyswarmd.utils import logging
 from polyswarmd.websockets.messages import (WebsocketEventlogMessage, Deprecated, FeesUpdated, InitializedChannel,
                                             LatestEvent, NewAssertion, NewBounty, NewVote, QuorumReached,
                                             RevealedAssertion, SettledBounty, WindowsUpdated)
+import weakref
 
 logger = logging.getLogger(__name__)
+
+# The type of a formatter used in `FilterWrapper`
+FilterFormatter = Type[WebsocketEventlogMessage]
+
+
+class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'wait'])):
+    def __del__(self):
+        web3.eth.uninstallFilter(self.filter.filter_id)
+        super().__del__(self)
+
+    def get_new_entries(self):
+        for entry in self.filter.get_new_entries():
+            yield self.formatter(entry)
+
+    def __hash__(self):
+        return hash(self.filter.filter_id)
 
 
 class FilterManager(object):
     """Manages access to filtered Ethereum events."""
 
-    # Maximum amount of time to back-off on event fetching.
-    MAXIMUM_WAIT = 20
+    wrappers: Collection[FilterWrapper]
+    pool: Pool
+    MAX_WEIGHT: int = 10
 
     def __init__(self):
-        self.filters = []
-        self.formatters = {}
-        self.pool = None
+        self.wrappers = {}
+        self.pool = Pool(None)
 
-    def register(self, flt: Filter, ws_serializer: Optional[WebsocketEventlogMessage]):
+    def register(self, flt: Filter, fmt_cls: FilterFormatter = lambda x: x, wait=1):
         "Add a new filter, with an optional associated WebsocketMessage-serializer class"
-        self.filters.append(flt)
-        self.formatters[flt] = ws_serializer
+        wrapper = FilterWrapper(flt, fmt_cls, wait)
+        self.wrappers.add(wrapper)
+        logger.debug('Registered new filter: %s', wrapper)
+        self.pool.size = (len(self.wrappers) * 2) + 1
+
+    @property
+    def filters(self):
+        for filt in self.wrappers:
+            yield filt
 
     def __del__(self):
         "Destructor to be run when a filter manager is no longer needed"
-        if self.pool:
-            self.pool.kill()
-        for filt in self.filters:
-            web3.eth.uninstallFilter(filt.filter_id)
-        self.formatters = {}
-        self.filters = []
+        self.pool.kill()
+        self.pool = Pool(None)
+        self.wrappers = {}
 
     def flush(self):
+        logger.debug('Clearing out of date filter events.')
         for filt in self.filters:
             filt.get_new_entries()
 
-    def event_pool(self, callback, group=None):
+    def event_pool(self, callback: Callable[..., Any], immediate: Container[Filter] = {NewBounty}):
         """Maintains a gevent Pool of filter event entry fetchers.
 
         The pool is filled by `fetch_filter', which automatically creates
@@ -55,40 +77,38 @@ class FilterManager(object):
             - No entries were returned by this filter (it doesn't need to be checked as frequently)
             - A connection error occurred (maybe geth is down, try to back off and wait)
         """
-        if group:
-            self.group = group
-        else:
-            self.group = Pool(len(self.filters))
-
-        def fetch_filter(filt, wait=1):
-            if filt not in self.formatters:
-                raise ValueError("Filter does not have associated formatter")
-
+        def fetch_filter(wrapper: FilterWrapper, wait: int = None):
             # Run the `callback' on every new filter entry
             try:
-                entries = filt.get_new_entries()
-                format_cls = self.formatters[filt]
-                for entry in entries:
-                    callback(format_cls(entry))
-                # If we aren't receiving much traffic on this channel, back off.
-                if len(entries) == 0 and wait < self.MAXIMUM_WAIT:
-                    wait = wait + 1
-                elif wait > self.MAXIMUM_WAIT // 2:
-                    wait = wait - self.MAXIMUM_WAIT // 4
-                elif wait >= 1:
-                    wait = wait - 1
+                empty_filter = True
+                for entry in wrapper.get_new_entries():
+                    empty_filter = False
+                    callback(entry)
+                if wait:
+                    if empty_filter:
+                        wait *= 2  # if there's no traffic, back off
+                    elif wait > self.MAX_WAIT // 2:
+                        wait //= 2  # but drop quickly if our wait is high w/ new traffic
+                    elif wait >= 0:
+                        wait -= 1  # otherwise steadily decrease
             except ConnectionError:
-                if wait < self.MAXIMUM_WAIT:
-                    wait += 5
-                logger.exception('ConnectionError occcurred, backing off...')
+                if wait:
+                    wait = (wait + 1) * 2
+                logger.exception('ConnectionError occurred, backing off...')
 
             # Spawn the next version of this instance
-            self.group.start(gevent.spawn_later(wait, fetch_filter, filt, wait))
+            if wait:
+                wait = min(self.MAX_WAIT, max(0.01, wait))
+                self.pool.start(gevent.spawn_later(wait, fetch_filter, wrapper, wait))
+            else:
+                self.pool.start(gevent.spawn(fetch_filter, wrapper))
 
-        for filt in self.filters:
-            self.group.add(gevent.spawn(fetch_filter, filt))
+        # Greenlet's can continue to exist beyond the lifespan of the object itself, this will prevent filters from
+        # cleaning up after themselves.
+        for wrapper in [weakref.proxy(w) for w in self.wrappers]:
+            self.pool.add(gevent.spawn(fetch_filter, wrapper, wrapper.wait))
 
-        return self.group
+        return self.pool
 
 
 class EthereumRpc:
@@ -130,23 +150,9 @@ class EthereumRpc:
         """
         Continually poll all Ethereum filters as long as there are WebSockets listening
         """
-        # Setup filters
-        self.fmanager = FilterManager()
-        for cls in [
-                FeesUpdated, WindowsUpdated, NewBounty, NewAssertion, NewVote, QuorumReached, SettledBounty,
-                RevealedAssertion, Deprecated
-        ]:
-            self.fmanager.register(cls, self.chain.bounty_registry.contract.eventFilter(cls.event_name))
-
-        self.fmanager.register(LatestEvent, self.chain.w3.eth.filter('latest'))
-
-        if self.chain.offer_registry.contract:
-            self.fmanager.register(InitializedChannel,
-                                   self.chain.offer_registry.contract.eventFilter('InitializedChannel'))
-
         # Start the pool
         try:
-            self.fmanager.event_pool(self.broadcast).join()
+            self.filter_manager.event_pool(self.broadcast).join()
         except Exception:
             logger.exception('Exception in filter checks, restarting greenlet')
             # Creates a new greenlet with all new filters and let's this one die.
@@ -164,15 +170,30 @@ class EthereumRpc:
             if self.websockets is None:
                 start = True
                 self.websockets = []
-            elif not self.websockets:
-                # Clear the filters of old data.
-                # Possible when last WebSocket closes & a new one opens before the 1 poll sleep ends
-                logger.debug('Clearing out of date filter events.')
-                self.fmanager.flush()
 
             self.websockets.append(ws)
 
         if start:
+            # Setup filters
+            self.filter_manager = FilterManager()
+
+            bounty_contract = self.chain.bounty_registry.contract
+            self.filter_manager.register(NewBounty, bounty_contract.eventFilter(NewBounty.event_name), wait=None)
+
+            filter_events = [
+                FeesUpdated, WindowsUpdated, NewAssertion, NewVote, QuorumReached, SettledBounty, RevealedAssertion,
+                Deprecated
+            ]
+
+            for cls in filter_events:
+                self.filter_manager.register(cls, bounty_contract.eventFilter(cls.event_name))
+
+            self.filter_manager.register(LatestEvent, self.chain.w3.eth.filter('latest'))
+
+            offer_registry_contract = self.chain.offer_registry.contract
+            if offer_registry_contract:
+                self.filter_manager.register(InitializedChannel, offer_registry_contract.eventFilter(cls.event_name))
+
             logger.debug('First WebSocket registered, starting greenlet')
             gevent.spawn(self.poll)
 

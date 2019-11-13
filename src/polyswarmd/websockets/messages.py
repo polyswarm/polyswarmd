@@ -113,6 +113,8 @@ class WebsocketEventlogMessage(WebsocketMessage):
         "The event name used by web3 (e.g 'Transfer' or 'FeesUpdated')"
         return self.__class__.__name__
 
+    def __repr__(self):
+        return f'<WebsocketEventlogMessage name={self._ws_event}>'
 
 session = FuturesSession(adapter_kwargs={'max_retries': 3})
 
