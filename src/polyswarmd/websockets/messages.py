@@ -1,4 +1,8 @@
-import json
+try:
+    import ujson as json
+except ImportError:
+    import json
+
 import uuid
 
 from web3.utils import Event
