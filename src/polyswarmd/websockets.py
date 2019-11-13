@@ -86,28 +86,15 @@ def init_websockets(app):
         msig_address = offer_channel['msig_address']
         offer_msig = g.chain.offer_multisig.bind(msig_address)
         fmanager = FilterManager()
+        for evt in [ClosedAgreement, StartedSettle, SettleStateChanged]:
+            fmanager.register(offer_msig.eventFilter(evt.event_name), evt)
 
-        while not ws.closed:
-            try:
-                if not fmanager.is_active():
-                    for evt in [ClosedAgreement, StartedSettle, SettleStateChanged]:
-                        fmanager.register(offer_msig.eventFilter(evt.event_name), evt)
+        def send(msg):
+            if ws.closed:
+                raise RuntimeError("WebSocket is closed")
+            return ws.send(msg)
 
-                for event in fmanager.new_ws_events():
-                    ws.send(event)
-
-                gevent.sleep(1)
-            except WebSocketError:
-                logger.info('Websocket connection closed, exiting loop')
-                break
-            except ConnectionError:
-                logger.exception('ConnectionError in offer /events (is geth down?)')
-                fmanager.unregister_all()
-                continue
-            except Exception:
-                logger.exception('Exception in /events, resetting filters')
-                fmanager.unregister_all()
-                continue
+        fmanager.event_pool(ws.send).join()
 
     # for receiving messages about offers that might need to be signed
     @sockets.route('/messages/<uuid:guid>')
