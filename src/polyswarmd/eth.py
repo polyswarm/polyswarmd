@@ -28,7 +28,7 @@ GAS_MULTIPLIER = 1.5
 ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 TRANSFER_SIGNATURE_HASH = 'a9059cbb'
 HOME_TIMEOUT = 60
-SIDE_TIMEOUT = 10
+SIDE_TIMEOUT = 20
 
 
 class Debug(Module):
@@ -336,7 +336,7 @@ def events_from_transaction(txhash, chain):
             tx = g.chain.w3.eth.getTransaction(txhash)
             if tx is not None and tx.blockNumber:
                 # fix suggested by https://github.com/ethereum/web3.js/issues/2917#issuecomment-507154487
-                while g.chain.w3.eth.blockNumber - tx.blockNumber < 0:
+                while g.chain.w3.eth.blockNumber - tx.blockNumber < 2:
                     gevent.sleep(1)
                 receipt = g.chain.w3.eth.getTransactionReceipt(txhash)
                 break
