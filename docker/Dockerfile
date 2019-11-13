@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt ./
 
 RUN set -x && pip install --no-cache-dir -r requirements.txt
-RUN set -x && pip install ujson gunicorn==19.9.0 meinheld
+RUN set -x && pip install ujson gunicorn==19.9.0
 
 COPY . .
 RUN set -x && pip install .
