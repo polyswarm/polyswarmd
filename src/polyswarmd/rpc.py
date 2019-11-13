@@ -186,4 +186,3 @@ class EthereumRpc:
             if ws in self.websockets:
                 logger.debug('Removing WebSocket %s', ws)
                 self.websockets.remove(ws)
-                self.websockets.remove(ws)

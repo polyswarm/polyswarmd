@@ -3,6 +3,7 @@ import uuid
 
 from web3.utils import Event
 from typing import List, Callable, Optional, TypeVar, Generic, Any
+from polyswarmartifact import ArtifactType
 
 from types import MappingProxyType
 from requests_futures.sessions import FuturesSession
@@ -19,7 +20,6 @@ class WebsocketMessage(object):
     "Represent a message that can be handled by polyswarm-client"
     # This is the identifier used when building a websocket event identifier.
     _ws_event = 'websocket'
-    __slots__ = ('data')
 
     @property
     def event(self):
@@ -40,38 +40,65 @@ class Connected(WebsocketMessage):
     _ws_event = 'connected'
 
 
+def json_schema_extractor(schema, source):
+    """Extract and format fields from a `source' object with jsonschema
+
+    It extends jsonschema with several special keys that control extraction from `source`:
+
+        $fetch - Run a function with args=[source, key, property_schema]
+        $src - Extract this key from `source'
+
+        If neither of these are present, it copies the value of source[key].
+
+    Any properties with a `type` parameter will be converted to that type.
+    """
+    for key, pschema in schema['properties'].items():
+        if '$src' in pschema:
+            value = source[pschema['$src']], pschema
+        elif '$fetch' in pschema:
+            fn = pschema['$fetch']
+            value = fn(source, key, pschema)
+        else:
+            value = source[pschema[key]]
+
+        yield {key: format_type(value, pschema)}
+
+
+def format_type(value, schema):
+    result = value
+
+    def as_uuid() -> uuid.UUID:
+        return uuid.UUID(int=value)
+
+    formatters = {'uuid': as_uuid}
+
+    if 'format' in schema:
+        if schema['format'] in formatters:
+            result = formatters[schema['format']](result)
+
+    def decide_array():
+        return [format_type(v, {'type': schema['items']}) for v in value]
+
+    conversions = {'string': str, 'integer': int, 'number': float, 'array': decide_array, 'bool': bool}
+    if 'type' in schema:
+        if schema['type'] in conversions:
+            result = conversions[schema['type']](result)
+
+    return result
+
+
 class WebsocketEventlogMessage(WebsocketMessage):
     """Websocket message interface for etherem event entries. """
-
-    __slots__ = ('event')
-    _ws_fields = ()
-
     def __init__(self, event):
-        self.event = MappingProxyType(event)
-        if not self._ws_fields:
-            raise ValueError("WebsocketEventlogMessage must define _ws_fields")
+        self.data = json_schema_extractor(self._ws_schema, MappingProxyType(event))
 
     def as_dict(self):
         return {
             'event': self.name,
-            'data': self.format_data(),
+            'data': self.data,
             'block_number': self.block_number,
             'txhash': self.txhash
         }
-
-    def format_data(self):
-        "Format the event log entry for Websocket"
-        for field in self._ws_fields:
-            # This mode directly returns the key `field' from self.event
-            # ('key_name')
-            if isinstance(field, str):
-                yield {field: self.event.args[field]}
-
-            if isinstance(field, tuple) and len(field) == 2:
-                key, arg = field
-                yield {key: arg(self.event.args, key) if callable(arg) else arg}
-
-            raise ValueError("Invalid _ws_fields")
 
     @property
     def block_number(self):
@@ -99,55 +126,191 @@ def fetch_metadata(uri: str,
     return substitute_metadata(uri, artifact_client, session, validate, redis)
 
 
-def as_uuid(e: Event, k: str) -> str:
-    return str(uuid.UUID(int=e[k]))
-
-
-def as_bv(e: Event, k: str) -> List[bool]:
+def as_bv(e: Event, k: str, *args) -> List[bool]:
     "Return the bitvector for a number, where 1 is 'True' and 0 is 'False'"
     return [True if b == '1' else False for b in format(e[k], f"0>{e.numArtifacts}b")]
 
 
-bounty_guid = ('bounty_guid', lambda e: as_uuid(e, 'bountyGuid'))
+guid = {
+    'type': 'string',
+    'format': 'uuid',
+}
+
+bounty_guid = {'type': 'string', 'format': 'uuid', '$from': 'bountyGuid'}
 
 
 class FeesUpdated(WebsocketEventlogMessage):
     _ws_event = 'fee_update'
-    _ws_fields = ('bounty_fee',
-                  'assertion_fee')
+    _ws_schema = {
+        'properties': {
+            'bounty_fee': {
+                'type': 'integer',
+            },
+            'assertion_fee': {
+                'type': 'integer',
+            }
+        },
+    }
 
 
 class WindowsUpdated(WebsocketEventlogMessage):
     _ws_event = 'window_update'
-    _ws_fields = ('assertion_reveal_window',
-                  'arbiter_vote_window')
+    _ws_schema = {
+        'properties': {
+            'assertion_reveal_window': {
+                'type': 'integer',
+                '$src': 'assertionRevealWindow'
+            },
+            'arbiter_vote_window': {
+                'type': 'integer',
+                '$src': 'arbiterVoteWindow'
+            }
+        }
+    }
 
 
-def bids(e: Event) -> List[str]:
-    return map(str, e.bids)
+class NewBounty(WebsocketEventlogMessage):
+    _ws_event = 'bounty'
+    _ws_schema = {
+        'guid': guid,
+        'artifact_type': {
+            'type': 'string',
+            'enum': ['file', 'url'],
+            '$fetch': lambda e: ArtifactType.to_string(ArtifactType(e.artifactType))
+        },
+        'author': {
+            'type': 'string',
+        },
+        'amount': {
+            'type': 'string'
+        },
+        'uri': {
+            'type': 'string',
+            '$from': 'artifactURI'
+        },
+        'expiration': {
+            'type': 'string',
+            '$from': 'expirationBlock'
+        },
+        'metadata': {
+            'type': 'string',
+            '$fetch': lambda e, k, _: fetch_metadata(e['metadata'])
+        }
+    }
+
 
 class NewAssertion(WebsocketEventlogMessage):
     _ws_event = 'assertion'
-    _ws_fields = ('author',
-                  ('mask', as_bv),
-                  ('bid', bids),
-                  'commitment',
-                  'nonce',
-                  ('verdicts', as_bv),
-                  'metadata')
+    _ws_schema = {
+        'properties': {
+            'bounty_guid': bounty_guid,
+            'author': {
+                'type': 'string'
+            },
+            'index': {
+                'type': 'string'
+            },
+            'bid': {
+                'type': 'array',
+                'items': 'string',
+            },
+            'mask': {
+                'type': 'array',
+                'items': 'bool',
+                '$fetch': as_bv
+            },
+            'commitment': {
+                'type': 'string'
+            },
+        },
+    }
+
+
+class RevealedAssertion(WebsocketEventlogMessage):
+    _ws_event = 'reveal'
+    _ws_schema = {
+        'properties': {
+            'bounty_guid': bounty_guid,
+            'author': {
+                'type': 'string'
+            },
+            'index': {
+                'type': 'string'
+            },
+            'nonce': {
+                'type': 'string'
+            },
+            'verdicts': {
+                'type': 'array',
+                'items': 'boolean',
+                '$fetch': as_bv
+            },
+            'metadata': {
+                'type': 'object',
+                '$fetch': lambda e, k, _: fetch_metadata(e['metadata'])
+            }
+        }
+    }
 
 
 class NewVote(WebsocketEventlogMessage):
     _ws_event = 'vote'
-    _ws_fields = (bounty_guid, ('votes', as_bv), 'voter')
+    _ws_schema = {
+        'properties': {
+            'bounty_guid': bounty_guid,
+            'voter': {
+                'type': 'string'
+            },
+            'votes': {
+                '$fetch': as_bv,
+                'items': 'bool',
+                'type': 'array'
+            }
+        }
+    }
+
+
+class QuorumReached(WebsocketEventlogMessage):
+    _ws_event = 'quorum'
+    _ws_schema = {'bounty_guid': bounty_guid, 'to': {'type': 'string'}, 'from': {'type': 'string'}}
+
+
+class SettledBounty(WebsocketEventlogMessage):
+    _ws_event = 'settled_bounty'
+    _ws_schema = {
+        'properties': {
+            'bounty_guid': bounty_guid,
+            'settler': {
+                'type': 'string'
+            },
+            'payout': {
+                'type': 'string'
+            }
+        }
+    }
+
+
+class Deprecated(WebsocketEventlogMessage):
+    _ws_event = 'deprecated'
 
 
 class InitializedChannel(WebsocketEventlogMessage):
     _ws_event = 'initialized_channel'
-    _ws_fields = (('guid', as_uuid),
-                  'ambassador',
-                  'expert',
-                  ('multi_signature', 'msig'))
+    _ws_schema = {
+        'properties': {
+            'ambassador': {
+                'type': 'string'
+            },
+            'expert': {
+                'type': 'string'
+            },
+            'guid': guid,
+            'multi_signature': {
+                '$from': 'msig',
+                'type': 'string'
+            }
+        }
+    }
 
 
 class LatestEvent(WebsocketEventlogMessage):
@@ -160,19 +323,54 @@ class LatestEvent(WebsocketEventlogMessage):
 
 class ClosedAgreement(WebsocketEventlogMessage):
     _ws_event = 'closed_agreement'
-    _ws_fields = (('expert', '_expert'),
-                  ('ambassador', '_ambassador'))
+    _ws_schema = {
+        'properties': {
+            'ambassador': {
+                '$from': '_ambassador',
+                'type': 'string'
+            },
+            'expert': {
+                '$from': '_expert',
+                'type': 'string'
+            }
+        }
+    }
 
 
 class StartedSettle(WebsocketEventlogMessage):
     _ws_event = 'settle_started'
-    _ws_fields = ('initiator',
-                  ('nonce', 'sequence'),
-                  ('settle_period_end', 'settlementPeriodEnd'))
+    _ws_schema = {
+        'properties': {
+            'initiator': {
+                'type': 'string'
+            },
+            'nonce': {
+                '$from': 'sequence',
+                'type': 'string'
+            },
+            'settle_period_end': {
+                '$from': 'settlementPeriodEnd',
+                'type': 'string'
+            }
+        }
+    }
 
 
 class SettleStateChallenged(WebsocketEventlogMessage):
     _ws_event = 'settle_challenged'
-    _ws_fields = ('challenger',
-                  ('nonce', 'sequence'),
-                  ('settle_period_end', 'settlementPeriodEnd'))
+
+    _ws_schema = {
+        'properties': {
+            'challenger': {
+                'type': 'string'
+            },
+            'nonce': {
+                '$from': 'sequence',
+                'type': 'string'
+            },
+            'settle_period_end': {
+                '$from': 'settlementPeriodEnd',
+                'type': 'string'
+            }
+        }
+    }
