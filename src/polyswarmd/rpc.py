@@ -1,15 +1,52 @@
-import json
 import time
+from typing import Optional
 
+import web3.eth
+from web3.utils import Filter
 from requests.exceptions import ConnectionError
 
 import gevent
-from filter_manager import (FilterManager,
-                            Deprecated, FeesUpdated, InitializedChannel,
-                            LatestEvent, NewAssertion, NewBounty, NewVote,
-                            QuorumReached, RevealedAssertion, SettledBounty,
-                            WindowsUpdated)
 from gevent.lock import BoundedSemaphore
+from polyswarmd.utils import logging
+from polyswarmd.websockets.messages import (WebsocketEventlogMessage, Deprecated, FeesUpdated, InitializedChannel, LatestEvent, NewAssertion,
+                                            NewBounty, NewVote, QuorumReached, RevealedAssertion, SettledBounty,
+                                            WindowsUpdated)
+
+logger = logging.getLogger(__name__)
+
+class FilterManager(object):
+    """Manages access to filtered Ethereum events."""
+    def __init__(self):
+        self.filters = []
+        self.formatters = {}
+
+    def register(self, flt: Filter, ws_serializer: Optional[WebsocketEventlogMessage]):
+        "Add a new filter, with an optional associated WebsocketMessage-serializer class"
+        self.filters.append(flt)
+        self.formatters[flt] = ws_serializer
+
+    def unregister_all(self):
+        for filt in self.filters:
+            web3.eth.uninstallFilter(filt.filter_id)
+        self.formatters = {}
+        self.filters = []
+
+    def is_active(self):
+        return len(self.filters) > 0
+
+    def flush(self):
+        for filt in self.filters:
+            filt.get_new_entries()
+
+    def new_ws_events(self):
+        "Yields all of the new entries matches by the filters (in-order), returning each as a websocket message."
+        for filt in self.filters:
+            # You must have a formatter to be serialized as a websocket message.
+            if filt not in self.formatters:
+                continue
+            formatter = self.formatters[filt]
+            for event in filt.get_new_entries():
+                yield formatter(event)
 
 
 class EthereumRpc:
@@ -21,7 +58,6 @@ class EthereumRpc:
         self.block_filter = None
         self.websockets_lock = BoundedSemaphore(1)
         self.websockets = None
-        self.fmanager = FilterManager()
 
     @staticmethod
     def compute_sleep(diff):
@@ -43,7 +79,6 @@ class EthereumRpc:
         Send a message to all connected WebSockets
         :param message: dict to be converted to json and sent
         """
-        logger.debug('Sending: %s', message)
         with self.websockets_lock:
             for ws in self.websockets:
                 ws.send(message)
@@ -53,6 +88,20 @@ class EthereumRpc:
         """
         Continually poll all Ethereum filters as long as there are WebSockets listening
         """
+        # Setup filters
+        self.fmanager = FilterManager()
+        for cls in [
+                FeesUpdated, WindowsUpdated, NewBounty, NewAssertion, NewVote, QuorumReached, SettledBounty,
+                RevealedAssertion, Deprecated
+        ]:
+            self.fmanager.register(cls, self.chain.bounty_registry.contract.eventFilter(cls.event_name))
+
+        self.fmanager.register(LatestEvent, self.chain.w3.eth.filter('latest'))
+
+        if self.chain.offer_registry.contract:
+            self.fmanager.register(InitializedChannel,
+                                   self.chain.offer_registry.contract.eventFilter('InitializedChannel'))
+
         last = time.time() * 1000 // 1
         while True:
             now = time.time() * 1000 // 1
@@ -74,27 +123,6 @@ class EthereumRpc:
                 logger.exception('Exception in filter checks, restarting greenlet')
                 # Creates a new greenlet with all new filters and let's this one die.
                 gevent.spawn(self.poll)
-                return
-
-    def setup_filters(self):
-        bounty_filters = [
-            FeesUpdated,
-            WindowsUpdated,
-            NewBounty,
-            NewAssertion,
-            NewVote,
-            QuorumReached,
-            SettledBounty,
-            RevealedAssertion,
-            Deprecated
-        ]
-        for cls in bounty_filters:
-            self.fmanager.register(cls, self.chain.bounty_registry.contract.eventFilter(cls.filter_id))
-
-        self.fmanager.register(LatestEvent, self.chain.w3.eth.filter('latest'))
-
-        if self.chain.offer_registry.contract:
-            self.fmanager.register(InitializedChannel, self.chain.offer_registry.contract.eventFilter('InitializedChannel'))
 
     def register(self, ws):
         """
@@ -112,7 +140,7 @@ class EthereumRpc:
                 # Clear the filters of old data.
                 # Possible when last WebSocket closes & a new one opens before the 1 poll sleep ends
                 logger.debug('Clearing out of date filter events.')
-                self.event_filters.flush()
+                self.fmanager.flush()
 
             self.websockets.append(ws)
 
@@ -129,4 +157,5 @@ class EthereumRpc:
         with self.websockets_lock:
             if ws in self.websockets:
                 logger.debug('Removing WebSocket %s', ws)
+                self.websockets.remove(ws)
                 self.websockets.remove(ws)

@@ -1,41 +1,21 @@
 import json
 import time
 
-import jsonschema
-from flask_sockets import Sockets
-from geventwebsocket import WebSocketError
-from jsonschema.exceptions import ValidationError
 from requests.exceptions import ConnectionError
 
 import gevent
+import jsonschema
+from flask_sockets import Sockets
 from gevent.queue import Empty, Queue
+from geventwebsocket import WebSocketError
+from jsonschema.exceptions import ValidationError
 from polyswarmd.chains import chain
-from polyswarmd.filter_manager import (ClosedAgreement, FilterManager,
-                                       SettleStateChanged, StartedSettle)
-from polyswarmd.utils import (channel_to_dict, g, logging, state_to_dict, uuid)
+from polyswarmd.utils import channel_to_dict, g, logging, state_to_dict, uuid
+from polyswarmd.websockets.messages import (ClosedAgreement, Connected,
+                                            FilterManager, SettleStateChanged,
+                                            StartedSettle)
 
 logger = logging.getLogger(__name__)
-
-
-class WebsocketMessage(object):
-    "Represent a message that can be handled by polyswarm-client"
-    # This is the identifier used when building a websocket event identifier.
-    _ws_event = 'websocket'
-    __slots__ = ('data')
-
-    @property
-    def event(self):
-        return self._ws_event
-
-    def __init__(self, data={}):
-        self.data = data
-
-    def as_dict(self):
-        "`as_dict' should return an object representing the websocket message that the client will consume"
-        return {'event': self.event, 'data': self.data}
-
-    def __str__(self):
-        return json.dumps(self.as_dict())
 
 
 class WebSocket:
@@ -64,10 +44,6 @@ class WebSocket:
     def __eq__(self, other):
         return isinstance(other, WebSocket) and \
                other.guid == self.guid
-
-
-class Connected(WebsocketMessage):
-    _ws_event = 'connected'
 
 
 def init_websockets(app):
@@ -113,9 +89,9 @@ def init_websockets(app):
 
         while not ws.closed:
             try:
-                if not fmanager.has_registered():
+                if not fmanager.is_active():
                     for evt in [ClosedAgreement, StartedSettle, SettleStateChanged]:
-                        fmanager.register(offer_msig.eventFilter(evt.filter_id), evt)
+                        fmanager.register(offer_msig.eventFilter(evt.event_name), evt)
 
                 for event in fmanager.new_ws_events():
                     ws.send(event)
