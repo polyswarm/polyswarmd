@@ -64,10 +64,12 @@ def json_schema_extractor(schema: JSONSchema, source: Any) -> Dict[str, Any]:
             value = source[pschema['$#from']]
         elif '$#fetch' in pschema:
             value = pschema['$#fetch'](source, key, pschema)
+        elif key in source:
+            value = source[key]
         else:
-            value = source[pschema[key]]
+            AttributeError('Invalid JSONSchema extraction directive: ', key, schema)
 
-        yield {key: format_type(value, pschema)}
+        yield { key: format_type(value, pschema) }
 
 
 def format_type(value: Any, schema: JSONSchema) -> Any:
@@ -78,17 +80,23 @@ def format_type(value: Any, schema: JSONSchema) -> Any:
 
     formatters = {'uuid': as_uuid}
 
-    if 'format' in schema:
-        if schema['format'] in formatters:
-            result = formatters[schema['format']](result)
+    if schema.get('format') in formatters:
+        result = formatters[schema['format']](result)
 
     def decide_array():
         return [format_type(v, {'type': schema['items']}) for v in value]
 
-    conversions = {'string': str, 'integer': int, 'number': float, 'array': decide_array, 'bool': bool}
-    if 'type' in schema:
-        if schema['type'] in conversions:
-            result = conversions[schema['type']](result)
+    conversions = {
+        'string': str,
+        'integer': int,
+        'number': float,
+        'array': decide_array,
+        'bool': bool,
+        'object': dict,
+    }
+
+    if schema.get('type') in conversions:
+        result = conversions[schema['type']](result)
 
     return result
 

@@ -150,7 +150,7 @@ class EthereumRpc:
                 ws.send(message)
 
     # noinspection PyBroadException
-    async def poll(self):
+    def poll(self):
         """
         Continually poll all Ethereum filters as long as there are WebSockets listening
         """
