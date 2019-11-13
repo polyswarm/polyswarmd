@@ -335,6 +335,9 @@ def events_from_transaction(txhash, chain):
         while True:
             tx = g.chain.w3.eth.getTransaction(txhash)
             if tx is not None and tx.blockNumber:
+                # fix suggested by https://github.com/ethereum/web3.js/issues/2917#issuecomment-507154487
+                while g.chain.w3.eth.blockNumber - tx.blockNumber < 0:
+                    gevent.sleep(1)
                 receipt = g.chain.w3.eth.getTransactionReceipt(txhash)
                 break
             gevent.sleep(1)
