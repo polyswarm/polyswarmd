@@ -9,7 +9,8 @@ session = FuturesSession(executor=ThreadPoolExecutor(), adapter_kwargs={'max_ret
 
 
 def patch_all():
-    patch_gevent()
+    if not os.getenv('DISABLE_WEBSOCKETS', False):
+        patch_gevent()
     patch_web3()
 
 
