@@ -333,8 +333,9 @@ def events_from_transaction(txhash, chain):
 
     try:
         while True:
-            receipt = g.chain.w3.eth.getTransactionReceipt(txhash)
-            if receipt is not None:
+            tx = g.chain.w3.eth.getTransaction(txhash)
+            if tx is not None and tx.blockNumber:
+                receipt = g.chain.w3.eth.getTransactionReceipt(txhash)
                 break
             gevent.sleep(1)
 
