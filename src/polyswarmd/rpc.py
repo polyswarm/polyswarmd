@@ -188,7 +188,13 @@ class EthereumRpc:
             self.filter_manager.register(bounty_contract.eventFilter(NewBounty.filter_event()), NewBounty, 0)
 
             filter_events = [
-                FeesUpdated, WindowsUpdated, NewAssertion, NewVote, QuorumReached, SettledBounty, RevealedAssertion,
+                FeesUpdated,
+                WindowsUpdated,
+                NewAssertion,
+                NewVote,
+                QuorumReached,
+                SettledBounty,
+                RevealedAssertion,
                 Deprecated
             ]
 

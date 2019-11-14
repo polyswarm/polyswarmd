@@ -321,7 +321,16 @@ class LatestEvent(WebsocketFilterMessage):
     _chain = None
 
     def __init__(self, event):
-        self.data = json.dumps({'event': self.event_name, 'data': {'number': self._chain.blockNumber}})
+        self.data = json.dumps({
+            'event': self.event_name,
+            'data': {
+                'number': self.block_number
+            }
+        })
+
+    @property
+    def block_number(self):
+        return self._chain.blockNumber
 
     @classmethod
     def make(cls, chain):
