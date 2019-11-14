@@ -3,16 +3,13 @@ try:
 except ImportError:
     import json
 
-import uuid
 from functools import lru_cache
-from types import MappingProxyType
-from typing import Any, Dict, List
+from typing import List
 
 from polyswarmartifact import ArtifactType
+from polyswarm.json_schema import JSONSchema, copy_with_schema
 from polyswarmd import app
-from polyswarmd.artifacts.ipfs import IpfsServiceClient
 from polyswarmd.bounties import substitute_metadata
-from redis import redis
 from requests_futures.sessions import FuturesSession
 from web3.utils import Event
 
@@ -44,63 +41,6 @@ class Connected(WebsocketMessage):
     _ws_event = 'connected'
 
 
-JSONSchema = Any
-
-
-def json_schema_extractor(schema: JSONSchema, source: Any) -> Dict[str, Any]:
-    """Extract and format fields from a `source' object with jsonschema
-
-    It extends jsonschema with several special keys that control extraction from `source`:
-
-        $#fetch - Run a function with args=[source, key, property_schema]
-        $#from - Extract this key from `source'
-
-        If neither of these are present, it copies the value of source[key].
-
-    Any properties with a `type` parameter will be converted to that type.
-    """
-    for key, pschema in schema['properties'].items():
-        if '$#from' in pschema:
-            value = source[pschema['$#from']]
-        elif '$#fetch' in pschema:
-            value = pschema['$#fetch'](source, key, pschema)
-        elif key in source:
-            value = source[key]
-        else:
-            AttributeError('Invalid JSONSchema extraction directive: ', key, schema)
-
-        yield { key: format_type(value, pschema) }
-
-
-def format_type(value: Any, schema: JSONSchema) -> Any:
-    result = value
-
-    def as_uuid() -> uuid.UUID:
-        return uuid.UUID(int=value)
-
-    formatters = {'uuid': as_uuid}
-
-    if schema.get('format') in formatters:
-        result = formatters[schema['format']](result)
-
-    def decide_array():
-        return [format_type(v, {'type': schema['items']}) for v in value]
-
-    conversions = {
-        'string': str,
-        'integer': int,
-        'number': float,
-        'array': decide_array,
-        'bool': bool,
-        'object': dict,
-    }
-
-    if schema.get('type') in conversions:
-        result = conversions[schema['type']](result)
-
-    return result
-
-
 class WebsocketEventlogMessage(WebsocketMessage):
     """Websocket message interface for etherem event entries. """
 
@@ -108,10 +48,15 @@ class WebsocketEventlogMessage(WebsocketMessage):
     _ws_schema: JSONSchema
 
     def __init__(self, event: Event):
-        self.data = json_schema_extractor(self._ws_schema, MappingProxyType(event))
+        self.data = json.dump({
+            'event': self.event_name,
+            'data': copy_with_schema(self._ws_schema, event),
+            'block_number': event.blockNumber,
+            'txhash': event.transactionHash.hex()
+        })
 
-    def as_dict(self):
-        return {'event': self.event_name, 'data': self.data, 'block_number': self.block_number, 'txhash': self.txhash}
+    def str(self):
+        return self.data
 
     @property
     def filter_event(self) -> str:
@@ -122,38 +67,27 @@ class WebsocketEventlogMessage(WebsocketMessage):
     def event_name(self):
         return self._ws_event
 
-    @property
-    def block_number(self) -> int:
-        return self.event.blockNumber
-
-    @property
-    def txhash(self) -> str:
-        return self.event.transactionHash.hex()
-
     def __repr__(self):
-        return f'<WebsocketEventlogMessage name={self._ws_event}>'
+        return f'<WebsocketEventlogMessage name={self.event_name} filter_event={self.filter_event}>'
 
 
 session = FuturesSession(adapter_kwargs={'max_retries': 3})
-
+artifact_client = app.config['POLYSWARMD'].artifact_client
+redis_client = app.config['POLYSWARMD'].redis
 
 @lru_cache(15)
-def fetch_metadata(uri: str,
-                   validate=None,
-                   artifact_client: IpfsServiceClient = app.config['POLYSWARMD'].artifact_client,
-                   redis: redis = app.config['POLYSWARMD'].redis):
+def _fetch_metadata(uri: str, validate, artifact_client=artifact_client, redis=redis_client):
     return substitute_metadata(uri, artifact_client, session, validate, redis)
 
+def as_fetched_metadata(e: Event, k: str, *args):
+    return _fetch_metadata(e[k])
 
 def as_bv(e: Event, k: str, *args) -> List[bool]:
     "Return the bitvector for a number, where 1 is 'True' and 0 is 'False'"
     return [True if b == '1' else False for b in format(e[k], f"0>{e.numArtifacts}b")]
 
-
-guid = {
-    'type': 'string',
-    'format': 'uuid',
-}
+def as_artifact_type(e: Event, k: str, *args) -> str:
+    return ArtifactType.to_string(ArtifactType(e.artifactType))
 
 # bounty_guid = { '$ref': '#/defs/bounty_guid }
 bounty_guid = {'type': 'string', 'format': 'uuid', '$#from': 'bountyGuid'}
@@ -193,29 +127,35 @@ class NewBounty(WebsocketEventlogMessage):
     _ws_event = 'bounty'
     _ws_schema = {
         'properties': {
-            'guid': guid,
+            'guid': {
+                'type': 'string',
+                'format': 'uuid',
+            },
             'artifact_type': {
                 'type': 'string',
-                'enum': ['file', 'url'],
-                '$#fetch': lambda e, *_: ArtifactType.to_string(ArtifactType(e.artifactType))
+                'enum': [ArtifactType.to_string(t.value) for t in ArtifactType],
+                '$#convert': True,
+                '$#fetch': as_artifact_type
             },
             'author': {
                 'type': 'string',
+                'format': 'ethaddr'
             },
             'amount': {
-                'type': 'string'
+                'type': 'string',
+                '$#convert': True,
             },
             'uri': {
                 'type': 'string',
                 '$#from': 'artifactURI'
             },
             'expiration': {
-                'type': 'string',
-                '$#from': 'expirationBlock'
+                '$#from': 'expirationBlock',
+                '$#convert': True,
             },
             'metadata': {
-                'type': 'string',
-                '$#fetch': lambda e, k, *_: fetch_metadata(e[k])
+                'type': 'object',
+                '$#fetch': as_fetched_metadata
             }
         }
     }
@@ -227,14 +167,16 @@ class NewAssertion(WebsocketEventlogMessage):
         'properties': {
             'bounty_guid': bounty_guid,
             'author': {
-                'type': 'string'
+                'type': 'string',
+                'format': 'ethaddr'
             },
             'index': {
-                'type': 'string'
+                'type': 'integer'
             },
             'bid': {
                 'type': 'array',
                 'items': 'string',
+                '$#convert': True,
             },
             'mask': {
                 'type': 'array',
@@ -242,7 +184,8 @@ class NewAssertion(WebsocketEventlogMessage):
                 '$#fetch': as_bv
             },
             'commitment': {
-                'type': 'string'
+                'type': 'string',
+                '$#convert': True,
             },
         },
     }
@@ -254,13 +197,15 @@ class RevealedAssertion(WebsocketEventlogMessage):
         'properties': {
             'bounty_guid': bounty_guid,
             'author': {
-                'type': 'string'
+                'type': 'string',
+                'format': 'ethaddr'
             },
             'index': {
-                'type': 'string'
+                'type': 'integer'
             },
             'nonce': {
-                'type': 'string'
+                'type': 'string',
+                '$#convert': True,
             },
             'verdicts': {
                 'type': 'array',
@@ -269,7 +214,7 @@ class RevealedAssertion(WebsocketEventlogMessage):
             },
             'metadata': {
                 'type': 'object',
-                '$#fetch': lambda e, k, _: fetch_metadata(e['metadata'])
+                '$#fetch': as_fetched_metadata
             }
         }
     }
@@ -281,7 +226,8 @@ class NewVote(WebsocketEventlogMessage):
         'properties': {
             'bounty_guid': bounty_guid,
             'voter': {
-                'type': 'string'
+                'type': 'string',
+                'format': 'ethaddr'
             },
             'votes': {
                 '$#fetch': as_bv,
@@ -294,7 +240,19 @@ class NewVote(WebsocketEventlogMessage):
 
 class QuorumReached(WebsocketEventlogMessage):
     _ws_event = 'quorum'
-    _ws_schema = {'properties': {'bounty_guid': bounty_guid, 'to': {'type': 'string'}, 'from': {'type': 'string'}}}
+    _ws_schema = {
+        'properties': {
+            'bounty_guid': bounty_guid,
+            'to': {
+                'type': 'string',
+                'format': 'ethaddr'
+            },
+            'from': {
+                'type': 'string',
+                'format': 'ethaddr'
+            }
+        }
+    }
 
 
 class SettledBounty(WebsocketEventlogMessage):
@@ -303,10 +261,11 @@ class SettledBounty(WebsocketEventlogMessage):
         'properties': {
             'bounty_guid': bounty_guid,
             'settler': {
-                'type': 'string'
+                'type': 'integer',
+                'format': 'ethaddr'
             },
             'payout': {
-                'type': 'string'
+                'type': 'integer'
             }
         }
     }
@@ -315,24 +274,27 @@ class SettledBounty(WebsocketEventlogMessage):
 class Deprecated(WebsocketEventlogMessage):
     _ws_event = 'deprecated'
 
-    def __init__(self, *args):
-        self.data = {}
-
 
 class InitializedChannel(WebsocketEventlogMessage):
     _ws_event = 'initialized_channel'
     _ws_schema = {
         'properties': {
             'ambassador': {
-                'type': 'string'
+                'type': 'string',
+                'format': 'ethaddr'
             },
             'expert': {
-                'type': 'string'
+                'type': 'string',
+                'format': 'ethaddr'
             },
-            'guid': guid,
+            'guid': {
+                'type': 'string',
+                'format': 'uuid',
+            },
             'multi_signature': {
                 '$#from': 'msig',
-                'type': 'string'
+                'type': 'string',
+                'format': 'ethaddr',
             }
         }
     }
@@ -352,11 +314,13 @@ class ClosedAgreement(WebsocketEventlogMessage):
         'properties': {
             'ambassador': {
                 '$#from': '_ambassador',
-                'type': 'string'
+                'type': 'string',
+                'format': 'ethaddr',
             },
             'expert': {
                 '$#from': '_expert',
-                'type': 'string'
+                'type': 'string',
+                'format': 'ethaddr',
             }
         }
     }
@@ -367,15 +331,16 @@ class StartedSettle(WebsocketEventlogMessage):
     _ws_schema = {
         'properties': {
             'initiator': {
-                'type': 'string'
+                'type': 'string',
+                'format': 'ethaddr'
             },
             'nonce': {
                 '$#from': 'sequence',
-                'type': 'string'
+                'type': 'integer'
             },
             'settle_period_end': {
                 '$#from': 'settlementPeriodEnd',
-                'type': 'string'
+                'type': 'integer'
             }
         }
     }
@@ -386,15 +351,16 @@ class SettleStateChallenged(WebsocketEventlogMessage):
     _ws_schema = {
         'properties': {
             'challenger': {
-                'type': 'string'
+                'type': 'string',
+                'format': 'ethaddr'
             },
             'nonce': {
                 '$#from': 'sequence',
-                'type': 'string'
+                'type': 'integer'
             },
             'settle_period_end': {
                 '$#from': 'settlementPeriodEnd',
-                'type': 'string'
+                'type': 'integer'
             }
         }
     }
