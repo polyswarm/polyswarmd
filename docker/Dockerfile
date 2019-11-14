@@ -1,4 +1,4 @@
-FROM python:3.6-jessie
+FROM pypy:3.6-7.2-stretch
 LABEL maintainer="PolySwarm Developers <info@polyswarm.io>"
 
 WORKDIR /usr/src/app
@@ -11,10 +11,11 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt ./
 
 RUN set -x && pip install --no-cache-dir -r requirements.txt
-RUN set -x && pip install gunicorn
+RUN set -x && pip install ujson gunicorn==19.9.0
 
 COPY . .
 RUN set -x && pip install .
 
 # You can set log format and level in command line by e.g. `polyswarmd.wsgi:app(log_format='text', log_level='WARNING')`
-CMD ["gunicorn", "--bind", "0.0.0.0:31337", "-k", "flask_sockets.worker", "-t", "600", "-w", "4", "polyswarmd.wsgi:app()"]
+ENV GUNICORN_CMD_ARGS="--bind 0.0.0.0:31337 -k flask_sockets.worker -t 600 -w 4"
+CMD ["gunicorn", "polyswarmd.wsgi:app()"]

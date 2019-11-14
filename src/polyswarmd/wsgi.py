@@ -1,6 +1,6 @@
 import logging
-import os
 import sys
+import os
 
 from polyswarmd.logger import init_logging
 
