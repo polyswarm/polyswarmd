@@ -50,13 +50,17 @@ class WebsocketEventlogMessage(WebsocketMessage):
     def __init__(self, event: Event):
         self.data = json.dump({
             'event': self.event_name,
-            'data': copy_with_schema(self._ws_schema, event),
+            'data': self.extract(event),
             'block_number': event.blockNumber,
             'txhash': event.transactionHash.hex()
         })
 
     def str(self):
         return self.data
+
+    @classmethod
+    def extract(cls, source: Event):
+        return copy_with_schema(cls._ws_schema, source)
 
     @property
     def filter_event(self) -> str:
