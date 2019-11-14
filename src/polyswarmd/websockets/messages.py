@@ -9,7 +9,7 @@ from typing import List, Any
 from polyswarmartifact import ArtifactType
 # from polyswarmd.bounties import substitute_metadata
 # from polyswarmd.config import Config
-from polyswarmd.json_schema import JSONSchema, copy_with_schema
+from polyswarmd.websockets.json_schema import copy_with_schema
 # from requests_futures.sessions import FuturesSession
 
 # session = FuturesSession(adapter_kwargs={'max_retries': 3})
@@ -33,24 +33,19 @@ class WebsocketMessage():
     def __init__(self, data={}):
         if not self._ws_event:
             raise ValueError("This class has no websocket event name")
-        self.data = data
-
-    def as_dict(self):
-        "`as_dict' should return an object representing the websocket message that the client will consume"
-        return {'event': self.event, 'data': self.data}
+        self.data = json.dumps({'event': self.event, 'data': data})
 
     def __str__(self):
-        return json.dumps(self.as_dict())
+        return self.data
 
     def __bytes__(self):
-        return json.dumps(self.as_dict()).encode()
+        return self.data.encode('ascii')
 
 
 class WebsocketFilterMessage(WebsocketMessage):
     """Websocket message interface for etherem event entries. """
     _ws_event: str
     _ws_schema: str
-    pass
 
     def __init__(self, event: Event):
         self.data = json.dump({
@@ -77,13 +72,7 @@ class WebsocketFilterMessage(WebsocketMessage):
         return self._ws_event
 
     def __repr__(self):
-        return f'<WebsocketFilterMessage name={self.event_name} filter_event={self.filter_event}>'
-
-    def __str__(self):
-        return self.data
-
-    def __bytes__(self):
-        return self.data.encode()
+        return f'<WebsocketFilterMessage name={self.event_name} filter_event={self.filter_event()}>'
 
 # Methods for extracting information from an ethereum event log (suitable for websocket)
 # @lru_cache(15)
@@ -317,7 +306,6 @@ class InitializedChannel(WebsocketFilterMessage):
 
 class LatestEvent(WebsocketFilterMessage):
     _ws_event = 'block'
-    filter_event = 'latest'
     _chain = None
 
     def __init__(self, event):
@@ -327,6 +315,10 @@ class LatestEvent(WebsocketFilterMessage):
                 'number': self.block_number
             }
         })
+
+    @classmethod
+    def filter_event(cls):
+        return 'latest'
 
     @property
     def block_number(self):

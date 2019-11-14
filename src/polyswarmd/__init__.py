@@ -42,7 +42,7 @@ from polyswarmd.bounties import bounties
 from polyswarmd.relay import relay
 from polyswarmd.offers import offers
 from polyswarmd.staking import staking
-from polyswarmd.websockets import init_websockets
+from polyswarmd.event_message import init_websockets
 
 app.register_blueprint(misc, url_prefix='/')
 app.register_blueprint(artifacts, url_prefix='/artifacts')
