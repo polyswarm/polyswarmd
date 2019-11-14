@@ -37,11 +37,7 @@ class WebsocketMessage():
         return json.dumps(self.as_dict())
 
 
-class Connected(WebsocketMessage):
-    _ws_event = 'connected'
-
-
-class WebsocketEventlogMessage(WebsocketMessage):
+class WebsocketFilterMessage(WebsocketMessage):
     """Websocket message interface for etherem event entries. """
 
     _ws_event: str
@@ -72,7 +68,40 @@ class WebsocketEventlogMessage(WebsocketMessage):
         return self._ws_event
 
     def __repr__(self):
-        return f'<WebsocketEventlogMessage name={self.event_name} filter_event={self.filter_event}>'
+        return f'<WebsocketFilterMessage name={self.event_name} filter_event={self.filter_event}>'
+
+class Connected(WebsocketMessage):
+    _ws_event = 'connected'
+
+
+class FeesUpdated(WebsocketFilterMessage):
+    _ws_event = 'fee_update'
+    _ws_schema = {
+        'properties': {
+            'bounty_fee': {
+                'type': 'integer',
+            },
+            'assertion_fee': {
+                'type': 'integer',
+            }
+        },
+    }
+
+
+class WindowsUpdated(WebsocketFilterMessage):
+    _ws_event = 'window_update'
+    _ws_schema = {
+        'properties': {
+            'assertion_reveal_window': {
+                'type': 'integer',
+                '$#from': 'assertionRevealWindow'
+            },
+            'arbiter_vote_window': {
+                'type': 'integer',
+                '$#from': 'arbiterVoteWindow'
+            }
+        }
+    }
 
 
 session = FuturesSession(adapter_kwargs={'max_retries': 3})
@@ -97,37 +126,8 @@ def as_artifact_type(e: Event, k: str, *args) -> str:
 bounty_guid = {'type': 'string', 'format': 'uuid', '$#from': 'bountyGuid'}
 
 
-class FeesUpdated(WebsocketEventlogMessage):
-    _ws_event = 'fee_update'
-    _ws_schema = {
-        'properties': {
-            'bounty_fee': {
-                'type': 'integer',
-            },
-            'assertion_fee': {
-                'type': 'integer',
-            }
-        },
-    }
 
-
-class WindowsUpdated(WebsocketEventlogMessage):
-    _ws_event = 'window_update'
-    _ws_schema = {
-        'properties': {
-            'assertion_reveal_window': {
-                'type': 'integer',
-                '$#from': 'assertionRevealWindow'
-            },
-            'arbiter_vote_window': {
-                'type': 'integer',
-                '$#from': 'arbiterVoteWindow'
-            }
-        }
-    }
-
-
-class NewBounty(WebsocketEventlogMessage):
+class NewBounty(WebsocketFilterMessage):
     _ws_event = 'bounty'
     _ws_schema = {
         'properties': {
@@ -165,7 +165,7 @@ class NewBounty(WebsocketEventlogMessage):
     }
 
 
-class NewAssertion(WebsocketEventlogMessage):
+class NewAssertion(WebsocketFilterMessage):
     _ws_event = 'assertion'
     _ws_schema = {
         'properties': {
@@ -195,7 +195,7 @@ class NewAssertion(WebsocketEventlogMessage):
     }
 
 
-class RevealedAssertion(WebsocketEventlogMessage):
+class RevealedAssertion(WebsocketFilterMessage):
     _ws_event = 'reveal'
     _ws_schema = {
         'properties': {
@@ -224,7 +224,7 @@ class RevealedAssertion(WebsocketEventlogMessage):
     }
 
 
-class NewVote(WebsocketEventlogMessage):
+class NewVote(WebsocketFilterMessage):
     _ws_event = 'vote'
     _ws_schema = {
         'properties': {
@@ -242,7 +242,7 @@ class NewVote(WebsocketEventlogMessage):
     }
 
 
-class QuorumReached(WebsocketEventlogMessage):
+class QuorumReached(WebsocketFilterMessage):
     _ws_event = 'quorum'
     _ws_schema = {
         'properties': {
@@ -259,7 +259,7 @@ class QuorumReached(WebsocketEventlogMessage):
     }
 
 
-class SettledBounty(WebsocketEventlogMessage):
+class SettledBounty(WebsocketFilterMessage):
     _ws_event = 'settled_bounty'
     _ws_schema = {
         'properties': {
@@ -275,11 +275,11 @@ class SettledBounty(WebsocketEventlogMessage):
     }
 
 
-class Deprecated(WebsocketEventlogMessage):
+class Deprecated(WebsocketFilterMessage):
     _ws_event = 'deprecated'
 
 
-class InitializedChannel(WebsocketEventlogMessage):
+class InitializedChannel(WebsocketFilterMessage):
     _ws_event = 'initialized_channel'
     _ws_schema = {
         'properties': {
@@ -304,7 +304,7 @@ class InitializedChannel(WebsocketEventlogMessage):
     }
 
 
-class LatestEvent(WebsocketEventlogMessage):
+class LatestEvent(WebsocketFilterMessage):
     _ws_event = 'block'
     filter_event = 'latest'
 
@@ -312,7 +312,7 @@ class LatestEvent(WebsocketEventlogMessage):
         return {'event': self.name, 'data': {'number': self.block_number}}
 
 
-class ClosedAgreement(WebsocketEventlogMessage):
+class ClosedAgreement(WebsocketFilterMessage):
     _ws_event = 'closed_agreement'
     _ws_schema = {
         'properties': {
@@ -330,7 +330,7 @@ class ClosedAgreement(WebsocketEventlogMessage):
     }
 
 
-class StartedSettle(WebsocketEventlogMessage):
+class StartedSettle(WebsocketFilterMessage):
     _ws_event = 'settle_started'
     _ws_schema = {
         'properties': {
@@ -350,7 +350,7 @@ class StartedSettle(WebsocketEventlogMessage):
     }
 
 
-class SettleStateChallenged(WebsocketEventlogMessage):
+class SettleStateChallenged(WebsocketFilterMessage):
     _ws_event = 'settle_challenged'
     _ws_schema = {
         'properties': {

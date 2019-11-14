@@ -14,15 +14,14 @@ from polyswarmd.websockets.messages import (Deprecated, FeesUpdated,
                                             NewAssertion, NewBounty, NewVote,
                                             QuorumReached, RevealedAssertion,
                                             SettledBounty,
-                                            WebsocketEventlogMessage,
+                                            WebsocketFilterMessage,
                                             WindowsUpdated)
 from web3.utils import Filter
 
 logger = logging.getLogger(__name__)
 
 # The type of a formatter used in `FilterWrapper`
-FilterFormatter = Type[WebsocketEventlogMessage]
-
+FilterFormatter = Type[WebsocketFilterMessage]
 
 class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'wait'])):
     def __del__(self):
