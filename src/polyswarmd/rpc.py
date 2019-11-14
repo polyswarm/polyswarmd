@@ -16,7 +16,7 @@ from polyswarmd.websockets.messages import (Deprecated, FeesUpdated,
                                             SettledBounty,
                                             WebsocketFilterMessage,
                                             WindowsUpdated)
-from web3.utils import Filter
+from web3.utils.filters import LogFilter
 
 logger = logging.getLogger(__name__)
 
@@ -33,21 +33,22 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'wait'])):
             yield self.formatter(entry)
 
     def __hash__(self):
-        return hash(self.filter.filter_id)
+        return hash(self.filter)
 
 
-class FilterManager(object):
+class FilterManager():
     """Manages access to filtered Ethereum events."""
 
     wrappers: Collection[FilterWrapper]
     pool: Pool
-    MAX_WEIGHT: int = 10
+    MAX_WAIT: int
 
     def __init__(self):
-        self.wrappers = {}
+        self.MAX_WAIT = 10
+        self.wrappers = set()
         self.pool = Pool(None)
 
-    def register(self, flt: Filter, fmt_cls: FilterFormatter = lambda x: x, wait=1):
+    def register(self, flt: LogFilter, fmt_cls: FilterFormatter = lambda x: x, wait=1):
         "Add a new filter, with an optional associated WebsocketMessage-serializer class"
         wrapper = FilterWrapper(flt, fmt_cls, wait)
         self.wrappers.add(wrapper)
@@ -70,7 +71,7 @@ class FilterManager(object):
         for filt in self.filters:
             filt.get_new_entries()
 
-    def event_pool(self, callback: Callable[..., Any], immediate: Container[Filter] = {NewBounty}):
+    def event_pool(self, callback: Callable[..., Any], immediate: Container[LogFilter] = {NewBounty}):
         """Maintains a gevent Pool of filter event entry fetchers.
 
         The pool is filled by `fetch_filter', which automatically creates
@@ -108,7 +109,8 @@ class FilterManager(object):
 
         # Greenlet's can continue to exist beyond the lifespan of the object itself, this will prevent filters from
         # cleaning up after themselves.
-        for wrapper in [weakref.proxy(w) for w in self.wrappers]:
+        #for wrapper in [weakref.proxy(w) for w in self.wrappers]:
+        for wrapper in self.wrappers:
             self.pool.add(gevent.spawn(fetch_filter, wrapper, wrapper.wait))
 
         return self.pool
@@ -180,8 +182,10 @@ class EthereumRpc:
             # Setup filters
             self.filter_manager = FilterManager()
 
+            self.filter_manager.register(self.chain.w3.eth.filter('latest'), LatestEvent.make(self.chain.w3.eth))
+
             bounty_contract = self.chain.bounty_registry.contract
-            self.filter_manager.register(NewBounty, bounty_contract.eventFilter(NewBounty.filter_event), wait=None)
+            self.filter_manager.register(bounty_contract.eventFilter(NewBounty.filter_event()), NewBounty, 0)
 
             filter_events = [
                 FeesUpdated, WindowsUpdated, NewAssertion, NewVote, QuorumReached, SettledBounty, RevealedAssertion,
@@ -189,13 +193,13 @@ class EthereumRpc:
             ]
 
             for cls in filter_events:
-                self.filter_manager.register(cls, bounty_contract.eventFilter(cls.filter_event))
-
-            self.filter_manager.register(LatestEvent, self.chain.w3.eth.filter('latest'))
+                self.filter_manager.register(bounty_contract.eventFilter(cls.filter_event()), cls)
 
             offer_registry_contract = self.chain.offer_registry.contract
             if offer_registry_contract:
-                self.filter_manager.register(InitializedChannel, offer_registry_contract.eventFilter(cls.filter_event))
+                self.filter_manager.register(
+                    offer_registry_contract.eventFilter(InitializedChannel.filter_event()),
+                    InitializedChannel)
 
             logger.debug('First WebSocket registered, starting greenlet')
             gevent.spawn(self.poll)

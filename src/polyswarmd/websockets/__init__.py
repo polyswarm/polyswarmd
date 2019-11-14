@@ -1,8 +1,6 @@
 import json
 import time
 
-from requests.exceptions import ConnectionError
-
 import gevent
 import jsonschema
 from flask_sockets import Sockets
@@ -11,9 +9,9 @@ from geventwebsocket import WebSocketError
 from jsonschema.exceptions import ValidationError
 from polyswarmd.chains import chain
 from polyswarmd.utils import channel_to_dict, g, logging, state_to_dict, uuid
-from polyswarmd.websockets.messages import (ClosedAgreement, Connected,
-                                            FilterManager, SettleStateChanged,
-                                            StartedSettle)
+
+from .messages import (ClosedAgreement, Connected, SettleStateChallenged,
+                       StartedSettle)
 
 logger = logging.getLogger(__name__)
 
@@ -82,11 +80,12 @@ def init_websockets(app):
     @sockets.route('/events/<uuid:guid>')
     @chain(chain_name='home', account_required=False)
     def channel_events(ws, guid):
+        from polyswarmd.rpc import FilterManager
         offer_channel = channel_to_dict(g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
         msig_address = offer_channel['msig_address']
         offer_msig = g.chain.offer_multisig.bind(msig_address)
         fmanager = FilterManager()
-        for evt in [ClosedAgreement, StartedSettle, SettleStateChanged]:
+        for evt in [ClosedAgreement, StartedSettle, SettleStateChallenged]:
             fmanager.register(offer_msig.eventFilter(evt.filter_event), evt)
 
         def send(msg):

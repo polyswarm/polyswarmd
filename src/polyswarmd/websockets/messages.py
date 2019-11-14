@@ -3,16 +3,22 @@ try:
 except ImportError:
     import json
 
-from functools import lru_cache
-from typing import List
+# from functools import lru_cache
+from typing import List, Any
 
 from polyswarmartifact import ArtifactType
-from polyswarm.json_schema import JSONSchema, copy_with_schema
-from polyswarmd import app
-from polyswarmd.bounties import substitute_metadata
-from requests_futures.sessions import FuturesSession
-from web3.utils import Event
+# from polyswarmd.bounties import substitute_metadata
+# from polyswarmd.config import Config
+from polyswarmd.json_schema import JSONSchema, copy_with_schema
+# from requests_futures.sessions import FuturesSession
 
+# session = FuturesSession(adapter_kwargs={'max_retries': 3})
+
+# config = Config.auto()
+# artifact_client = config['POLYSWARMD'].artifact_client
+# redis_client = config['POLYSWARMD'].redis
+
+Event = Any
 
 class WebsocketMessage():
     "Represent a message that can be handled by polyswarm-client"
@@ -36,12 +42,15 @@ class WebsocketMessage():
     def __str__(self):
         return json.dumps(self.as_dict())
 
+    def __bytes__(self):
+        return json.dumps(self.as_dict()).encode()
+
 
 class WebsocketFilterMessage(WebsocketMessage):
     """Websocket message interface for etherem event entries. """
-
     _ws_event: str
-    _ws_schema: JSONSchema
+    _ws_schema: str
+    pass
 
     def __init__(self, event: Event):
         self.data = json.dump({
@@ -58,10 +67,10 @@ class WebsocketFilterMessage(WebsocketMessage):
     def extract(cls, source: Event):
         return copy_with_schema(cls._ws_schema, source)
 
-    @property
-    def filter_event(self) -> str:
+    @classmethod
+    def filter_event(cls) -> str:
         "The event name used by web3 (e.g 'Transfer' or 'FeesUpdated')"
-        return self.__class__.__name__
+        return str(cls.__name__)
 
     @property
     def event_name(self):
@@ -70,9 +79,35 @@ class WebsocketFilterMessage(WebsocketMessage):
     def __repr__(self):
         return f'<WebsocketFilterMessage name={self.event_name} filter_event={self.filter_event}>'
 
+    def __str__(self):
+        return self.data
+
+    def __bytes__(self):
+        return self.data.encode()
+
+# Methods for extracting information from an ethereum event log (suitable for websocket)
+# @lru_cache(15)
+# def _fetch_metadata(uri: str, validate, artifact_client=artifact_client, redis=redis_client):
+#     return substitute_metadata(uri, artifact_client, session, validate, redis)
+
+# def as_fetched_metadata(e: Event, k: str, *args):
+#     return _fetch_metadata(e[k])
+
+def as_fetched_metadata(e: Event, k: str, *args):
+    return e[k]
+
+def as_bv(e: Event, k: str, *args) -> List[bool]:
+    "Return the bitvector for a number, where 1 is 'True' and 0 is 'False'"
+    return [True if b == '1' else False for b in format(e[k], f"0>{e.numArtifacts}b")]
+
+def as_artifact_type(e: Event, k: str, *args) -> str:
+    return ArtifactType.to_string(ArtifactType(e.artifactType))
+
 class Connected(WebsocketMessage):
     _ws_event = 'connected'
 
+# Commonly used schema properties
+bounty_guid = {'type': 'string', 'format': 'uuid', '$#from': 'bountyGuid'}
 
 class FeesUpdated(WebsocketFilterMessage):
     _ws_event = 'fee_update'
@@ -103,30 +138,6 @@ class WindowsUpdated(WebsocketFilterMessage):
         }
     }
 
-
-session = FuturesSession(adapter_kwargs={'max_retries': 3})
-artifact_client = app.config['POLYSWARMD'].artifact_client
-redis_client = app.config['POLYSWARMD'].redis
-
-@lru_cache(15)
-def _fetch_metadata(uri: str, validate, artifact_client=artifact_client, redis=redis_client):
-    return substitute_metadata(uri, artifact_client, session, validate, redis)
-
-def as_fetched_metadata(e: Event, k: str, *args):
-    return _fetch_metadata(e[k])
-
-def as_bv(e: Event, k: str, *args) -> List[bool]:
-    "Return the bitvector for a number, where 1 is 'True' and 0 is 'False'"
-    return [True if b == '1' else False for b in format(e[k], f"0>{e.numArtifacts}b")]
-
-def as_artifact_type(e: Event, k: str, *args) -> str:
-    return ArtifactType.to_string(ArtifactType(e.artifactType))
-
-# bounty_guid = { '$ref': '#/defs/bounty_guid }
-bounty_guid = {'type': 'string', 'format': 'uuid', '$#from': 'bountyGuid'}
-
-
-
 class NewBounty(WebsocketFilterMessage):
     _ws_event = 'bounty'
     _ws_schema = {
@@ -137,7 +148,7 @@ class NewBounty(WebsocketFilterMessage):
             },
             'artifact_type': {
                 'type': 'string',
-                'enum': [ArtifactType.to_string(t.value) for t in ArtifactType],
+                'enum': [ArtifactType.to_string(t) for t in ArtifactType],
                 '$#convert': True,
                 '$#fetch': as_artifact_type
             },
@@ -307,9 +318,15 @@ class InitializedChannel(WebsocketFilterMessage):
 class LatestEvent(WebsocketFilterMessage):
     _ws_event = 'block'
     filter_event = 'latest'
+    _chain = None
 
-    def as_dict(self):
-        return {'event': self.name, 'data': {'number': self.block_number}}
+    def __init__(self, event):
+        self.data = json.dumps({'event': self.event_name, 'data': {'number': self._chain.blockNumber}})
+
+    @classmethod
+    def make(cls, chain):
+        cls._chain = chain
+        return cls
 
 
 class ClosedAgreement(WebsocketFilterMessage):
