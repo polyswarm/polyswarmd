@@ -17,7 +17,7 @@ def copy_with_schema(schema: JSONSchema, source: Any) -> Dict[str, Any]:
     If neither $#fetch or $#from are present, it attempts to fetch the value from `source`
     with the same name as the key.
 
-    >>> make_range = lambda src, key, schema: range(1,3)
+    >>> make_range = lambda src, key, schema: src['range']()
     >>> schema = { \
         'properties': { \
             'a': {'type': 'string'},  \
@@ -29,7 +29,7 @@ def copy_with_schema(schema: JSONSchema, source: Any) -> Dict[str, Any]:
                 'type': 'array', \
                 'items': 'integer', \
                 '$#convert': True }}}
-    >>> source = { 'a': "1", 'b_src': "2", 'c_src': 3, 'x': 4, 'xs': ["5","6"] }
+    >>> source = { 'a': "1", 'b_src': "2", 'c_src': 3, 'x': 4, 'xs': ["5","6"], 'range': lambda: range(1,3) }
     >>> copy_with_schema(schema, source)
     {'a': '1', 'b': '2', 'c': '3', 'x': 4, 'fetch': ['1', '2'], 'xs': [5, 6]}
     """
@@ -72,6 +72,7 @@ def _apply_conversion(value: Any, schema: JSONSchema) -> Any:
     dtype = schema.get('type')
     itype = schema.get('items')
     if dtype == 'array' and itype in _conversions:
+        # this should really be recursive, but we're not using nested item definitions yet.
         return [ _conversions[itype](v) for v in value ]
     if dtype in _conversions:
         return _conversions[schema['type']](value)
