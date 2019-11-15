@@ -5,6 +5,7 @@ from polyswarmd.websockets.filter import (FilterManager)
 
 logger = logging.getLogger(__name__)
 
+
 class EthereumRpc:
     """
     This class periodically polls several geth filters, and multicasts the results across any open WebSockets

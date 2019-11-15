@@ -1,8 +1,3 @@
-try:
-    import ujson as json
-except ImportError:
-    import json
-
 import logging
 import weakref
 from collections import namedtuple
@@ -14,10 +9,8 @@ import gevent
 import web3.eth
 from gevent.pool import Pool
 from web3.utils.filters import LogFilter
-from .messages import (Deprecated, FeesUpdated, InitializedChannel,
-                       LatestEvent, NewAssertion, NewBounty, NewVote,
-                       QuorumReached, RevealedAssertion, SettledBounty,
-                       WindowsUpdated, EventLogMessage)
+from .messages import (Deprecated, FeesUpdated, InitializedChannel, LatestEvent, NewAssertion, NewBounty, NewVote,
+                       QuorumReached, RevealedAssertion, SettledBounty, WindowsUpdated, EventLogMessage)
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +94,7 @@ class FilterManager():
         offer_registry = chain.offer_registry
         if offer_registry and offer_registry.contract:
             self.register(offer_registry.contract.eventFilter(InitializedChannel.contract_event_name()),
-                                         InitializedChannel)
+                          InitializedChannel)
 
     def event_pool(self, callback: Callable[..., Any], immediate: Container[LogFilter] = {NewBounty}):
         """Maintains a gevent Pool of filter event entry fetchers.
@@ -140,8 +133,7 @@ class FilterManager():
             if wait:
                 wait = min(self.MAX_WAIT, max(self.MIN_WAIT, wait))
                 logger.debug("%s wait: %f", wrapper.contract_event_name(), wait)
-            self.pool.start(gevent.spawn_later(wait + self.MIN_WAIT,
-                                               fetch_filter, wrapper, wait))
+            self.pool.start(gevent.spawn_later(wait + self.MIN_WAIT, fetch_filter, wrapper, wait))
 
         # Greenlet's can continue to exist beyond the lifespan of
         # the object itself. Failing to use a weakref here can prevent filters

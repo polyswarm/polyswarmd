@@ -51,6 +51,7 @@ def copy_with_schema(schema: JSONSchema, source: Any) -> Dict[str, Any]:
 
     return result
 
+
 _formatters = {'uuid': lambda x: uuid.UUID(int=x)}
 
 
@@ -73,11 +74,10 @@ def _apply_conversion(value: Any, schema: JSONSchema) -> Any:
     itype = schema.get('items')
     if dtype == 'array' and itype in _conversions:
         # this should really be recursive, but we're not using nested item definitions yet.
-        return [ _conversions[itype](v) for v in value ]
+        return [_conversions[itype](v) for v in value]
     if dtype in _conversions:
         return _conversions[schema['type']](value)
     return value
-
 
 
 if __name__ == "__main__":

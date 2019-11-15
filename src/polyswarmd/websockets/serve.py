@@ -4,6 +4,7 @@ from geventwebsocket import WebSocketServer, WebSocketApplication, Resource
 
 from .filter import (FilterManager)
 
+
 class EventServer(WebSocketApplication):
     def __init__(self, *args):
         super().__init__(*args)
