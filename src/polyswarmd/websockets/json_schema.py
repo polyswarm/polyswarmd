@@ -16,6 +16,22 @@ def copy_with_schema(schema: JSONSchema, source: Any) -> Dict[str, Any]:
 
     If neither $#fetch or $#from are present, it attempts to fetch the value from `source`
     with the same name as the key.
+
+    >>> make_range = lambda src, key, schema: range(1,3)
+    >>> schema = { \
+        'properties': { \
+            'a': {'type': 'string'},  \
+            'b': {'type': 'string', '$#from': 'b_src'}, \
+            'c': {'type': 'string', '$#from': 'c_src', '$#convert': True}, \
+            'x': {'type': 'integer'}, \
+            'fetch': { 'type': 'array', 'items': 'string', '$#convert': True, '$#fetch': make_range }, \
+            'xs': { \
+                'type': 'array', \
+                'items': 'integer', \
+                '$#convert': True }}}
+    >>> source = { 'a': "1", 'b_src': "2", 'c_src': 3, 'x': 4, 'xs': ["5","6"] }
+    >>> copy_with_schema(schema, source)
+    {'a': '1', 'b': '2', 'c': '3', 'x': 4, 'fetch': ['1', '2'], 'xs': [5, 6]}
     """
     result = {}
     for key, pschema in schema['properties'].items():
@@ -29,7 +45,7 @@ def copy_with_schema(schema: JSONSchema, source: Any) -> Dict[str, Any]:
             AttributeError('Invalid JSONSchema extraction directive: ', key, schema)
 
         if pschema.get('$#convert'):
-            result[key] = _apply_conversion(_apply_format(value))(value, pschema)
+            result[key] = _apply_conversion(_apply_format(value, pschema), pschema)
         else:
             result[key] = value
 
@@ -44,22 +60,25 @@ def _apply_format(value: Any, schema: JSONSchema) -> Any:
     return value
 
 
-def _convert_array(xs: Iterable[Any], schema: JSONSchema):
-    return [_apply_conversion(x, schema) for x in xs]
-
-
 _conversions = {
     'string': str,
     'integer': int,
-    'array': _convert_array,
     'number': float,
     'bool': bool,
 }
 
 
 def _apply_conversion(value: Any, schema: JSONSchema) -> Any:
-    if 'type' in schema and schema['type'] in _conversions:
+    dtype = schema.get('type')
+    itype = schema.get('items')
+    if dtype == 'array' and itype in _conversions:
+        return [ _conversions[itype](v) for v in value ]
+    if dtype in _conversions:
         return _conversions[schema['type']](value)
-    elif 'items' in schema and schema['items'] in _conversions:
-        return _conversions[schema['items']](value)
     return value
+
+
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
