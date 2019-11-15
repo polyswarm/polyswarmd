@@ -133,20 +133,16 @@ class WebsocketFilterMessage(WebsocketMessage, EventLogMessage):
 
 
 # Commonly used schema properties
+uint256 = {'type': 'integer'}
 guid = {'type': 'string', 'format': 'uuid'}
 bounty_guid = {**guid, '$#from': 'bountyGuid'}
 ethereum_address = {'type': 'string', 'format': 'ethaddr'}
+
+# The fetch routine uses format to split into a bitvector, e.g format(16, "0>10b") => '0000010000'
 boolvector = {
-    'type':
-    'array',
-    'items':
-    'boolean',
-    '$#fetch':
-    lambda e, k, *args: [
-        b != '0' for b in
-        # format(16, "0>10b") => '0000010000'
-        format(int(e[k]), f"0>{e.numArtifacts}b")
-    ]
+    'type': 'array',
+    'items': 'boolean',
+    '$#fetch': lambda e, k, *args: [b != '0' for b in format(int(e[k]), f"0>{e.numArtifacts}b")]
 }
 
 ## The functions below are commented out because they depend on configuration being loaded from PolyswarmD.
@@ -173,10 +169,10 @@ class FeesUpdated(WebsocketFilterMessage):
     _extraction_schema = {
         'properties': {
             'bounty_fee': {
-                'type': 'integer',
+                **uint256, '$#from': 'bountyFee'
             },
             'assertion_fee': {
-                'type': 'integer',
+                **uint256, '$#from': 'assertionFee'
             }
         },
     }
@@ -187,12 +183,10 @@ class WindowsUpdated(WebsocketFilterMessage):
     _extraction_schema = {
         'properties': {
             'assertion_reveal_window': {
-                'type': 'integer',
-                '$#from': 'assertionRevealWindow'
+                **uint256, '$#from': 'assertionRevealWindow'
             },
             'arbiter_vote_window': {
-                'type': 'integer',
-                '$#from': 'arbiterVoteWindow'
+                **uint256, '$#from': 'arbiterVoteWindow'
             }
         }
     }
@@ -211,8 +205,8 @@ class NewBounty(WebsocketFilterMessage):
             },
             'author': ethereum_address,
             'amount': {
-                'type': 'string',
                 '$#convert': True,
+                'type': 'string',
             },
             'uri': {
                 'type': 'string',
@@ -234,9 +228,7 @@ class NewAssertion(WebsocketFilterMessage):
         'properties': {
             'bounty_guid': bounty_guid,
             'author': ethereum_address,
-            'index': {
-                'type': 'integer'
-            },
+            'index': uint256,
             'bid': {
                 'type': 'array',
                 'items': 'string',
@@ -257,9 +249,7 @@ class RevealedAssertion(WebsocketFilterMessage):
         'properties': {
             'bounty_guid': bounty_guid,
             'author': ethereum_address,
-            'index': {
-                'type': 'integer'
-            },
+            'index': uint256,
             'nonce': {
                 'type': 'string',
                 '$#convert': True,
@@ -288,19 +278,7 @@ class QuorumReached(WebsocketFilterMessage):
 
 class SettledBounty(WebsocketFilterMessage):
     _ws_event = 'settled_bounty'
-    _extraction_schema = {
-        'properties': {
-            'bounty_guid': bounty_guid,
-            'settler': ethereum_address,
-            'payout': {
-                'type': 'integer'
-            }
-        }
-    }
-
-
-class Deprecated(WebsocketFilterMessage):
-    _ws_event = 'deprecated'
+    _extraction_schema = {'properties': {'bounty_guid': bounty_guid, 'settler': ethereum_address, 'payout': uint256}}
 
 
 class InitializedChannel(WebsocketFilterMessage):
@@ -316,30 +294,6 @@ class InitializedChannel(WebsocketFilterMessage):
             }
         }
     }
-
-
-class LatestEvent(WebsocketFilterMessage):
-    _ws_event = 'block'
-    _chain = None
-
-    def __init__(self, event):
-        self.data = json.dumps({'event': self.ws_event, 'data': {'number': self.block_number}})
-
-    @classmethod
-    def contract_event_name(cls):
-        return 'latest'
-
-    @property
-    def block_number(self):
-        if self._chain:
-            return self._chain.blockNumber
-        else:
-            return -1
-
-    @classmethod
-    def make(cls, chain):
-        cls._chain = chain
-        return cls
 
 
 class ClosedAgreement(WebsocketFilterMessage):
@@ -365,11 +319,11 @@ class StartedSettle(WebsocketFilterMessage):
             'initiator': ethereum_address,
             'nonce': {
                 '$#from': 'sequence',
-                'type': 'integer'
+                **uint256
             },
             'settle_period_end': {
                 '$#from': 'settlementPeriodEnd',
-                'type': 'integer'
+                **uint256
             }
         }
     }
@@ -382,11 +336,39 @@ class SettleStateChallenged(WebsocketFilterMessage):
             'challenger': ethereum_address,
             'nonce': {
                 '$#from': 'sequence',
-                'type': 'integer'
+                **uint256
             },
             'settle_period_end': {
                 '$#from': 'settlementPeriodEnd',
-                'type': 'integer'
+                **uint256
             }
         }
     }
+
+
+class Deprecated(WebsocketFilterMessage):
+    _ws_event = 'deprecated'
+
+
+class LatestEvent(WebsocketFilterMessage):
+    _ws_event = 'block'
+    _chain = None
+
+    def __init__(self, event):
+        self.data = json.dumps({'event': self.ws_event, 'data': {'number': self.block_number}})
+
+    @classmethod
+    def contract_event_name(cls):
+        return 'latest'
+
+    @property
+    def block_number(self):
+        if self._chain:
+            return self._chain.blockNumber
+        else:
+            return -1
+
+    @classmethod
+    def make(cls, chain):
+        cls._chain = chain
+        return cls
