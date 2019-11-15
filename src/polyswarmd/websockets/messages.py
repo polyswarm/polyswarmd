@@ -2,11 +2,11 @@ try:
     import ujson as json
 except ImportError:
     import json
+from abc import ABC
 from typing import Any
 
 from polyswarmartifact import ArtifactType
 
-from abc import ABC
 from .json_schema import copy_with_schema
 
 

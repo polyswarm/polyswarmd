@@ -16,16 +16,11 @@ logger = logging.getLogger(__name__)
 
 
 class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'wait'])):
-    def __del__(self):
-        web3.eth.uninstallFilter(self.filter.filter_id)
-        super().__del__(self)
+    "A utility class which wraps a contract filter with websocket-messaging features"
 
     def get_new_entries(self):
         for entry in self.filter.get_new_entries():
             yield self.formatter(entry)
-
-    def __hash__(self):
-        return hash(self.filter)
 
     @property
     def ws_event(self):
@@ -34,17 +29,22 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'wait'])):
     def contract_event_name(self):
         return self.formatter.contract_event_name() if self.formatter else 'Unknown'
 
+    def __del__(self):
+        web3.eth.uninstallFilter(self.filter.filter_id)
+        super().__del__(self)
+
+    def __hash__(self):
+        return hash(self.filter)
 
 class FilterManager():
     """Manages access to filtered Ethereum events."""
 
     wrappers: Collection[FilterWrapper]
     pool: Pool
-    MAX_WAIT: int
+    MIN_WAIT: float = 0.1
+    MAX_WAIT: float = 10.0
 
     def __init__(self):
-        self.MAX_WAIT = 10
-        self.MIN_WAIT = 0.1
         self.wrappers = set()
         self.pool = Pool(None)
 
@@ -55,16 +55,10 @@ class FilterManager():
         logger.debug('Registered new filter: %s', wrapper)
         self.pool.size = (len(self.wrappers) * 2) + 1
 
-    @property
-    def filters(self):
-        for filt in self.wrappers:
-            yield filt
-
     def __del__(self):
         "Destructor to be run when a filter manager is no longer needed"
         self.pool.kill()
-        self.pool = Pool(None)
-        self.wrappers = {}
+        super().__del__(self)
 
     def flush(self):
         logger.debug('Clearing out of date filter events.')
@@ -122,18 +116,18 @@ class FilterManager():
                         wait //= 2  # but drop quickly if our wait is high w/ new traffic
                     elif wait > 1:
                         wait -= 1  # otherwise steadily decrease
-                    elif handled > 1 and wait > 0:
+                    elif handled > 1 and wait > 0.1:
                         wait -= 0.1
             except ConnectionError:
                 if wait:
                     wait = (wait + 1) * 2
-                logger.exception('ConnectionError occurred, backing off...')
+                    logger.exception('ConnectionError occurred, backing off...')
 
             # Spawn the next version of this instance
             if wait:
                 wait = min(self.MAX_WAIT, max(self.MIN_WAIT, wait))
                 logger.debug("%s wait: %f", wrapper.contract_event_name(), wait)
-            self.pool.start(gevent.spawn_later(wait + self.MIN_WAIT, fetch_filter, wrapper, wait))
+            self.pool.start(gevent.spawn_later(max(wait, self.MIN_WAIT), fetch_filter, wrapper, wait))
 
         # Greenlet's can continue to exist beyond the lifespan of
         # the object itself. Failing to use a weakref here can prevent filters
