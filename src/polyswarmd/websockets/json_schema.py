@@ -66,6 +66,7 @@ _conversions = {
     'integer': int,
     'number': float,
     'bool': bool,
+    'boolean': bool,
 }
 
 
