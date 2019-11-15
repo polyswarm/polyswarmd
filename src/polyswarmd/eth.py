@@ -16,6 +16,9 @@ from jsonschema.exceptions import ValidationError
 from polyswarmd import cache
 from polyswarmd.chains import chain
 from polyswarmd.response import success, failure
+from polyswarmd.websockets.messages import (Transfer, NewBounty, NewAssertion, NewVote, RevealedAssertion,
+                                            NewWithdrawal, NewDeposit, OpenedAgreement, JoinedAgreement,
+                                            ClosedAgreement, StartedSettle, CanceledAgreement, SettleStateChallenged)
 
 from web3.module import Module
 
@@ -314,10 +317,6 @@ def is_withdrawal(tx):
 
 
 def events_from_transaction(txhash, chain):
-    from polyswarmd.utils import new_bounty_event_to_dict, new_assertion_event_to_dict, \
-        new_vote_event_to_dict, revealed_assertion_event_to_dict, \
-        transfer_event_to_dict, new_withdrawal_event_to_dict, new_deposit_event_to_dict
-
     config = app.config['POLYSWARMD']
     trace_transactions = config.trace_transactions
     if trace_transactions:
@@ -383,95 +382,36 @@ def events_from_transaction(txhash, chain):
                 ]
             }
 
+    # This code builds the return value from the list of (CONTRACT, [HANDLER, ...])
+    # a HANDLER is a tuple of (RESULT KEY, EXTRACTION CLASS). RESULT KEY is the key that will be used in the output dict,
+    # EXTRACTION CLASS is any class which inherits from `EventLogMessage'.
+    # NOTE EXTRACTION CLASS's name is used to id the contract event, which is then pass to it's own `extract` fn
+    # XXX The `extract' method is a conversion function also used to convert events for WebSocket consumption.
+    contracts = [
+        (g.chain.nectar_token.contract.events, [('transfers', Transfer)]),
+        (g.chain.bounty_registry.contract.events, [('bounties', NewBounty), ('assertions', NewAssertion),
+                                                   ('votes', NewVote), ('reveals', RevealedAssertion)]),
+        (g.chain.arbiter_staking.contract.events, [('withdrawals', NewWithdrawal), ('deposits', NewDeposit)])]
+
+    if g.chain.offer_registry and g.chain.offer_registry.contract:
+        contracts.append((g.chain.offer_registry.contract.events, [('offers_initialized', OpenedAgreement),
+                                                                   ('offers_opened', CanceledAgreement),
+                                                                   ('offers_canceled', JoinedAgreement),
+                                                                   ('offers_closed', ClosedAgreement),
+                                                                   ('offers_settled', StartedSettle),
+                                                                   ('offers_challenged', SettleStateChallenged)]))
     ret = {}
-
-    # Transfers
-    processed = g.chain.nectar_token.contract.events.Transfer().processReceipt(receipt)
-    if processed:
-        transfer = transfer_event_to_dict(processed[0]['args'])
-        ret['transfers'] = ret.get('transfers', []) + [transfer]
-
-    # Bounties
-    processed = g.chain.bounty_registry.contract.events.NewBounty().processReceipt(
-        receipt)
-    if processed:
-        bounty = new_bounty_event_to_dict(processed[0]['args'])
-
-        if config.artifact_client.check_uri(bounty['uri']):
-            ret['bounties'] = ret.get('bounties', []) + [bounty]
-
-    processed = g.chain.bounty_registry.contract.events.NewAssertion().processReceipt(
-        receipt)
-    if processed:
-        assertion = new_assertion_event_to_dict(processed[0]['args'])
-        ret['assertions'] = ret.get('assertions', []) + [assertion]
-
-    processed = g.chain.bounty_registry.contract.events.NewVote().processReceipt(
-        receipt)
-    if processed:
-        vote = new_vote_event_to_dict(processed[0]['args'])
-        ret['votes'] = ret.get('votes', []) + [vote]
-
-    processed = g.chain.bounty_registry.contract.events.RevealedAssertion().processReceipt(receipt)
-    if processed:
-        reveal = revealed_assertion_event_to_dict(processed[0]['args'])
-        ret['reveals'] = ret.get('reveals', []) + [reveal]
-
-    # Arbiter
-    processed = g.chain.arbiter_staking.contract.events.NewWithdrawal().processReceipt(
-        receipt)
-    if processed:
-        withdrawal = new_withdrawal_event_to_dict(processed[0]['args'])
-        ret['withdrawals'] = ret.get('withdrawals', []) + [withdrawal]
-
-    processed = g.chain.arbiter_staking.contract.events.NewDeposit().processReceipt(
-        receipt)
-    if processed:
-        deposit = new_deposit_event_to_dict(processed[0]['args'])
-        ret['deposits'] = ret.get('deposits', []) + [deposit]
-
-    # Offers
-    # TODO: no conversion functions for most of these, do we want those?
-    if g.chain.offer_registry.contract is None:
-        return ret
-
-    offer_msig = g.chain.offer_multisig.bind(ZERO_ADDRESS)
-    processed = g.chain.offer_registry.contract.events.InitializedChannel().processReceipt(receipt)
-    if processed:
-        initialized = dict(processed[0]['args'])
-        ret['offers_initialized'] = ret.get('offers_initialized', []) + [initialized]
-
-    processed = offer_msig.events.OpenedAgreement().processReceipt(receipt)
-    if processed:
-        opened = dict(processed[0]['args'])
-        ret['offers_opened'] = ret.get('offers_opened', []) + [opened]
-
-    processed = offer_msig.events.CanceledAgreement().processReceipt(receipt)
-    if processed:
-        canceled = dict(processed[0]['args'])
-        ret['offers_canceled'] = ret.get('offers_canceled', []) + [canceled]
-
-    processed = offer_msig.events.JoinedAgreement().processReceipt(receipt)
-    if processed:
-        joined = dict(processed[0]['args'])
-        ret['offers_joined'] = ret.get('offers_joined', []) + [joined]
-
-    processed = offer_msig.events.ClosedAgreement().processReceipt(receipt)
-    if processed:
-        closed = dict(processed[0]['args'])
-        ret['offers_closed'] = ret.get('offers_closed', []) + [closed]
-
-    processed = offer_msig.events.StartedSettle().processReceipt(receipt)
-    if processed:
-        settled = dict(processed[0]['args'])
-        ret['offers_settled'] = ret.get('offers_settled', []) + [settled]
-
-    processed = offer_msig.events.SettleStateChallenged().processReceipt(
-        receipt)
-    if processed:
-        challenged = dict(processed[0]['args'])
-        ret['offers_challenged'] = ret.get('offers_challenged',
-                                           []) + [challenged]
+    for contract, processors in contracts:
+        for key, extractor in processors:
+            filter_event = extractor.filter_event()
+            contract_event = contract[filter_event]()
+            if not contract_event:
+                logger.warning("No contract event for: %s", filter_event)
+                continue
+            # Now pull out the pertinent logs from the transaction receipt
+            event_log = contract_event.processLog(receipt)
+            if event_log:
+                ret[key] = extractor.extract(event_log['args'])
 
     return ret
 

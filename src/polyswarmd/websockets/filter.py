@@ -1,3 +1,9 @@
+try:
+    import ujson as json
+except ImportError:
+    import json
+
+import logging
 import weakref
 from collections import namedtuple
 from typing import Any, Callable, Collection, Container, Type
@@ -7,16 +13,12 @@ from requests.exceptions import ConnectionError
 import gevent
 import web3.eth
 from gevent.pool import Pool
-from polyswarmd.websockets.messages import (Deprecated, FeesUpdated,
-                                            InitializedChannel, LatestEvent,
-                                            NewAssertion, NewBounty, NewVote,
-                                            QuorumReached, RevealedAssertion,
-                                            SettledBounty,
-                                            WebsocketFilterMessage,
-                                            WindowsUpdated)
 from web3.utils.filters import LogFilter
+from .messages import (Deprecated, FeesUpdated, InitializedChannel,
+                       LatestEvent, NewAssertion, NewBounty, NewVote,
+                       QuorumReached, RevealedAssertion, SettledBounty,
+                       WindowsUpdated, EventLogMessage)
 
-import logging
 logger = logging.getLogger(__name__)
 
 
@@ -33,15 +35,12 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'wait'])):
         return hash(self.filter)
 
     @property
-    def event_name(self):
-        return self.formatter.event_name if self.formatter else 'N/A'
+    def ws_event(self):
+        return self.formatter.ws_event if self.formatter else 'N/A'
 
-    def filter_event(self):
-        return self.formatter.filter_event() if self.formatter else 'Unknown'
+    def contract_event_name(self):
+        return self.formatter.contract_event_name() if self.formatter else 'Unknown'
 
-
-# The type of a formatter used in `FilterWrapper`
-FilterFormatter = Type[WebsocketFilterMessage]
 
 class FilterManager():
     """Manages access to filtered Ethereum events."""
@@ -56,7 +55,7 @@ class FilterManager():
         self.wrappers = set()
         self.pool = Pool(None)
 
-    def register(self, flt: LogFilter, fmt_cls: FilterFormatter = lambda x: x, wait=1):
+    def register(self, flt: LogFilter, fmt_cls: Type[EventLogMessage] = lambda x: x, wait=1):
         "Add a new filter, with an optional associated WebsocketMessage-serializer class"
         wrapper = FilterWrapper(flt, fmt_cls, wait)
         self.wrappers.add(wrapper)
@@ -86,7 +85,7 @@ class FilterManager():
 
         bounty_contract = chain.bounty_registry.contract
         self.register(
-            bounty_contract.eventFilter(NewBounty.filter_event()),
+            bounty_contract.eventFilter(NewBounty.contract_event_name()),
             NewBounty,
             # NewBounty shouldn't wait or back-off from new bounties.
             wait=0)
@@ -97,11 +96,11 @@ class FilterManager():
         ]
 
         for cls in filter_events:
-            self.register(bounty_contract.eventFilter(cls.filter_event()), cls)
+            self.register(bounty_contract.eventFilter(cls.contract_event_name()), cls)
 
         offer_registry = chain.offer_registry
         if offer_registry and offer_registry.contract:
-            self.register(offer_registry.contract.eventFilter(InitializedChannel.filter_event()),
+            self.register(offer_registry.contract.eventFilter(InitializedChannel.contract_event_name()),
                                          InitializedChannel)
 
     def event_pool(self, callback: Callable[..., Any], immediate: Container[LogFilter] = {NewBounty}):
@@ -140,15 +139,15 @@ class FilterManager():
             # Spawn the next version of this instance
             if wait:
                 wait = min(self.MAX_WAIT, max(self.MIN_WAIT, wait))
-                logger.debug("%s wait: %f", wrapper.filter_event(), wait)
+                logger.debug("%s wait: %f", wrapper.contract_event_name(), wait)
             self.pool.start(gevent.spawn_later(wait + self.MIN_WAIT,
                                                fetch_filter, wrapper, wait))
 
         # Greenlet's can continue to exist beyond the lifespan of
-        # the object itself. Failing to use a weakref here can prevent filters from
-        # cleaning up after themselves.
+        # the object itself. Failing to use a weakref here can prevent filters
+        # destructors from running
         for wrapper in map(weakref.proxy, self.wrappers):
-            logger.debug("Spawning filter: %s", wrapper.filter_event())
+            logger.debug("Spawning filter: %s", wrapper.contract_event_name())
             self.pool.spawn(fetch_filter, wrapper, wrapper.wait)
 
         return self.pool

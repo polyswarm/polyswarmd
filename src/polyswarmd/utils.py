@@ -55,18 +55,6 @@ def bloom_to_dict(bloom):
         'bloom': bloom,
     }
 
-def new_bounty_event_to_dict(new_bounty_event):
-    return {
-        'guid': str(uuid.UUID(int=new_bounty_event.guid)),
-        'artifact_type': ArtifactType.to_string(ArtifactType(new_bounty_event.artifactType)),
-        'author': new_bounty_event.author,
-        'amount': str(new_bounty_event.amount),
-        'uri': new_bounty_event.artifactURI,
-        'expiration': str(new_bounty_event.expirationBlock),
-        'metadata': str(new_bounty_event.metadata),
-    }
-
-
 def assertion_to_dict(assertion, num_artifacts):
     return {
         'author': assertion[0],
@@ -78,28 +66,6 @@ def assertion_to_dict(assertion, num_artifacts):
     }
 
 
-def new_assertion_event_to_dict(new_assertion_event):
-    return {
-        'bounty_guid': str(uuid.UUID(int=new_assertion_event.bountyGuid)),
-        'author': new_assertion_event.author,
-        'index': new_assertion_event.index,
-        'bid': [str(bid) for bid in new_assertion_event.bid],
-        'mask': safe_int_to_bool_list(new_assertion_event.mask, new_assertion_event.numArtifacts),
-        'commitment': str(new_assertion_event.commitment),
-    }
-
-
-def revealed_assertion_event_to_dict(revealed_assertion_event):
-    return {
-        'bounty_guid': str(uuid.UUID(int=revealed_assertion_event.bountyGuid)),
-        'author': revealed_assertion_event.author,
-        'index': revealed_assertion_event.index,
-        'nonce': str(revealed_assertion_event.nonce),
-        'verdicts': safe_int_to_bool_list(revealed_assertion_event.verdicts, revealed_assertion_event.numArtifacts),
-        'metadata': revealed_assertion_event.metadata,
-    }
-
-
 def vote_to_dict(vote, num_artifacts):
     return {
         'voter': vote[0],
@@ -107,35 +73,6 @@ def vote_to_dict(vote, num_artifacts):
         'valid_bloom': vote[2],
     }
 
-
-def new_vote_event_to_dict(new_vote_event):
-    return {
-        'bounty_guid': str(uuid.UUID(int=new_vote_event.bountyGuid)),
-        'votes': safe_int_to_bool_list(new_vote_event.votes, new_vote_event.numArtifacts),
-        'voter': new_vote_event.voter,
-    }
-
-
-def transfer_event_to_dict(transfer_event):
-    return {
-        'from': transfer_event['from'],
-        'to': transfer_event['to'],
-        'value': str(transfer_event['value']),
-    }
-
-
-def new_deposit_event_to_dict(deposit_event):
-    return {
-        'from': deposit_event['from'],
-        'value': deposit_event['value'],
-    }
-
-
-def new_withdrawal_event_to_dict(withdrawal_event):
-    return {
-        'to': withdrawal_event['to'],
-        'value': withdrawal_event['value'],
-    }
 
 def channel_to_dict(channel_data):
     return {

@@ -7,18 +7,19 @@ except ImportError:
 from typing import List, Any
 
 from polyswarmartifact import ArtifactType
+
+from abc import ABC
+from .json_schema import copy_with_schema
+
 # from polyswarmd.bounties import substitute_metadata
-# from polyswarmd.config import Config
-from polyswarmd.websockets.json_schema import copy_with_schema
 # from requests_futures.sessions import FuturesSession
 
 # session = FuturesSession(adapter_kwargs={'max_retries': 3})
 
+# from polyswarmd.config import Config
 # config = Config.auto()
 # artifact_client = config['POLYSWARMD'].artifact_client
 # redis_client = config['POLYSWARMD'].redis
-
-Event = Any
 
 class WebsocketMessage():
     "Represent a message that can be handled by polyswarm-client"
@@ -26,14 +27,14 @@ class WebsocketMessage():
     _ws_event: str
     __slots__ = ('data')
 
-    @property
-    def event(self) -> str:
-        return self._ws_event
-
     def __init__(self, data={}):
         if not self._ws_event:
             raise ValueError("This class has no websocket event name")
-        self.data = json.dumps({'event': self.event, 'data': data})
+        self.data = json.dumps({'event': self.ws_event, 'data': data})
+
+    @property
+    def ws_event(self) -> str:
+        return self._ws_event
 
     def __str__(self):
         return self.data
@@ -42,65 +43,110 @@ class WebsocketMessage():
         return self.data.encode('ascii')
 
 
-class WebsocketFilterMessage(WebsocketMessage):
+class Connected(WebsocketMessage):
+    _ws_event = 'connected'
+
+
+
+EventLogEntry = Any
+
+class EventLogMessage(ABC):
+    _extraction_schema: str
+
+    @classmethod
+    def extract(cls, source: EventLogEntry):
+        "Extract the fields indicated in _extraction_schema from the event log message"
+        return copy_with_schema(cls._extraction_schema, source)
+
+    @classmethod
+    def contract_event_name(cls) -> str:
+        "The event name used by web3 (e.g 'Transfer' or 'FeesUpdated')"
+        return str(cls.__name__)
+
+    def __repr__(self):
+        return f'<EventLogMessage contract_event_name={self.contract_event_name()}>'
+
+
+class Transfer(EventLogMessage):
+    _extraction_schema = {
+        'properties': {
+            'to': {format: 'ethaddr', type: 'string '},
+            'from': {format: 'ethaddr', type: 'string '},
+            'value': {'type': 'string'}
+        }
+    }
+
+
+class NewWithdrawal(EventLogMessage):
+    _extraction_schema = {
+        'properties': {
+            'to': { format: 'ethaddr', type: 'string '},
+            'from': { format: 'ethaddr', type: 'string '},
+        }
+    }
+
+
+class NewDeposit(EventLogMessage):
+    _extraction_schema = {
+        'properties': {
+            'to': { format: 'ethaddr', type: 'string '},
+            'from': { format: 'ethaddr', type: 'string '},
+        }
+    }
+
+
+# The classes below have no defined extraction ('conversion') logic,
+# so they simply return the argument to `extract` as a `dict`
+extract_all = {
+    'extract': property(lambda self, event: dict(event))
+}
+
+OpenedAgreement = type('OpenedAgreement', (EventLogMessage, ), extract_all)
+CanceledAgreement = type('CanceledAgreement', (EventLogMessage, ), extract_all)
+JoinedAgreement = type('JoinedAgreement', (EventLogMessage, ), extract_all)
+ClosedAgreement = type('ClosedAgreement', (EventLogMessage, ), extract_all)
+StartedSettle = type('StartedSettle', (EventLogMessage, ), extract_all)
+
+
+class WebsocketFilterMessage(WebsocketMessage, EventLogMessage):
     """Websocket message interface for etherem event entries. """
     _ws_event: str
-    _ws_schema: str
+    _extraction_schema: dict
 
-    def __init__(self, event: Event):
+    def __init__(self, event: EventLogEntry):
         self.data = json.dump({
-            'event': self.event_name,
+            'event': self.ws_event,
             'data': self.extract(event),
             'block_number': event.blockNumber,
             'txhash': event.transactionHash.hex()
         })
 
-    def str(self):
-        return self.data
-
-    @classmethod
-    def extract(cls, source: Event):
-        return copy_with_schema(cls._ws_schema, source)
-
-    @classmethod
-    def filter_event(cls) -> str:
-        "The event name used by web3 (e.g 'Transfer' or 'FeesUpdated')"
-        return str(cls.__name__)
-
-    @property
-    def event_name(self):
-        return self._ws_event
-
     def __repr__(self):
-        return f'<WebsocketFilterMessage name={self.event_name} filter_event={self.filter_event()}>'
+        return f'<WebsocketFilterMessage name={self.ws_event} contract_event_name={self.contract_event_name()}>'
 
 # Methods for extracting information from an ethereum event log (suitable for websocket)
 # @lru_cache(15)
-# def _fetch_metadata(uri: str, validate, artifact_client=artifact_client, redis=redis_client):
+# def _fetch_metadata(uri: str, validate, artifact_client, redis):
+#     raise NotImplementedError("This function relies on config information in PolyswarmD")
 #     return substitute_metadata(uri, artifact_client, session, validate, redis)
 
-# def as_fetched_metadata(e: Event, k: str, *args):
-#     return _fetch_metadata(e[k])
-
-def as_fetched_metadata(e: Event, k: str, *args):
+def as_fetched_metadata(e: EventLogEntry, k: str, *args):
     return e[k]
+    # return _fetch_metadata(e[k])
 
-def as_bv(e: Event, k: str, *args) -> List[bool]:
+def as_bv(e: EventLogEntry, k: str, *args) -> List[bool]:
     "Return the bitvector for a number, where 1 is 'True' and 0 is 'False'"
     return [True if b == '1' else False for b in format(e[k], f"0>{e.numArtifacts}b")]
 
-def as_artifact_type(e: Event, k: str, *args) -> str:
+def as_artifact_type(e: EventLogEntry, k: str, *args) -> str:
     return ArtifactType.to_string(ArtifactType(e.artifactType))
-
-class Connected(WebsocketMessage):
-    _ws_event = 'connected'
 
 # Commonly used schema properties
 bounty_guid = {'type': 'string', 'format': 'uuid', '$#from': 'bountyGuid'}
 
 class FeesUpdated(WebsocketFilterMessage):
     _ws_event = 'fee_update'
-    _ws_schema = {
+    _extraction_schema = {
         'properties': {
             'bounty_fee': {
                 'type': 'integer',
@@ -114,7 +160,7 @@ class FeesUpdated(WebsocketFilterMessage):
 
 class WindowsUpdated(WebsocketFilterMessage):
     _ws_event = 'window_update'
-    _ws_schema = {
+    _extraction_schema = {
         'properties': {
             'assertion_reveal_window': {
                 'type': 'integer',
@@ -129,7 +175,7 @@ class WindowsUpdated(WebsocketFilterMessage):
 
 class NewBounty(WebsocketFilterMessage):
     _ws_event = 'bounty'
-    _ws_schema = {
+    _extraction_schema = {
         'properties': {
             'guid': {
                 'type': 'string',
@@ -167,7 +213,7 @@ class NewBounty(WebsocketFilterMessage):
 
 class NewAssertion(WebsocketFilterMessage):
     _ws_event = 'assertion'
-    _ws_schema = {
+    _extraction_schema = {
         'properties': {
             'bounty_guid': bounty_guid,
             'author': {
@@ -197,7 +243,7 @@ class NewAssertion(WebsocketFilterMessage):
 
 class RevealedAssertion(WebsocketFilterMessage):
     _ws_event = 'reveal'
-    _ws_schema = {
+    _extraction_schema = {
         'properties': {
             'bounty_guid': bounty_guid,
             'author': {
@@ -226,7 +272,7 @@ class RevealedAssertion(WebsocketFilterMessage):
 
 class NewVote(WebsocketFilterMessage):
     _ws_event = 'vote'
-    _ws_schema = {
+    _extraction_schema = {
         'properties': {
             'bounty_guid': bounty_guid,
             'voter': {
@@ -244,7 +290,7 @@ class NewVote(WebsocketFilterMessage):
 
 class QuorumReached(WebsocketFilterMessage):
     _ws_event = 'quorum'
-    _ws_schema = {
+    _extraction_schema = {
         'properties': {
             'bounty_guid': bounty_guid,
             'to': {
@@ -261,7 +307,7 @@ class QuorumReached(WebsocketFilterMessage):
 
 class SettledBounty(WebsocketFilterMessage):
     _ws_event = 'settled_bounty'
-    _ws_schema = {
+    _extraction_schema = {
         'properties': {
             'bounty_guid': bounty_guid,
             'settler': {
@@ -281,7 +327,7 @@ class Deprecated(WebsocketFilterMessage):
 
 class InitializedChannel(WebsocketFilterMessage):
     _ws_event = 'initialized_channel'
-    _ws_schema = {
+    _extraction_schema = {
         'properties': {
             'ambassador': {
                 'type': 'string',
@@ -310,19 +356,22 @@ class LatestEvent(WebsocketFilterMessage):
 
     def __init__(self, event):
         self.data = json.dumps({
-            'event': self.event_name,
+            'event': self.ws_event,
             'data': {
                 'number': self.block_number
             }
         })
 
     @classmethod
-    def filter_event(cls):
+    def contract_event_name(cls):
         return 'latest'
 
     @property
     def block_number(self):
-        return self._chain.blockNumber
+        if self._chain:
+            return self._chain.blockNumber
+        else:
+            return -1
 
     @classmethod
     def make(cls, chain):
@@ -332,7 +381,7 @@ class LatestEvent(WebsocketFilterMessage):
 
 class ClosedAgreement(WebsocketFilterMessage):
     _ws_event = 'closed_agreement'
-    _ws_schema = {
+    _extraction_schema = {
         'properties': {
             'ambassador': {
                 '$#from': '_ambassador',
@@ -350,7 +399,7 @@ class ClosedAgreement(WebsocketFilterMessage):
 
 class StartedSettle(WebsocketFilterMessage):
     _ws_event = 'settle_started'
-    _ws_schema = {
+    _extraction_schema = {
         'properties': {
             'initiator': {
                 'type': 'string',
@@ -370,7 +419,7 @@ class StartedSettle(WebsocketFilterMessage):
 
 class SettleStateChallenged(WebsocketFilterMessage):
     _ws_event = 'settle_challenged'
-    _ws_schema = {
+    _extraction_schema = {
         'properties': {
             'challenger': {
                 'type': 'string',
