@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'backoff'])):
     "A utility class which wraps a contract filter with websocket-messaging features"
     min_wait = 0.5
-    max_wait = 5.0
+    max_wait = 8.0
 
     @property
     def ws_event(self):
@@ -76,7 +76,7 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'backoff'])):
                 wait = (wait + 1) * 2
                 logger.exception('ConnectionError occurred')
             finally:
-                logger.debug("%s wait=%f", self.contract_event_name(), min(self.min_wait, wait))
+                logger.debug("%s wait=%f", self.contract_event_name(), wait)
 
     def __hash__(self):
         return hash(self.filter)
