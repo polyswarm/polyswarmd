@@ -30,21 +30,22 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'wait'])):
         self.formatter = formatter
         self.backoff = backoff
 
-    def get_new_entries(self):
-        return [self.formatter(entry) for entry in self.filter.get_new_entries()]
-
     @property
     def ws_event(self):
+        "Return the name of the websocket 'event name' that events will be formatted with"
         return self.formatter.ws_event if self.formatter else 'N/A'
 
     @property
     def filter_id(self):
+        "Return the associated contract event filter's numeric web3 id"
         return self.filter.filter_id
 
     def contract_event_name(self):
+        "Return the name of the associated contract event."
         return self.formatter.contract_event_name() if self.formatter else 'Unknown'
 
     def uninstall(self):
+        "Uninstall this filter. We will no longer recieve changes"
         logger.debug("%s destructor preparing to run", repr(self))
         if web3.eth.uninstallFilter(self.filter_id):
             logger.debug("Uninstalled filter<filter_id=%s>", self.filter_id)
@@ -55,7 +56,11 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'wait'])):
         self.uninstall()
         super().__del__(self)
 
+    def get_new_entries(self):
+        return [self.formatter(entry) for entry in self.filter.get_new_entries()]
+
     def spawn_poll_loop(self, callback):
+        "Spawn a greenlet which polls the filter's contract events, passing results to `callback'"
         shift = 0
         wait = 0
         logger.debug("Spawning fetch: %s", self.contract_event_name())
@@ -133,6 +138,7 @@ class FilterManager():
 
     @contextmanager
     def fetch(self):
+        "Return a queue of currently managed contract events"
         try:
             queue = Queue()
             # Greenlet's can continue to exist beyond the lifespan of
