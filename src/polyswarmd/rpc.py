@@ -2,6 +2,7 @@ import gevent
 from gevent.lock import BoundedSemaphore
 from polyswarmd.utils import logging
 from polyswarmd.websockets.filter import (FilterManager)
+from signal import SIGQUIT
 
 logger = logging.getLogger(__name__)
 
@@ -10,6 +11,8 @@ class EthereumRpc:
     """
     This class periodically polls several geth filters, and multicasts the results across any open WebSockets
     """
+    filter_manager = FilterManager()
+
     def __init__(self, chain):
         self.chain = chain
         self.websockets_lock = BoundedSemaphore(1)
@@ -32,10 +35,9 @@ class EthereumRpc:
         # Start the pool
         try:
             with self.filter_manager.fetch() as results:
-                for result in results:
-                    if len(self.websockets) == 0:
+                for messages in results:
+                    if self.websockets == None:
                         return
-                    messages = result.get()
                     for msg in messages:
                         self.broadcast(msg)
 
@@ -50,18 +52,15 @@ class EthereumRpc:
         Gets all events going forward
         :param ws: WebSocket wrapper to register
         """
-        # Cross greenlet list
         with self.websockets_lock:
             if self.websockets is None:
-                self.websockets = []
-            self.websockets.append(ws)
-
-        if len(self.websockets) == 1:
-            # Setup filters
-            logger.debug('First WebSocket registered, starting greenlet')
-            self.filter_manager = FilterManager()
-            self.filter_manager.setup_event_filters(self.chain)
-            gevent.spawn(self.poll)
+                self.websockets = [ws]
+                logger.debug('First WebSocket registered, starting greenlet')
+                self.filter_manager.setup_event_filters(self.chain)
+                greenlet = gevent.spawn(self.poll)
+                gevent.signal(SIGQUIT, greenlet.kill)
+            else:
+                self.websockets.append(ws)
 
     def unregister(self, ws):
         """
@@ -73,3 +72,6 @@ class EthereumRpc:
             if ws in self.websockets:
                 logger.debug('Removing WebSocket %s', ws)
                 self.websockets.remove(ws)
+                if len(self.websockets) == 0:
+                    self.websockets = None
+                    self.filter_manager.flush()

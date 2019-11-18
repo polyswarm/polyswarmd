@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'backoff'])):
     "A utility class which wraps a contract filter with websocket-messaging features"
-    min_wait = 0.5
-    max_wait = 8.0
+    MIN_WAIT = 0.5
+    MAX_WAIT = 8.0
 
     @property
     def ws_event(self):
@@ -39,7 +39,7 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'backoff'])):
 
     def uninstall(self):
         if self.filter.web3.eth.uninstallFilter(self.filter_id):
-            logger.debug("Uninstalled filter<filter_id=%s>", self.filter_id)
+            logger.debug("Uninstalled filter_id=%s", self.filter_id)
         else:
             logger.warn("Could not uninstall filter<filter_id=%s>")
 
@@ -47,36 +47,44 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'backoff'])):
         self.uninstall()
         super().__del__(self)
 
+    def compute_wait(self, ctr):
+        "Compute the amount of wait time from a counter of (sequential) empty replies"
+        if self.backoff:
+            # backoff 'exponentially'
+            exp = (1 << max(0, ctr - 2)) - 1
+            return gauss(min(self.MAX_WAIT, max(self.MIN_WAIT, exp)), 0.1)
+        else:
+            return gauss(self.MIN_WAIT, 0.1)
+
     def get_new_entries(self):
-        return [self.formatter(entry) for entry in self.filter.get_new_entries()]
+        return [self.formatter(e) for e in self.filter.get_new_entries()]
 
     def spawn_poll_loop(self, callback):
         "Spawn a greenlet which polls the filter's contract events, passing results to `callback'"
-        ctr = 0
-        wait = 0
+        ctr = 0  # number of loops since the last non-empty response
+        wait = 0  # The amount of time this loop will wait.
         logger.debug("Spawning fetch: %s", self.contract_event_name())
         while True:
+            ctr += 1
+            # XXX spawn_later prevents easily killing the pool. Use `wait` here.
+            gevent.sleep(wait)
+            # Spawn the next version of this instance
+            greenlet = gevent.spawn(self.get_new_entries)
             try:
-                # Spawn the next version of this instance
-                gevent.sleep(wait)
-                greenlet = gevent.spawn(self.get_new_entries)
-                greenlet.link_value(callback)
-                # NOTE there are pros and cons to leaving either gevent or wait logic inside the filter wrapper or the
-                # manager. If someone can make a stronger case than "purity", or at least one stronger than the
-                # associated additional work required to track waiting per-filter, I'm all ears -zv
-                if len(greenlet.get()) == 0 and self.backoff:
-                    ctr += 1
-                else:
-                    ctr = 0
+                result = greenlet.get(block=True, timeout=self.MAX_WAIT)
+            except (ConnectionError, gevent.Timeout):
+                logger.exception("Error thrown in get_new_entries")
+                wait = self.compute_wait(ctr + 2)
+                continue
 
-                # backoff 'exponentially'
-                exp = (1 << (ctr >> 2)) - 1
-                wait = gauss(min(self.max_wait, max(self.min_wait, exp)), 0.1)
-            except ConnectionError:
-                wait = (wait + 1) * 2
-                logger.exception('ConnectionError occurred')
-            finally:
-                logger.debug("%s wait=%f", self.contract_event_name(), wait)
+            # Reset the ctr if we recieved a non-empty response or we shouldn't backoff
+            if len(result) != 0:
+                callback(result)
+                ctr = 0
+
+            # We add gaussian randomness so that requests are queued all-at-once.
+            wait = self.compute_wait(ctr)
+            logger.debug("%s wait=%f", self.contract_event_name(), wait)
 
     def __hash__(self):
         return hash(self.filter)
@@ -99,14 +107,34 @@ class FilterManager():
         logger.debug('Registered new filter: %s', wrapper)
 
     def flush(self):
+        "End all event polling, uninstall all filters and remove their corresponding wrappers"
         self.pool.kill()
-        logger.debug('Flushing filters.')
+        logger.debug('Flushing %d filters', len(self.wrappers))
         for filt in self.wrappers:
             filt.uninstall()
         self.wrappers.clear()
 
+    @contextmanager
+    def fetch(self):
+        "Return a queue of currently managed contract events"
+        try:
+            queue = Queue()
+            # Greenlet's can continue to exist beyond the lifespan of
+            # the object itself. Failing to use a weakref here can prevent filters
+            # destructors from running
+            for wrapper in map(weakref.proxy, self.wrappers):
+                self.pool.spawn(wrapper.spawn_poll_loop, queue.put_nowait)
+
+            yield queue
+        finally:
+            self.flush()
+
     def setup_event_filters(self, chain):
         "Setup the most common event filters"
+        if len(self.wrappers) != 0:
+            logger.exception("Attempting to initialize already initialized filter manager")
+            return
+
         # Setup Latest
         self.register(chain.w3.eth.filter('latest'), messages.LatestEvent.make(chain.w3.eth))
 
@@ -129,18 +157,3 @@ class FilterManager():
         if offer_registry and offer_registry.contract:
             self.register(offer_registry.contract.eventFilter(messages.InitializedChannel.contract_event_name()),
                           messages.InitializedChannel)
-
-    @contextmanager
-    def fetch(self):
-        "Return a queue of currently managed contract events"
-        try:
-            queue = Queue()
-            # Greenlet's can continue to exist beyond the lifespan of
-            # the object itself. Failing to use a weakref here can prevent filters
-            # destructors from running
-            for wrapper in map(weakref.proxy, self.wrappers):
-                self.pool.spawn(wrapper.spawn_poll_loop, queue.put_nowait)
-
-            yield queue
-        finally:
-            self.flush()
