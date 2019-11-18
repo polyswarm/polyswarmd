@@ -56,82 +56,6 @@ class EventLogMessage(ABC):
         return f'<EventLogMessage contract_event_name={self.contract_event_name()}>'
 
 
-class Transfer(EventLogMessage):
-    _extraction_schema = {
-        'properties': {
-            'to': {
-                format: 'ethaddr',
-                type: 'string '
-            },
-            'from': {
-                format: 'ethaddr',
-                type: 'string '
-            },
-            'value': {
-                'type': 'string'
-            }
-        }
-    }
-
-
-class NewWithdrawal(EventLogMessage):
-    _extraction_schema = {
-        'properties': {
-            'to': {
-                format: 'ethaddr',
-                type: 'string '
-            },
-            'from': {
-                format: 'ethaddr',
-                type: 'string '
-            },
-        }
-    }
-
-
-class NewDeposit(EventLogMessage):
-    _extraction_schema = {
-        'properties': {
-            'to': {
-                format: 'ethaddr',
-                type: 'string '
-            },
-            'from': {
-                format: 'ethaddr',
-                type: 'string '
-            },
-        }
-    }
-
-
-# The classes below have no defined extraction ('conversion') logic,
-# so they simply return the argument to `extract` as a `dict`
-extract_all = {'extract': property(lambda self, event: dict(event))}
-
-OpenedAgreement = type('OpenedAgreement', (EventLogMessage, ), extract_all)
-CanceledAgreement = type('CanceledAgreement', (EventLogMessage, ), extract_all)
-JoinedAgreement = type('JoinedAgreement', (EventLogMessage, ), extract_all)
-ClosedAgreement = type('ClosedAgreement', (EventLogMessage, ), extract_all)
-StartedSettle = type('StartedSettle', (EventLogMessage, ), extract_all)
-
-
-class WebsocketFilterMessage(WebsocketMessage, EventLogMessage):
-    """Websocket message interface for etherem event entries. """
-    _ws_event: str
-    _extraction_schema: dict
-
-    def __init__(self, event: EventLogEntry):
-        self.data = json.dumps({
-            'event': self.ws_event,
-            'data': self.extract(event),
-            'block_number': event.blockNumber,
-            'txhash': event.transactionHash.hex()
-        })
-
-    def __repr__(self):
-        return f'<WebsocketFilterMessage name={self.ws_event} contract_event_name={self.contract_event_name()}>'
-
-
 # Commonly used schema properties
 uint256 = {'type': 'integer'}
 guid = {'type': 'string', 'format': 'uuid'}
@@ -162,6 +86,64 @@ boolvector = {
 # artifact_metadata = {'type': 'object', '$#fetch': lambda e, k, *args: _fetch_metadata(e[k]) }
 
 artifact_metadata = {'type': 'object', '$#fetch': lambda e, k, *args: e[k]}
+
+
+class Transfer(EventLogMessage):
+    _extraction_schema = {
+        'properties': {
+            'to': ethereum_address,
+            'from': ethereum_address,
+            'value': {
+                'type': 'string'
+            }
+        }
+    }
+
+
+class NewWithdrawal(EventLogMessage):
+    _extraction_schema = {
+        'properties': {
+            'to': ethereum_address,
+            'from': ethereum_address,
+        }
+    }
+
+
+class NewDeposit(EventLogMessage):
+    _extraction_schema = {
+        'properties': {
+            'to': ethereum_address,
+            'from': ethereum_address,
+        }
+    }
+
+
+# The classes below have no defined extraction ('conversion') logic,
+# so they simply return the argument to `extract` as a `dict`
+extract_all = {'extract': property(lambda self, event: dict(event))}
+
+OpenedAgreement = type('OpenedAgreement', (EventLogMessage, ), extract_all)
+CanceledAgreement = type('CanceledAgreement', (EventLogMessage, ), extract_all)
+JoinedAgreement = type('JoinedAgreement', (EventLogMessage, ), extract_all)
+ClosedAgreement = type('ClosedAgreement', (EventLogMessage, ), extract_all)
+StartedSettle = type('StartedSettle', (EventLogMessage, ), extract_all)
+
+
+class WebsocketFilterMessage(WebsocketMessage, EventLogMessage):
+    """Websocket message interface for etherem event entries. """
+    _ws_event: str
+    _extraction_schema: dict
+
+    def __init__(self, event: EventLogEntry):
+        self.data = json.dumps({
+            'event': self.ws_event,
+            'data': self.extract(event),
+            'block_number': event.blockNumber,
+            'txhash': event.transactionHash.hex()
+        })
+
+    def __repr__(self):
+        return f'<WebsocketFilterMessage name={self.ws_event} contract_event_name={self.contract_event_name()}>'
 
 
 class FeesUpdated(WebsocketFilterMessage):
