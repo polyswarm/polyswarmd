@@ -121,7 +121,7 @@ class WebsocketFilterMessage(WebsocketMessage, EventLogMessage):
     _extraction_schema: dict
 
     def __init__(self, event: EventLogEntry):
-        self.data = json.dump({
+        self.data = json.dumps({
             'event': self.ws_event,
             'data': self.extract(event),
             'block_number': event.blockNumber,

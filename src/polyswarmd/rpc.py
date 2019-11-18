@@ -12,7 +12,6 @@ class EthereumRpc:
     """
     def __init__(self, chain):
         self.chain = chain
-        self.block_filter = None
         self.websockets_lock = BoundedSemaphore(1)
         self.websockets = None
 
@@ -32,7 +31,12 @@ class EthereumRpc:
         """
         # Start the pool
         try:
-            self.filter_manager.event_pool(self.broadcast).join()
+            with self.filter_manager.fetch() as results:
+                for result in results:
+                    messages = result.get()
+                    for msg in messages:
+                        self.broadcast(msg)
+
         except Exception:
             logger.exception('Exception in filter checks, restarting greenlet')
             # Creates a new greenlet with all new filters and let's this one die.
@@ -44,20 +48,17 @@ class EthereumRpc:
         Gets all events going forward
         :param ws: WebSocket wrapper to register
         """
-        start = False
         # Cross greenlet list
         with self.websockets_lock:
             if self.websockets is None:
-                start = True
                 self.websockets = []
-
             self.websockets.append(ws)
 
-        if start:
+        if len(self.websockets) == 1:
             # Setup filters
+            logger.debug('First WebSocket registered, starting greenlet')
             self.filter_manager = FilterManager()
             self.filter_manager.setup_event_filters(self.chain)
-            logger.debug('First WebSocket registered, starting greenlet')
             gevent.spawn(self.poll)
 
     def unregister(self, ws):

@@ -1,64 +1,105 @@
 import logging
 import weakref
 from collections import namedtuple
+from contextlib import contextmanager
 from typing import Any, Callable, Collection, Container, Type
+from random import random
 
 from requests.exceptions import ConnectionError
 
 import gevent
 import web3.eth
-from gevent.pool import Pool
+from gevent.pool import Group
+from gevent.queue import Queue
 from web3.utils.filters import LogFilter
-from .messages import (Deprecated, FeesUpdated, InitializedChannel, LatestEvent, NewAssertion, NewBounty, NewVote,
-                       QuorumReached, RevealedAssertion, SettledBounty, WindowsUpdated, EventLogMessage)
+
+from .messages import (Deprecated, EventLogMessage, FeesUpdated, InitializedChannel, LatestEvent, NewAssertion,
+                       NewBounty, NewVote, QuorumReached, RevealedAssertion, SettledBounty, WindowsUpdated)
 
 logger = logging.getLogger(__name__)
 
 
 class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'wait'])):
     "A utility class which wraps a contract filter with websocket-messaging features"
+    min_wait = 0.2
+    max_wait = 10.0
+    __slots__ = ('filter', 'formatter', 'backoff')
+
+    def __init__(self, filter, formatter, backoff):
+        self.filter = filter
+        self.formatter = formatter
+        self.backoff = backoff
 
     def get_new_entries(self):
-        for entry in self.filter.get_new_entries():
-            yield self.formatter(entry)
+        return [self.formatter(entry) for entry in self.filter.get_new_entries()]
 
     @property
     def ws_event(self):
         return self.formatter.ws_event if self.formatter else 'N/A'
 
+    @property
+    def filter_id(self):
+        return self.filter.filter_id
+
     def contract_event_name(self):
         return self.formatter.contract_event_name() if self.formatter else 'Unknown'
 
+    def uninstall(self):
+        logger.debug("%s destructor preparing to run", repr(self))
+        if web3.eth.uninstallFilter(self.filter_id):
+            logger.debug("Uninstalled filter<filter_id=%s>", self.filter_id)
+        else:
+            logger.warn("Could not uninstall filter<filter_id=%s>")
+
     def __del__(self):
-        web3.eth.uninstallFilter(self.filter.filter_id)
+        self.uninstall()
         super().__del__(self)
+
+    def spawn_poll_loop(self, callback):
+        shift = 0
+        wait = 0
+        logger.debug("Spawning fetch: %s", self.contract_event_name())
+        while True:
+            try:
+                # Spawn the next version of this instance
+                greenlet = gevent.spawn_later(wait, self.get_new_entries)
+                greenlet.link_value(callback)
+                entries = greenlet.get()
+                # NOTE there are pros and cons to leaving either gevent or wait logic inside the filter wrapper or the
+                # manager. If someone can make a stronger case than "purity", or at least one stronger than the
+                # associated additional work required to track waiting per-filter, I'm all ears -zv
+                if len(entries) == 0 and self.backoff:
+                    shift += 1
+                else:
+                    shift = 0
+
+                # backoff 'exponentially'
+                wait = min(self.max_wait, max(self.min_wait, random() + (1 << (shift >> 2)) - 1))
+            except ConnectionError:
+                wait = (wait + 1) * 2
+                logger.exception('ConnectionError occurred')
+            finally:
+                logger.debug("%s wait=%f", self.contract_event_name(), min(self.min_wait, wait))
 
     def __hash__(self):
         return hash(self.filter)
+
 
 class FilterManager():
     """Manages access to filtered Ethereum events."""
 
     wrappers: Collection[FilterWrapper]
-    pool: Pool
-    MIN_WAIT: float = 0.1
-    MAX_WAIT: float = 10.0
+    pool: Group
 
     def __init__(self):
         self.wrappers = set()
-        self.pool = Pool(None)
+        self.pool = Group()
 
-    def register(self, flt: LogFilter, fmt_cls: Type[EventLogMessage] = lambda x: x, wait=1):
+    def register(self, flt: LogFilter, fmt_cls: Type[EventLogMessage] = lambda x: x, backoff=True):
         "Add a new filter, with an optional associated WebsocketMessage-serializer class"
-        wrapper = FilterWrapper(flt, fmt_cls, wait)
+        wrapper = FilterWrapper(flt, fmt_cls, backoff)
         self.wrappers.add(wrapper)
         logger.debug('Registered new filter: %s', wrapper)
-        self.pool.size = (len(self.wrappers) * 2) + 1
-
-    def __del__(self):
-        "Destructor to be run when a filter manager is no longer needed"
-        self.pool.kill()
-        super().__del__(self)
 
     def flush(self):
         logger.debug('Clearing out of date filter events.')
@@ -75,7 +116,7 @@ class FilterManager():
             bounty_contract.eventFilter(NewBounty.contract_event_name()),
             NewBounty,
             # NewBounty shouldn't wait or back-off from new bounties.
-            wait=0)
+            backoff=False)
 
         filter_events = [
             FeesUpdated, WindowsUpdated, NewAssertion, NewVote, QuorumReached, SettledBounty, RevealedAssertion,
@@ -90,50 +131,17 @@ class FilterManager():
             self.register(offer_registry.contract.eventFilter(InitializedChannel.contract_event_name()),
                           InitializedChannel)
 
-    def event_pool(self, callback: Callable[..., Any], immediate: Container[LogFilter] = {NewBounty}):
-        """Maintains a gevent Pool of filter event entry fetchers.
+    @contextmanager
+    def fetch(self):
+        try:
+            queue = Queue()
+            # Greenlet's can continue to exist beyond the lifespan of
+            # the object itself. Failing to use a weakref here can prevent filters
+            # destructors from running
+            for wrapper in map(weakref.proxy, self.wrappers):
+                self.pool.spawn(wrapper.spawn_poll_loop, queue.put_nowait)
 
-        The pool is filled by `fetch_filter', which automatically creates
-        another greenlet of itself. It may also alter how long it waits before
-        that greenlet is run based on if:
-
-            - No entries were returned by this filter (it doesn't need to be checked as frequently)
-            - A connection error occurred (maybe geth is down, try to back off and wait)
-        """
-        def fetch_filter(wrapper: FilterWrapper, wait: int):
-            try:
-                # XXX This is YAGNI here, but it might make sense to break out
-                # wait and result-handling logic into a function which is passed
-                # in by the caller to `event_pool'
-                handled = 0
-                for entry in wrapper.get_new_entries():
-                    callback(entry)
-                    handled += 1
-                if wait:
-                    if handled == 0:
-                        wait *= 2  # if there's no traffic, back off
-                    elif wait > self.MAX_WAIT // 2:
-                        wait //= 2  # but drop quickly if our wait is high w/ new traffic
-                    elif wait > 1:
-                        wait -= 1  # otherwise steadily decrease
-                    elif handled > 1 and wait > 0.1:
-                        wait -= 0.1
-            except ConnectionError:
-                if wait:
-                    wait = (wait + 1) * 2
-                    logger.exception('ConnectionError occurred, backing off...')
-
-            # Spawn the next version of this instance
-            if wait:
-                wait = min(self.MAX_WAIT, max(self.MIN_WAIT, wait))
-                logger.debug("%s wait: %f", wrapper.contract_event_name(), wait)
-            self.pool.start(gevent.spawn_later(max(wait, self.MIN_WAIT), fetch_filter, wrapper, wait))
-
-        # Greenlet's can continue to exist beyond the lifespan of
-        # the object itself. Failing to use a weakref here can prevent filters
-        # destructors from running
-        for wrapper in map(weakref.proxy, self.wrappers):
-            logger.debug("Spawning filter: %s", wrapper.contract_event_name())
-            self.pool.spawn(fetch_filter, wrapper, wrapper.wait)
-
-        return self.pool
+            yield queue
+        finally:
+            self.pool.kill()
+            self.wrappers.clear()
