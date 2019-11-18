@@ -47,7 +47,7 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'wait'])):
     def uninstall(self):
         "Uninstall this filter. We will no longer recieve changes"
         logger.debug("%s destructor preparing to run", repr(self))
-        if web3.eth.uninstallFilter(self.filter_id):
+        if self.filter.web3.eth.uninstallFilter(self.filter_id):
             logger.debug("Uninstalled filter<filter_id=%s>", self.filter_id)
         else:
             logger.warn("Could not uninstall filter<filter_id=%s>")
@@ -67,13 +67,13 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'wait'])):
         while True:
             try:
                 # Spawn the next version of this instance
-                greenlet = gevent.spawn_later(wait, self.get_new_entries)
+                gevent.sleep(wait)
+                greenlet = gevent.spawn(self.get_new_entries)
                 greenlet.link_value(callback)
-                entries = greenlet.get()
                 # NOTE there are pros and cons to leaving either gevent or wait logic inside the filter wrapper or the
                 # manager. If someone can make a stronger case than "purity", or at least one stronger than the
                 # associated additional work required to track waiting per-filter, I'm all ears -zv
-                if len(entries) == 0 and self.backoff:
+                if len(greenlet.get()) == 0 and self.backoff:
                     shift += 1
                 else:
                     shift = 0
@@ -150,4 +150,5 @@ class FilterManager():
             yield queue
         finally:
             self.pool.kill()
+            [ wr.uninstall() for wr in self.wrappers ]
             self.wrappers.clear()

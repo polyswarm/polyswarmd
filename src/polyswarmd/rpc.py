@@ -33,6 +33,8 @@ class EthereumRpc:
         try:
             with self.filter_manager.fetch() as results:
                 for result in results:
+                    if len(self.websockets) == 0:
+                        return
                     messages = result.get()
                     for msg in messages:
                         self.broadcast(msg)
