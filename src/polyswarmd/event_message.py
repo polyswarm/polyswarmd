@@ -9,11 +9,12 @@ from geventwebsocket import WebSocketError
 from jsonschema.exceptions import ValidationError
 from polyswarmd.chains import chain
 from polyswarmd.utils import channel_to_dict, g, logging, state_to_dict, uuid
-from polyswarmd.websockets.messages import (ClosedAgreement, Connected,
-                                            SettleStateChallenged,
-                                            StartedSettle)
 
-from polyswarmd.websockets.filter import (FilterManager)
+# normally, we `import polyswarmd.websockets.messages`, but due to the existing
+# `messages' method and the small number of imports, we import directly.
+from polyswarmd.websockets.messages import (ClosedAgreement, Connected, SettleStateChallenged, StartedSettle)
+
+from polyswarmd.websockets.filter import FilterManager
 logger = logging.getLogger(__name__)
 
 

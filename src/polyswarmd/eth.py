@@ -16,9 +16,7 @@ from jsonschema.exceptions import ValidationError
 from polyswarmd import cache
 from polyswarmd.chains import chain
 from polyswarmd.response import success, failure
-from polyswarmd.websockets.messages import (Transfer, NewBounty, NewAssertion, NewVote, RevealedAssertion,
-                                            NewWithdrawal, NewDeposit, OpenedAgreement, JoinedAgreement,
-                                            ClosedAgreement, StartedSettle, CanceledAgreement, SettleStateChallenged)
+import polyswarmd.websockets.messages
 
 from web3.module import Module
 
@@ -387,19 +385,21 @@ def events_from_transaction(txhash, chain):
     # EXTRACTION CLASS is any class which inherits from `EventLogMessage'.
     # NOTE EXTRACTION CLASS's name is used to id the contract event, which is then pass to it's own `extract` fn
     # XXX The `extract' method is a conversion function also used to convert events for WebSocket consumption.
-    contracts = [
-        (g.chain.nectar_token.contract.events, [('transfers', Transfer)]),
-        (g.chain.bounty_registry.contract.events, [('bounties', NewBounty), ('assertions', NewAssertion),
-                                                   ('votes', NewVote), ('reveals', RevealedAssertion)]),
-        (g.chain.arbiter_staking.contract.events, [('withdrawals', NewWithdrawal), ('deposits', NewDeposit)])]
+    contracts = [(g.chain.nectar_token.contract.events, [('transfers', messages.Transfer)]),
+                 (g.chain.bounty_registry.contract.events, [('bounties', messages.NewBounty),
+                                                            ('assertions', NewAssertion), ('votes', messages.NewVote),
+                                                            ('reveals', messages.RevealedAssertion)]),
+                 (g.chain.arbiter_staking.contract.events, [('withdrawals', messages.NewWithdrawal),
+                                                            ('deposits', messages.NewDeposit)])]
 
     if g.chain.offer_registry and g.chain.offer_registry.contract:
-        contracts.append((g.chain.offer_registry.contract.events, [('offers_initialized', OpenedAgreement),
-                                                                   ('offers_opened', CanceledAgreement),
-                                                                   ('offers_canceled', JoinedAgreement),
-                                                                   ('offers_closed', ClosedAgreement),
-                                                                   ('offers_settled', StartedSettle),
-                                                                   ('offers_challenged', SettleStateChallenged)]))
+        contracts.append(
+            (g.chain.offer_registry.contract.events, [('offers_initialized', messages.OpenedAgreement),
+                                                      ('offers_opened', messages.CanceledAgreement),
+                                                      ('offers_canceled', messages.JoinedAgreement),
+                                                      ('offers_closed', messages.ClosedAgreement),
+                                                      ('offers_settled', messages.StartedSettle),
+                                                      ('offers_challenged', messages.SettleStateChallenged)]))
     ret = {}
     for contract, processors in contracts:
         for key, extractor in processors:
