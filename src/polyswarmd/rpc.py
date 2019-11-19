@@ -1,4 +1,10 @@
 import gevent
+
+try:
+    import ujson as json
+except ImportError:
+    import json
+
 from gevent.lock import BoundedSemaphore
 from polyswarmd.utils import logging
 from polyswarmd.websockets.filter import FilterManager
@@ -23,9 +29,29 @@ class EthereumRpc:
         Send a message to all connected WebSockets
         :param message: dict to be converted to json and sent
         """
+        logger.debug('Sending: %s', message)
+        msg = json.dumps(message)
         with self.websockets_lock:
             for ws in self.websockets:
-                ws.send(message)
+                logger.debug('Sending WebSocket %s %s', ws, message)
+                ws.send(msg)
+
+    def flush_filters(self):
+        """
+        Clear filters of existing entires
+        """
+        self.block_filter.get_new_entries()
+        self.fee_filter.get_new_entries()
+        self.window_filter.get_new_entries()
+        self.bounty_filter.get_new_entries()
+        self.assertion_filter.get_new_entries()
+        self.vote_filter.get_new_entries()
+        self.quorum_filiter.get_new_entries()
+        self.settled_filter.get_new_entries()
+        self.reveal_filter.get_new_entries()
+        self.deprecated_filter.get_new_entries()
+        if self.init_filter:
+            self.init_filter.get_new_entries()
 
     # noinspection PyBroadException
     def poll(self):

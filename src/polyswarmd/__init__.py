@@ -1,3 +1,4 @@
+import os
 from concurrent.futures import ThreadPoolExecutor
 from requests_futures.sessions import FuturesSession
 from polyswarmd.monkey import patch_all
@@ -51,7 +52,9 @@ app.register_blueprint(relay, url_prefix='/relay')
 app.register_blueprint(offers, url_prefix='/offers')
 app.register_blueprint(staking, url_prefix='/staking')
 
-init_websockets(app)
+if not os.getenv('DISABLE_WEBSOCKETS', False):
+    init_websockets(app)
+
 setup_profiler(app)
 cache.init_app(app)
 
