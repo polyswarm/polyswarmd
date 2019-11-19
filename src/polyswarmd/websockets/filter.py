@@ -140,7 +140,7 @@ class FilterManager():
             return
 
         # Setup Latest
-        self.register(chain.w3.eth.filter('latest'), messages.LatestEvent.make(chain.w3.eth))
+        self.register(chain.w3.eth.filter('latest'), messages.LatestEvent.make(chain.w3.eth), backoff=False)
 
         bounty_contract = chain.bounty_registry.contract
         self.register(
