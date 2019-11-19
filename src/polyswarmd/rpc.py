@@ -62,7 +62,7 @@ class EthereumRpc:
         try:
             with self.filter_manager.fetch() as results:
                 for messages in results:
-                    if self.websockets == None:
+                    if self.websockets is None:
                         return
                     for msg in messages:
                         self.broadcast(msg)
