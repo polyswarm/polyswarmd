@@ -1,7 +1,17 @@
+version: "2"
+checks:
+  complex-logic:
+    enabled: false
+  method-complexity:
+    enabled: false
+  file-lines:
+    enabled: false
 engines:
   pep8:
     enabled: true
     checks:
+      E266: # Too many leading '#' in comment
+        enabled: false
       E402:  # module imports not at top of file
         enabled: false
       E501:  # line too long

@@ -25,8 +25,7 @@ cache = Cache(config={"CACHE_TYPE": "simple", "CACHE_DEFAULT_TIMEOUT": 30})
 app = Flask(__name__)
 app.config['POLYSWARMD'] = Config.auto()
 
-session = FuturesSession(executor=ThreadPoolExecutor(4),
-                         adapter_kwargs={'max_retries': 2})
+session = FuturesSession(executor=ThreadPoolExecutor(4), adapter_kwargs={'max_retries': 2})
 
 session.request = functools.partial(session.request, timeout=10)
 
@@ -34,18 +33,16 @@ app.config['REQUESTS_SESSION'] = session
 app.config['CHECK_BLOCK_LIMIT'] = True
 app.config['THREADPOOL'] = ThreadPoolExecutor()
 
-
 install_error_handlers(app)
 
 from polyswarmd.eth import misc
-from polyswarmd.utils import bool_list_to_int, int_to_bool_list
 from polyswarmd.artifacts.artifacts import artifacts
 from polyswarmd.balances import balances
 from polyswarmd.bounties import bounties
 from polyswarmd.relay import relay
 from polyswarmd.offers import offers
 from polyswarmd.staking import staking
-from polyswarmd.websockets import init_websockets
+from polyswarmd.event_message import init_websockets
 
 app.register_blueprint(misc, url_prefix='/')
 app.register_blueprint(artifacts, url_prefix='/artifacts')
@@ -82,7 +79,7 @@ def check_auth_response(api_response):
     try:
         return api_response.json()
     except ValueError:
-        logger.exception('Invalid response from API key management service, received: %s', r.content)
+        logger.exception('Invalid response from API key management service, received: %s', api_response.encode())
         return None
 
 
@@ -95,7 +92,6 @@ class User(object):
     @classmethod
     def from_api_key(cls, api_key):
         config = app.config['POLYSWARMD']
-        session = app.config['REQUESTS_SESSION']
 
         auth_uri = f'{config.auth_uri}/communities/{config.community}/auth'
 
@@ -116,8 +112,7 @@ class User(object):
 
         max_artifact_size = next(
             (f['base_uses'] for f in j.get('account', {}).get('features', []) if f['tag'] == 'max_artifact_size'),
-            config.fallback_max_artifact_size
-        )
+            config.fallback_max_artifact_size)
 
         return cls(authorized=True, user_id=user_id, max_artifact_size=max_artifact_size)
 

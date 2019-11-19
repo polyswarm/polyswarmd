@@ -1,7 +1,6 @@
 import click
 import logging
 import sys
-import redis
 
 from gevent import pywsgi
 from geventwebsocket.handler import WebSocketHandler

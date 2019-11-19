@@ -6,14 +6,20 @@ except ImportError:
 import jsonschema
 import time
 
+import gevent
+import jsonschema
 from flask_sockets import Sockets
-from gevent.queue import Queue, Empty
+from gevent.queue import Empty, Queue
 from geventwebsocket import WebSocketError
 from jsonschema.exceptions import ValidationError
-from requests.exceptions import ConnectionError
 from polyswarmd.chains import chain
-from polyswarmd.utils import *
+from polyswarmd.utils import channel_to_dict, g, logging, state_to_dict, uuid
 
+# normally, we `import polyswarmd.websockets.messages`, but due to the existing
+# `messages' method and the small number of imports, we import directly.
+from polyswarmd.websockets.messages import (ClosedAgreement, Connected, SettleStateChallenged, StartedSettle)
+
+from polyswarmd.websockets.filter import FilterManager
 logger = logging.getLogger(__name__)
 
 
@@ -54,13 +60,7 @@ def init_websockets(app):
     @chain(account_required=False)
     def events(ws):
         rpc = g.chain.rpc
-        ws.send(
-            json.dumps({
-                'event': 'connected',
-                'data': {
-                    'start_time': str(start_time),
-                }
-            }))
+        ws.send(Connected({'start_time': str(start_time)}))
 
         wrapper = WebSocket(ws)
 
@@ -90,56 +90,18 @@ def init_websockets(app):
         offer_channel = channel_to_dict(g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
         msig_address = offer_channel['msig_address']
         offer_msig = g.chain.offer_multisig.bind(msig_address)
+        filter_manager = FilterManager()
+        for evt in [ClosedAgreement, StartedSettle, SettleStateChallenged]:
+            filter_manager.register(offer_msig.eventFilter(evt.filter_event), evt)
 
-        filters_initialized = False
-        while not ws.closed:
-            try:
-                if not filters_initialized:
-                    closed_agreement_filter = offer_msig.eventFilter('ClosedAgreement')
-                    settle_started_filter = offer_msig.eventFilter('StartedSettle')
-                    settle_challenged_filter = offer_msig.eventFilter('SettleStateChallenged')
-
-                    filters_initialized = True
-
-                for event in closed_agreement_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'closed_agreement',
-                            'data': new_cancel_agreement_event_to_dict(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in settle_started_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'settle_started',
-                            'data': new_settle_started_event(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                for event in settle_challenged_filter.get_new_entries():
-                    ws.send(
-                        json.dumps({
-                            'event': 'settle_challenged',
-                            'data': new_settle_challenged_event(event.args),
-                            'block_number': event.blockNumber,
-                            'txhash': event.transactionHash.hex(),
-                        }))
-
-                gevent.sleep(1)
-            except WebSocketError:
-                logger.info('Websocket connection closed, exiting loop')
-                break
-            except ConnectionError:
-                logger.exception('ConnectionError in offer /events (is geth down?)')
-                filters_initialized = False
-                continue
-            except Exception:
-                logger.exception('Exception in /events, resetting filters')
-                filters_initialized = False
-                continue
+        with filter_manager.fetch() as results:
+            for messages in results:
+                if len(self.websockets) == 0:
+                    return
+                for msg in messages:
+                    if ws.closed:
+                        raise RuntimeError("WebSocket is closed")
+                    return ws.send(msg)
 
     # for receiving messages about offers that might need to be signed
     @sockets.route('/messages/<uuid:guid>')
@@ -198,11 +160,7 @@ def init_websockets(app):
 
                 state_dict = state_to_dict(body['state'])
                 state_dict['guid'] = guid.int
-                ret = {
-                    'type': body['type'],
-                    'raw_state': body['state'],
-                    'state': state_dict
-                }
+                ret = {'type': body['type'], 'raw_state': body['state'], 'state': state_dict}
 
                 if 'r' in body:
                     ret['r'] = body['r']
@@ -224,8 +182,7 @@ def init_websockets(app):
 
                 for message_websocket in message_sockets[guid]:
                     if not message_websocket.closed:
-                        message_websocket.send(
-                            json.dumps(ret))
+                        message_websocket.send(json.dumps(ret))
 
                 gevent.sleep(1)
             except WebSocketError:
