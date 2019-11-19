@@ -31,7 +31,7 @@ class EthereumRpc:
         """
         with self.websockets_lock:
             for ws in self.websockets:
-                ws.send(msg)
+                ws.send(message)
 
     # noinspection PyBroadException
     def poll(self):

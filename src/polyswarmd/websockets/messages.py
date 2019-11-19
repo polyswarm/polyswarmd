@@ -2,7 +2,6 @@ try:
     import ujson as json
 except ImportError:
     import json
-from abc import ABC
 from typing import Any
 
 from polyswarmartifact import ArtifactType
@@ -11,7 +10,7 @@ from polyswarmartifact.schema import Bounty as BountyMetadata
 from .json_schema import copy_with_schema
 
 
-class WebsocketMessage():
+class WebsocketMessage:
     "Represent a message that can be handled by polyswarm-client"
     # This is the identifier used when building a websocket event identifier.
     _ws_event: str
@@ -20,17 +19,14 @@ class WebsocketMessage():
     def __init__(self, data={}):
         if not self._ws_event:
             raise ValueError("This class has no websocket event name")
-        self.data = json.dumps({'event': self.ws_event, 'data': data})
+        self.data = json.dumps({'event': self.ws_event, 'data': data}).encode('ascii')
 
     @property
     def ws_event(self) -> str:
         return self._ws_event
 
-    def __str__(self):
-        return self.data
-
     def __bytes__(self):
-        return self.data.encode('ascii')
+        return self.data
 
 
 class Connected(WebsocketMessage):
@@ -40,7 +36,7 @@ class Connected(WebsocketMessage):
 EventLogEntry = Any
 
 
-class EventLogMessage(ABC):
+class EventLogMessage:
     _extraction_schema: str
 
     @classmethod
@@ -157,7 +153,7 @@ class WebsocketFilterMessage(WebsocketMessage, EventLogMessage):
             'data': self.extract(event['args']),
             'block_number': event.blockNumber,
             'txhash': event.transactionHash.hex()
-        })
+        }).encode('ascii')
 
     def __repr__(self):
         return f'<WebsocketFilterMessage name={self.ws_event} contract_event_name={self.contract_event_name()}>'
@@ -197,10 +193,11 @@ class NewBounty(WebsocketFilterMessage):
     def __init__(self, event: EventLogEntry):
         self.data = json.dumps({
             'event': self.ws_event,
+            # We do this here and not in `extract` because this is specifically needed for websocket messages
             'data': pull_metadata(self.extract(event['args']), validate=BountyMetadata.validate),
             'block_number': event.blockNumber,
             'txhash': event.transactionHash.hex()
-        })
+        }).encode('ascii')
 
     _extraction_schema = {
         'properties': {
@@ -260,10 +257,11 @@ class RevealedAssertion(WebsocketFilterMessage):
     def __init__(self, event: EventLogEntry):
         self.data = json.dumps({
             'event': self.ws_event,
+            # We do this here and not in `extract` because this is specifically needed for websocket messages
             'data': pull_metadata(self.extract(event['args']), validate=BountyMetadata.validate),
             'block_number': event.blockNumber,
             'txhash': event.transactionHash.hex()
-        })
+        }).encode('ascii')
 
     _extraction_schema = {
         'properties': {
@@ -371,7 +369,7 @@ class LatestEvent(WebsocketFilterMessage):
     _chain = None
 
     def __init__(self, event):
-        self.data = json.dumps({'event': self.ws_event, 'data': {'number': self.block_number}})
+        self.data = json.dumps({'event': self.ws_event, 'data': {'number': self.block_number}}).encode('ascii')
 
     @classmethod
     def contract_event_name(cls):

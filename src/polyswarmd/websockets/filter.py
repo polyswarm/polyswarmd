@@ -43,9 +43,6 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'backoff'])):
         else:
             logger.warn("Could not uninstall filter<filter_id=%s>")
 
-    def __del__(self):
-        self.uninstall()
-
     def compute_wait(self, ctr):
         "Compute the amount of wait time from a counter of (sequential) empty replies"
         result = 1
