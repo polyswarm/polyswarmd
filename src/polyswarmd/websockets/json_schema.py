@@ -35,14 +35,16 @@ def copy_with_schema(schema: JSONSchema, source: Any) -> Dict[str, Any]:
     """
     result = {}
     for key, pschema in schema['properties'].items():
+        value = None
         if '$#from' in pschema:
             value = source[pschema['$#from']]
         elif '$#fetch' in pschema:
             value = pschema['$#fetch'](source, key, pschema)
-        elif key in source:
-            value = source[key]
         else:
-            AttributeError('Invalid JSONSchema extraction directive: ', key, schema)
+            try:
+                value = source[key]
+            except (AttributeError, IndexError, KeyError) as e:
+                raise KeyError('Schema key not found in source ', key, source, schema)
 
         if pschema.get('$#convert'):
             result[key] = _apply_conversion(_apply_format(value, pschema), pschema)

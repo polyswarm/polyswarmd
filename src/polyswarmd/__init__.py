@@ -12,6 +12,7 @@ from flask import Flask, g, request
 from flask_caching import Cache
 
 from polyswarmd.config import Config, is_service_reachable, DEFAULT_FALLBACK_SIZE
+from polyswarmd.logger import init_logging
 from polyswarmd.profiler import setup_profiler
 from polyswarmd.response import success, failure, install_error_handlers
 
@@ -23,15 +24,13 @@ cache = Cache(config={"CACHE_TYPE": "simple", "CACHE_DEFAULT_TIMEOUT": 30})
 app = Flask(__name__)
 app.config['POLYSWARMD'] = Config.auto()
 
-session = FuturesSession(executor=ThreadPoolExecutor(4),
-                         adapter_kwargs={'max_retries': 2})
+session = FuturesSession(executor=ThreadPoolExecutor(4), adapter_kwargs={'max_retries': 2})
 
 session.request = functools.partial(session.request, timeout=10)
 
 app.config['REQUESTS_SESSION'] = session
 app.config['CHECK_BLOCK_LIMIT'] = True
 app.config['THREADPOOL'] = ThreadPoolExecutor()
-
 
 install_error_handlers(app)
 
@@ -110,8 +109,7 @@ class User(object):
 
         max_artifact_size = next(
             (f['base_uses'] for f in j.get('account', {}).get('features', []) if f['tag'] == 'max_artifact_size'),
-            config.fallback_max_artifact_size
-        )
+            config.fallback_max_artifact_size)
 
         return cls(authorized=True, user_id=user_id, max_artifact_size=max_artifact_size)
 

@@ -6,9 +6,7 @@ import rlp
 from collections import defaultdict
 from eth_abi import decode_abi
 from eth_abi.exceptions import InsufficientDataBytes
-from eth.vm.forks.constantinople.transactions import (
-    ConstantinopleTransaction
-)
+from eth.vm.forks.constantinople.transactions import (ConstantinopleTransaction)
 from flask import current_app as app, Blueprint, g, request
 from hexbytes import HexBytes
 from jsonschema.exceptions import ValidationError
@@ -16,7 +14,7 @@ from jsonschema.exceptions import ValidationError
 from polyswarmd import cache
 from polyswarmd.chains import chain
 from polyswarmd.response import success, failure
-import polyswarmd.websockets.messages
+import polyswarmd.websockets.messages as messages
 
 from web3.module import Module
 
@@ -39,11 +37,13 @@ class Debug(Module):
         if not txhash.startswith('0x'):
             txhash = '0x' + txhash
 
-        trace = self.web3.manager.request_blocking('debug_traceTransaction', [txhash, {
-            'disableStorage': True,
-            'disableMemory': True,
-            'disableStack': True,
-        }])
+        trace = self.web3.manager.request_blocking(
+            'debug_traceTransaction',
+            [txhash, {
+                'disableStorage': True,
+                'disableMemory': True,
+                'disableStack': True,
+            }])
 
         if not trace.get('failed'):
             logger.error('Transaction receipt indicates failure but trace succeeded')
@@ -143,10 +143,11 @@ def post_transactions():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
 
     # Does not include offer_multisig contracts, need to loosen validation for those
-    contract_addresses = {g.chain.w3.toChecksumAddress(c.address) for c in (
-        g.chain.nectar_token, g.chain.bounty_registry, g.chain.arbiter_staking, g.chain.erc20_relay,
-        g.chain.offer_registry
-    ) if c.address is not None}
+    contract_addresses = {
+        g.chain.w3.toChecksumAddress(c.address)
+        for c in (g.chain.nectar_token, g.chain.bounty_registry, g.chain.arbiter_staking, g.chain.erc20_relay,
+                  g.chain.offer_registry) if c.address is not None
+    }
 
     schema = {
         'type': 'object',
@@ -184,24 +185,20 @@ def post_transactions():
     except ValueError as e:
         logger.critical('Invalid transaction: %s', e)
         errors = True
-        results.append({
-            'is_error': True,
-            'message': f'Invalid transaction: {e}'
-        })
+        results.append({'is_error': True, 'message': f'Invalid transaction: {e}'})
     except Exception:
         logger.exception('Unexpected exception while parsing transaction')
         errors = True
-        results.append({
-            'is_error': True,
-            'message': 'Unexpected exception while parsing transaction'
-        })
+        results.append({'is_error': True, 'message': 'Unexpected exception while parsing transaction'})
 
     for raw_tx, tx in zip(body['transactions'], decoded_txs):
         if withdrawal_only and not is_withdrawal(tx):
             errors = True
             results.append({
-                'is_error': True,
-                'message': f'Invalid transaction for tx {tx.hash.hex()}: only withdrawals allowed without an API key'
+                'is_error':
+                True,
+                'message':
+                f'Invalid transaction for tx {tx.hash.hex()}: only withdrawals allowed without an API key'
             })
             continue
 
@@ -209,8 +206,10 @@ def post_transactions():
         if sender != account:
             errors = True
             results.append({
-                'is_error': True,
-                'message': f'Invalid transaction sender for tx {tx.hash.hex()}: expected {account} got {sender}'
+                'is_error':
+                True,
+                'message':
+                f'Invalid transaction sender for tx {tx.hash.hex()}: expected {account} got {sender}'
             })
             continue
 
@@ -227,15 +226,10 @@ def post_transactions():
         logger.info('Sending tx from %s to %s with nonce %s', sender, to, tx.nonce)
 
         try:
-            results.append({
-                'is_error': False,
-                'message': g.chain.w3.eth.sendRawTransaction(HexBytes(raw_tx)).hex()})
+            results.append({'is_error': False, 'message': g.chain.w3.eth.sendRawTransaction(HexBytes(raw_tx)).hex()})
         except ValueError as e:
             errors = True
-            results.append({
-                'is_error': True,
-                'message': f'Invalid transaction error for tx {tx.hash.hex()}: {e}'
-            })
+            results.append({'is_error': True, 'message': f'Invalid transaction error for tx {tx.hash.hex()}: {e}'})
     if errors:
         return failure(results, 400)
 
@@ -301,12 +295,9 @@ def is_withdrawal(tx):
         return False
 
     target = g.chain.w3.toChecksumAddress(target)
-    if (tx.data.startswith(HexBytes(TRANSFER_SIGNATURE_HASH))
-            and g.chain.nectar_token.address == to
-            and tx.value == 0
+    if (tx.data.startswith(HexBytes(TRANSFER_SIGNATURE_HASH)) and g.chain.nectar_token.address == to and tx.value == 0
             and tx.network_id == app.config["POLYSWARMD"].chains['side'].chain_id
-            and target == g.chain.erc20_relay.address
-            and amount > 0):
+            and target == g.chain.erc20_relay.address and amount > 0):
         logger.info('Transaction is a withdrawal by %s for %d NCT', sender, amount)
         return True
 
@@ -343,25 +334,16 @@ def events_from_transaction(txhash, chain):
         if t is not timeout:
             raise
         logging.error('Transaction %s: timeout waiting for receipt', bytes(txhash).hex())
-        return {
-            'errors':
-                [f'transaction {bytes(txhash).hex()}: timeout during wait for receipt']
-        }
+        return {'errors': [f'transaction {bytes(txhash).hex()}: timeout during wait for receipt']}
     except Exception:
         logger.exception('Transaction %s: error while fetching transaction receipt', bytes(txhash).hex())
-        return {
-            'errors':
-                [f'transaction {bytes(txhash).hex()}: unexpected error while fetching transaction receipt']
-        }
+        return {'errors': [f'transaction {bytes(txhash).hex()}: unexpected error while fetching transaction receipt']}
     finally:
         timeout.cancel()
 
     txhash = bytes(txhash).hex()
     if not receipt:
-        return {
-            'errors':
-                [f'transaction {txhash}: receipt not available']
-        }
+        return {'errors': [f'transaction {txhash}: receipt not available']}
     if receipt.gasUsed == MAX_GAS_LIMIT:
         return {'errors': [f'transaction {txhash}: out of gas']}
     if receipt.status != 1:
@@ -369,15 +351,12 @@ def events_from_transaction(txhash, chain):
             error = g.chain.w3.debug.getTransactionError(txhash)
             logger.error('Transaction %s failed with error message: %s', txhash, error)
             return {
-                'errors': [
-                    f'transaction {txhash}: transaction failed at block {receipt.blockNumber}, error: {error}'
-                ]
+                'errors': [f'transaction {txhash}: transaction failed at block {receipt.blockNumber}, error: {error}']
             }
         else:
             return {
-                'errors': [
-                    f'transaction {txhash}: transaction failed at block {receipt.blockNumber}, check parameters'
-                ]
+                'errors':
+                [f'transaction {txhash}: transaction failed at block {receipt.blockNumber}, check parameters']
             }
 
     # This code builds the return value from the list of (CONTRACT, [HANDLER, ...])
@@ -387,31 +366,35 @@ def events_from_transaction(txhash, chain):
     # XXX The `extract' method is a conversion function also used to convert events for WebSocket consumption.
     contracts = [(g.chain.nectar_token.contract.events, [('transfers', messages.Transfer)]),
                  (g.chain.bounty_registry.contract.events, [('bounties', messages.NewBounty),
-                                                            ('assertions', NewAssertion), ('votes', messages.NewVote),
+                                                            ('assertions', messages.NewAssertion),
+                                                            ('votes', messages.NewVote),
                                                             ('reveals', messages.RevealedAssertion)]),
                  (g.chain.arbiter_staking.contract.events, [('withdrawals', messages.NewWithdrawal),
                                                             ('deposits', messages.NewDeposit)])]
 
-    if g.chain.offer_registry and g.chain.offer_registry.contract:
+    if g.chain.offer_registry.contract:
+        offer_msig = g.chain.offer_multisig.bind(ZERO_ADDRESS)
         contracts.append(
-            (g.chain.offer_registry.contract.events, [('offers_initialized', messages.OpenedAgreement),
-                                                      ('offers_opened', messages.CanceledAgreement),
-                                                      ('offers_canceled', messages.JoinedAgreement),
-                                                      ('offers_closed', messages.ClosedAgreement),
-                                                      ('offers_settled', messages.StartedSettle),
-                                                      ('offers_challenged', messages.SettleStateChallenged)]))
+            (g.chain.offer_registry.contract.events, [('offers_initialized', messages.InitializedChannel)]))
+        contracts.append((offer_msig.events, [('offers_opened', messages.OpenedAgreement),
+                                              ('offers_canceled', messages.CanceledAgreement),
+                                              ('offers_joined', messages.JoinedAgreement),
+                                              ('offers_closed', messages.ClosedAgreement),
+                                              ('offers_settled', messages.StartedSettle),
+                                              ('offers_challenged', messages.SettleStateChallenged)]))
     ret = {}
     for contract, processors in contracts:
         for key, extractor in processors:
-            filter_event = extractor.filter_event()
-            contract_event = contract[filter_event]()
+            filter_event = extractor.contract_event_name()
+            contract_event = contract[filter_event]
             if not contract_event:
                 logger.warning("No contract event for: %s", filter_event)
                 continue
             # Now pull out the pertinent logs from the transaction receipt
-            event_log = contract_event.processLog(receipt)
+            event_log = contract_event().processReceipt(receipt)
             if event_log:
-                ret[key] = extractor.extract(event_log['args'])
+                # XXX I don't understand why ret.get is here, but I'm keeping it until I can understand why -zv
+                ret[key] = ret.get(key, []) + [extractor.extract(event_log[0]['args'])]
 
     return ret
 
@@ -434,6 +417,7 @@ def bounty_amount_min(bounty_registry):
 @cache.memoize(1)
 def assertion_bid_min(bounty_registry):
     return bounty_registry.functions.ASSERTION_BID_ARTIFACT_MINIMUM().call()
+
 
 @cache.memoize(1)
 def assertion_bid_max(bounty_registry):

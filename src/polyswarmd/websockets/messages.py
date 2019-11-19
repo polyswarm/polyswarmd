@@ -94,8 +94,18 @@ class Transfer(EventLogMessage):
             'to': ethereum_address,
             'from': ethereum_address,
             'value': {
-                'type': 'string'
+                'type': 'string',
+                '$#convert': True
             }
+        }
+    }
+
+
+class NewDeposit(EventLogMessage):
+    _extraction_schema = {
+        'properties': {
+            'value': uint256,
+            'from': ethereum_address,
         }
     }
 
@@ -104,16 +114,7 @@ class NewWithdrawal(EventLogMessage):
     _extraction_schema = {
         'properties': {
             'to': ethereum_address,
-            'from': ethereum_address,
-        }
-    }
-
-
-class NewDeposit(EventLogMessage):
-    _extraction_schema = {
-        'properties': {
-            'to': ethereum_address,
-            'from': ethereum_address,
+            'value': uint256,
         }
     }
 

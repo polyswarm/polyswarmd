@@ -45,7 +45,6 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'backoff'])):
 
     def __del__(self):
         self.uninstall()
-        super().__del__(self)
 
     def compute_wait(self, ctr):
         "Compute the amount of wait time from a counter of (sequential) empty replies"
@@ -72,6 +71,11 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'backoff'])):
             greenlet = gevent.spawn(self.get_new_entries)
             try:
                 result = greenlet.get(block=True, timeout=self.MAX_WAIT)
+            # KeyError generally arises when the JSONSchema describing a message is fed an invalid value.
+            except KeyError as e:
+                logger.exception(e)
+                continue
+            # ConnectionError generally occurs when we cannot fetch events
             except (ConnectionError, gevent.Timeout):
                 logger.exception("Error thrown in get_new_entries")
                 wait = self.compute_wait(ctr + 2)
