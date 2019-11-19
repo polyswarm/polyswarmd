@@ -71,8 +71,6 @@ boolvector = {
 }
 
 # The functions below are commented out because they depend on configuration being loaded from PolyswarmD.
-from functools import lru_cache
-
 from requests_futures.sessions import FuturesSession
 
 session = FuturesSession(adapter_kwargs={'max_retries': 3})
@@ -80,6 +78,8 @@ session = FuturesSession(adapter_kwargs={'max_retries': 3})
 config = None
 artifact_client = None
 redis = None
+
+from functools import lru_cache
 
 
 # XXX this is about as hacky as it gets. We should extract configuration loading out.
@@ -99,7 +99,8 @@ def fetch_metadata(uri: str, validate):
 
 
 def pull_metadata(data, validate=None):
-    data['metadata'] = fetch_metadata(data.get('metadata'), validate)
+    if 'metadata' in data:
+        data['metadata'] = fetch_metadata(data['metadata'], validate)
     return data
 
 
