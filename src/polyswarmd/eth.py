@@ -14,7 +14,7 @@ from jsonschema.exceptions import ValidationError
 from polyswarmd import cache
 from polyswarmd.chains import chain
 from polyswarmd.response import success, failure
-import polyswarmd.websockets.messages as messages
+from polyswarmd.websockets import messages
 
 from web3.module import Module
 
