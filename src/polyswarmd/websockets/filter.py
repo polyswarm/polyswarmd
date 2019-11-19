@@ -48,12 +48,15 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'backoff'])):
 
     def compute_wait(self, ctr):
         "Compute the amount of wait time from a counter of (sequential) empty replies"
+        result = 1
         if self.backoff:
             # backoff 'exponentially'
             exp = (1 << max(0, ctr - 2)) - 1
-            return gauss(min(self.MAX_WAIT, max(self.MIN_WAIT, exp)), 0.1)
+            result = min(self.MAX_WAIT, max(self.MIN_WAIT, exp))
         else:
-            return gauss(self.MIN_WAIT, 0.1)
+            result = self.MIN_WAIT
+
+        return abs(gauss(result, 0.1))
 
     def get_new_entries(self):
         return [self.formatter(e) for e in self.filter.get_new_entries()]
