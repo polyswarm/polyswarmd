@@ -6,6 +6,7 @@ from abc import ABC
 from typing import Any
 
 from polyswarmartifact import ArtifactType
+from polyswarmartifact.schema import Bounty as BountyMetadata
 
 from .json_schema import copy_with_schema
 
@@ -58,7 +59,7 @@ class EventLogMessage(ABC):
 
 # Commonly used schema properties
 uint256 = {'type': 'integer'}
-guid = {'type': 'string', 'format': 'uuid'}
+guid = {'type': 'string', 'format': 'uuid', '$#convert': True}
 bounty_guid = {**guid, '$#from': 'bountyGuid'}
 ethereum_address = {'type': 'string', 'format': 'ethaddr'}
 
@@ -69,23 +70,37 @@ boolvector = {
     '$#fetch': lambda e, k, *args: [b != '0' for b in format(int(e[k]), f"0>{e.numArtifacts}b")]
 }
 
-## The functions below are commented out because they depend on configuration being loaded from PolyswarmD.
-# from functools import lru_cache
-# from polyswarmd.bounties import substitute_metadata
-# from requests_futures.sessions import FuturesSession
-# session = FuturesSession(adapter_kwargs={'max_retries': 3})
-# from polyswarmd.config import Config
-# config = Config.auto()
-# artifact_client = config['POLYSWARMD'].artifact_client
-# redis_client = config['POLYSWARMD'].redis
-# Methods for extracting information from an ethereum event log (suitable for websocket)
-# @lru_cache(15)
-# def _fetch_metadata(uri: str, validate=None, artifact_client=artifact_client, redis=redis):
-#     raise NotImplementedError("This function relies on config information in PolyswarmD")
-#     return substitute_metadata(uri, artifact_client, session, validate, redis)
-# artifact_metadata = {'type': 'object', '$#fetch': lambda e, k, *args: _fetch_metadata(e[k]) }
+# The functions below are commented out because they depend on configuration being loaded from PolyswarmD.
+from functools import lru_cache
 
-artifact_metadata = {'type': 'object', '$#fetch': lambda e, k, *args: e[k]}
+from requests_futures.sessions import FuturesSession
+
+session = FuturesSession(adapter_kwargs={'max_retries': 3})
+
+config = None
+artifact_client = None
+redis = None
+
+
+# XXX this is about as hacky as it gets. We should extract configuration loading out.
+@lru_cache(15)
+def fetch_metadata(uri: str, validate):
+    from polyswarmd.bounties import substitute_metadata
+    global config
+    global redis
+    global artifact_client
+    if config is None:
+        from polyswarmd import app
+        config = app.config
+        artifact_client = config['POLYSWARMD'].artifact_client
+        redis = config['POLYSWARMD'].redis
+
+    return substitute_metadata(uri, artifact_client, session, validate=validate, redis=redis)
+
+
+def pull_metadata(data, validate=None):
+    data['metadata'] = fetch_metadata(data.get('metadata'), validate)
+    return data
 
 
 class Transfer(EventLogMessage):
@@ -138,7 +153,7 @@ class WebsocketFilterMessage(WebsocketMessage, EventLogMessage):
     def __init__(self, event: EventLogEntry):
         self.data = json.dumps({
             'event': self.ws_event,
-            'data': self.extract(event),
+            'data': self.extract(event['args']),
             'block_number': event.blockNumber,
             'txhash': event.transactionHash.hex()
         })
@@ -177,6 +192,15 @@ class WindowsUpdated(WebsocketFilterMessage):
 
 class NewBounty(WebsocketFilterMessage):
     _ws_event = 'bounty'
+
+    def __init__(self, event: EventLogEntry):
+        self.data = json.dumps({
+            'event': self.ws_event,
+            'data': pull_metadata(self.extract(event['args']), validate=BountyMetadata.validate),
+            'block_number': event.blockNumber,
+            'txhash': event.transactionHash.hex()
+        })
+
     _extraction_schema = {
         'properties': {
             'guid': guid,
@@ -200,7 +224,10 @@ class NewBounty(WebsocketFilterMessage):
                 'type': 'string',
                 '$#convert': True,
             },
-            'metadata': artifact_metadata
+            'metadata': {
+                'type': 'string',
+                '$#convert': True
+            }
         }
     }
 
@@ -228,6 +255,15 @@ class NewAssertion(WebsocketFilterMessage):
 
 class RevealedAssertion(WebsocketFilterMessage):
     _ws_event = 'reveal'
+
+    def __init__(self, event: EventLogEntry):
+        self.data = json.dumps({
+            'event': self.ws_event,
+            'data': pull_metadata(self.extract(event['args']), validate=BountyMetadata.validate),
+            'block_number': event.blockNumber,
+            'txhash': event.transactionHash.hex()
+        })
+
     _extraction_schema = {
         'properties': {
             'bounty_guid': bounty_guid,
@@ -238,7 +274,9 @@ class RevealedAssertion(WebsocketFilterMessage):
                 '$#convert': True,
             },
             'verdicts': boolvector,
-            'metadata': artifact_metadata
+            'metadata': {
+                'type': 'string'
+            }
         }
     }
 
@@ -250,13 +288,7 @@ class NewVote(WebsocketFilterMessage):
 
 class QuorumReached(WebsocketFilterMessage):
     _ws_event = 'quorum'
-    _extraction_schema = {
-        'properties': {
-            'bounty_guid': bounty_guid,
-            'to': ethereum_address,
-            'from': ethereum_address,
-        }
-    }
+    _extraction_schema = {'properties': {'bounty_guid': bounty_guid}}
 
 
 class SettledBounty(WebsocketFilterMessage):
