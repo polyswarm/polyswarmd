@@ -1,40 +1,44 @@
+import gevent
 import logging
 import weakref
-from collections import namedtuple
 from contextlib import contextmanager
-from typing import Any, Callable, Collection, Container, Type
-from random import gauss
-
-from requests.exceptions import ConnectionError
-
-import gevent
-import web3.eth
 from gevent.pool import Group
 from gevent.queue import Queue
+from random import gauss
+from requests.exceptions import ConnectionError
+from typing import Collection, Type
 from web3.utils.filters import LogFilter
+
 
 from . import messages
 
 logger = logging.getLogger(__name__)
 
 
-class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'backoff'])):
-    "A utility class which wraps a contract filter with websocket-messaging features"
+class FilterWrapper:
+    """A utility class which wraps a contract filter with websocket-messaging features"""
+    # Allow this class to be weak referencable
+    __slots__ = ('__weakref__', 'filter', 'formatter', 'backoff')
     MIN_WAIT = 0.5
     MAX_WAIT = 8.0
 
+    def __init__(self, ftlr, formatter, backoff):
+        self.filter = ftlr
+        self.formatter = formatter
+        self.backoff = backoff
+
     @property
     def ws_event(self):
-        "Return the name of the websocket 'event name' that events will be formatted with"
+        """"Return the name of the websocket 'event name' that events will be formatted with"""
         return self.formatter.ws_event if self.formatter else 'N/A'
 
     @property
     def filter_id(self):
-        "Return the associated contract event filter's numeric web3 id"
+        """Return the associated contract event filter's numeric web3 id"""
         return self.filter.filter_id
 
     def contract_event_name(self):
-        "Return the name of the associated contract event."
+        """Return the name of the associated contract event."""
         return self.formatter.contract_event_name() if self.formatter else 'Unknown'
 
     def uninstall(self):
@@ -44,8 +48,7 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'backoff'])):
             logger.warn("Could not uninstall filter<filter_id=%s>")
 
     def compute_wait(self, ctr):
-        "Compute the amount of wait time from a counter of (sequential) empty replies"
-        result = 1
+        """Compute the amount of wait time from a counter of (sequential) empty replies"""
         if self.backoff:
             # backoff 'exponentially'
             exp = (1 << max(0, ctr - 2)) - 1
@@ -59,7 +62,7 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'backoff'])):
         return [self.formatter(e) for e in self.filter.get_new_entries()]
 
     def spawn_poll_loop(self, callback):
-        "Spawn a greenlet which polls the filter's contract events, passing results to `callback'"
+        """Spawn a greenlet which polls the filter's contract events, passing results to `callback'"""
         ctr = 0  # number of loops since the last non-empty response
         wait = 0  # The amount of time this loop will wait.
         logger.debug("Spawning fetch: %s", self.contract_event_name())
@@ -94,7 +97,7 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'backoff'])):
         return hash(self.filter)
 
 
-class FilterManager():
+class FilterManager:
     """Manages access to filtered Ethereum events."""
 
     wrappers: Collection[FilterWrapper]
@@ -104,14 +107,14 @@ class FilterManager():
         self.wrappers = set()
         self.pool = Group()
 
-    def register(self, flt: LogFilter, fmt_cls: Type[messages.EventLogMessage] = lambda x: x, backoff=True):
-        "Add a new filter, with an optional associated WebsocketMessage-serializer class"
-        wrapper = FilterWrapper(flt, fmt_cls, backoff)
+    def register(self, fltr: LogFilter, fmt_cls: Type[messages.EventLogMessage] = lambda x: x, backoff=True):
+        """Add a new filter, with an optional associated WebsocketMessage-serializer class"""
+        wrapper = FilterWrapper(fltr, fmt_cls, backoff)
         self.wrappers.add(wrapper)
         logger.debug('Registered new filter: %s', wrapper)
 
     def flush(self):
-        "End all event polling, uninstall all filters and remove their corresponding wrappers"
+        """"End all event polling, uninstall all filters and remove their corresponding wrappers"""
         self.pool.kill()
         logger.debug('Flushing %d filters', len(self.wrappers))
         for filt in self.wrappers:
@@ -120,7 +123,7 @@ class FilterManager():
 
     @contextmanager
     def fetch(self):
-        "Return a queue of currently managed contract events"
+        """"Return a queue of currently managed contract events"""
         try:
             queue = Queue()
             # Greenlet's can continue to exist beyond the lifespan of
@@ -134,7 +137,7 @@ class FilterManager():
             self.flush()
 
     def setup_event_filters(self, chain):
-        "Setup the most common event filters"
+        """"Setup the most common event filters"""
         if len(self.wrappers) != 0:
             logger.exception("Attempting to initialize already initialized filter manager")
             return

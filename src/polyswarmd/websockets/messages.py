@@ -5,7 +5,7 @@ except ImportError:
 from typing import Any
 
 from polyswarmartifact import ArtifactType
-from polyswarmartifact.schema import Bounty as BountyMetadata
+from polyswarmartifact.schema import Bounty as BountyMetadata, Assertion as AssertionMetadata
 
 from .json_schema import copy_with_schema
 
@@ -258,7 +258,7 @@ class RevealedAssertion(WebsocketFilterMessage):
         self.data = json.dumps({
             'event': self.ws_event,
             # We do this here and not in `extract` because this is specifically needed for websocket messages
-            'data': pull_metadata(self.extract(event['args']), validate=BountyMetadata.validate),
+            'data': pull_metadata(self.extract(event['args']), validate=AssertionMetadata.validate),
             'block_number': event.blockNumber,
             'txhash': event.transactionHash.hex()
         }).encode('ascii')
