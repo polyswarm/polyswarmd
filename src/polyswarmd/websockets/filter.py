@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'backoff'])):
     """A utility class which wraps a contract filter with websocket-messaging features"""
-    # Allow this class to be weak referencable
     MIN_WAIT = 0.5
     MAX_WAIT = 8.0
 
