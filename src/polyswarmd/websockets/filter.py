@@ -1,6 +1,7 @@
 import gevent
 import logging
 import weakref
+from collections import namedtuple
 from contextlib import contextmanager
 from gevent.pool import Group
 from gevent.queue import Queue
@@ -15,17 +16,11 @@ from . import messages
 logger = logging.getLogger(__name__)
 
 
-class FilterWrapper:
+class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'backoff'])):
     """A utility class which wraps a contract filter with websocket-messaging features"""
     # Allow this class to be weak referencable
-    __slots__ = ('__weakref__', 'filter', 'formatter', 'backoff')
     MIN_WAIT = 0.5
     MAX_WAIT = 8.0
-
-    def __init__(self, ftlr, formatter, backoff):
-        self.filter = ftlr
-        self.formatter = formatter
-        self.backoff = backoff
 
     @property
     def ws_event(self):
@@ -123,13 +118,13 @@ class FilterManager:
 
     @contextmanager
     def fetch(self):
-        """"Return a queue of currently managed contract events"""
+        """Return a queue of currently managed contract events"""
         try:
             queue = Queue()
             # Greenlet's can continue to exist beyond the lifespan of
             # the object itself. Failing to use a weakref here can prevent filters
             # destructors from running
-            for wrapper in map(weakref.proxy, self.wrappers):
+            for wrapper in self.wrappers:
                 self.pool.spawn(wrapper.spawn_poll_loop, queue.put_nowait)
 
             yield queue
