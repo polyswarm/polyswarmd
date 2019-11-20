@@ -1,6 +1,5 @@
 import gevent
 import logging
-import weakref
 from collections import namedtuple
 from contextlib import contextmanager
 from gevent.pool import Group
@@ -40,7 +39,7 @@ class FilterWrapper(namedtuple('Filter', ['filter', 'formatter', 'backoff'])):
         if self.filter.web3.eth.uninstallFilter(self.filter_id):
             logger.debug("Uninstalled filter_id=%s", self.filter_id)
         else:
-            logger.warn("Could not uninstall filter<filter_id=%s>")
+            logger.warning("Could not uninstall filter<filter_id=%s>")
 
     def compute_wait(self, ctr):
         """Compute the amount of wait time from a counter of (sequential) empty replies"""
