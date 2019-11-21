@@ -1,5 +1,4 @@
-import ujson as json
-from json import JSONDecodeError
+import json
 import jsonschema
 import logging
 import os
@@ -91,7 +90,7 @@ def substitute_metadata(uri, artifact_client, session, validate=AssertionMetadat
         if validate(content):
             return content
 
-    except JSONDecodeError:
+    except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
         logger.warning('Metadata retrieved from IPFS does not match schema')
     except Exception:
@@ -297,7 +296,7 @@ def post_assertion_metadata():
         if not AssertionMetadata.validate(loaded_body, silent=True) and \
                 not BountyMetadata.validate(loaded_body, silent=True):
             return failure('Invalid metadata', 400)
-    except JSONDecodeError:
+    except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
         return failure('Invalid Assertion metadata', 400)
 

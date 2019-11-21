@@ -9,28 +9,24 @@ from requests_futures.sessions import FuturesSession
 
 from .json_schema import (PSJSONSchema, SchemaExtraction, SchemaDef)
 
-try:
-    from typing import TypedDict
-except ImportError:
-    from mypy_extensions import TypedDict
 
+if TYPE_CHECKING:
+    Hash32 = NewType('Hash32', bytes)
+    HexAddress = NewType('HexAddress', str)
+    ChecksumAddress = NewType('ChecksumAddress', HexAddress)
 
-Hash32 = NewType('Hash32', bytes)
-HexAddress = NewType('HexAddress', str)
-ChecksumAddress = NewType('ChecksumAddress', HexAddress)
-
-EventData = TypedDict(
-    'EventData', {
-        'args': Dict[str, Any],
-        'event': str,
-        'logIndex': int,
-        'transactionIndex': int,
-        'transactionHash': Hash32,
-        'address': ChecksumAddress,
-        'blockHash': Hash32,
-        'blockNumber': int,
-    })
-
+    # @type_check_only
+    class EventData:
+        args: Dict[str, Any]
+        event: str
+        logIndex: int
+        transactionIndex: int
+        transactionHash: Hash32
+        address: ChecksumAddress
+        blockHash: Hash32
+        blockNumber: int
+else:
+    EventData = Any
 
 class WebsocketMessage:
     "Represent a message that can be handled by polyswarm-client"
@@ -42,7 +38,7 @@ class WebsocketMessage:
         self.message = json.dumps(self.to_message(data)).encode('ascii')
 
     def to_message(self, data):
-        return {'event': self.event, **({'data': data} if data else {})}
+        return {'event': self.event, 'data': data}
 
     def __bytes__(self) -> bytes:
         return self.message
@@ -167,13 +163,13 @@ class WebsocketFilterMessage(WebsocketMessage, EventLogMessage):
     def to_message(self, event: EventData):
         return {
             'event': self.event,
-            'data': self.extract(event['args']),
-            'block_number': event['blockNumber'],
-            'txhash': event['transactionHash'].hex()
+            'data': self.extract(event.args),
+            'block_number': event.blockNumber,
+            'txhash': event.transactionHash.hex()
         }
 
     def __repr__(self):
-        return f'<{self.__class__.__name__} name={self.event}>'
+        return f'<{self.contract_event_name} name={self.event}>'
 
 
 class FeesUpdated(WebsocketFilterMessage):
@@ -226,14 +222,12 @@ class NewBounty(WebsocketFilterMessage):
                 'srckey': 'expirationBlock',
                 'type': 'string',
             },
-            'metadata': {
-                'type': 'string',
-            }
+            'metadata': {}
         }
     })
 
     def to_message(self, event: EventData):
-        return pull_metadata(self.extract(event['args']), validate=BountyMetadata.validate)
+        return pull_metadata(self.extract(event.args), validate=BountyMetadata.validate)
 
 
 class NewAssertion(WebsocketFilterMessage):
@@ -266,14 +260,12 @@ class RevealedAssertion(WebsocketFilterMessage):
                 'type': 'string',
             },
             'verdicts': boolvector,
-            'metadata': {
-                'type': 'string'
-            }
+            'metadata': {}
         }
     })
 
     def to_message(self, event: EventData):
-        return pull_metadata(self.extract(event['args']), validate=AssertionMetadata.validate)
+        return pull_metadata(self.extract(event.args), validate=AssertionMetadata.validate)
 
 
 class NewVote(WebsocketFilterMessage):

@@ -18,7 +18,7 @@ SchemaDef = TypedDict('SchemaDef', {
     'format': SchemaFormat,
     'enum': Iterable[Any],
     'items': SchemaType,
-    'srckey': Union[str, Callable[[Any], Any]],
+    'srckey': Union[str, Callable[[str, Any], Any]],
 }, total=False)
 
 JSONSchema = TypedDict('JSONSchema', {'properties': Mapping[str, SchemaDef]}, total=False)
@@ -32,9 +32,9 @@ class PSJSONSchema():
     schema: JSONSchema
     _extractor: Dict[str, Callable[[Any], Any]]
 
-    _TYPES = {'string': str, 'integer': int, 'number': float, 'bool': bool, 'boolean': bool, 'array': list}
+    _TYPES = {'string': str, 'integer': int, 'number': float, 'boolean': bool, 'array': list}
 
-    _FORMATTERS = {'uuid': lambda x: uuid.UUID(int=x), 'ethaddr': str}
+    _FORMATTERS = {'uuid': lambda x: uuid.UUID(int=x)}
 
     def __init__(self, schema: Dict[str, Any]):
         self.schema = cast(JSONSchema, schema)
@@ -54,19 +54,19 @@ class PSJSONSchema():
         If srckey is not present at all, it attempts to fetch the value from `source`
         with the same name/key as the definition.
 
-        >>> make_range = lambda src: src['range']()
+        >>> make_range = lambda key, src: range(1, src[key])
         >>> schema = PSJSONSchema({ \
             'properties': { \
                 'a': {'type':'string'},  \
                 'b': {'type':'string', 'srckey': 'b_src'}, \
                 'c': {'type':'string', 'srckey': 'c_src'}, \
                 'x': {'type':'integer'}, \
-                'fetch': {'type': 'array', 'items': 'string', 'srckey': make_range}, \
+                'range': {'type': 'array', 'items': 'string', 'srckey': make_range}, \
                 'xs': {'type': 'array', 'items': 'integer' }}})
         >>> instance = { 'a': "1", 'b_src': "2", 'c_src': 3, 'x': 4, \
-                        'xs': ["5","6"], 'range': lambda: range(1,3) }
+                        'xs': ["5","6"], 'range': 3 }
         >>> schema.extract(instance)
-        {'a': '1', 'b': '2', 'c': '3', 'x': 4, 'fetch': ['1', '2'], 'xs': [5, 6]}
+        {'a': '1', 'b': '2', 'c': '3', 'x': 4, 'range': ['1', '2'], 'xs': [5, 6]}
         """
         return {k: fn(instance) for k, fn in self._extractor.items()}
 
@@ -92,14 +92,16 @@ class PSJSONSchema():
                 extract_fn = partial(srckey, def_name)
 
             fmt = def_schema.get('format')
-            if fmt:
+            if fmt and fmt in self._FORMATTERS:
                 extract_fn = compose(self._FORMATTERS[fmt], extract_fn)
 
             itype = def_schema.get('items')
             if itype:
                 extract_fn = compose(partial(map, self.map_type(itype)), extract_fn)
 
-            extract_fn = compose(self.map_type(def_schema['type']), extract_fn)
+            dtype = def_schema.get('type')
+            if dtype:
+                extract_fn = compose(self.map_type(dtype), extract_fn)
             extract_map[def_name] = extract_fn
 
         return extract_map
