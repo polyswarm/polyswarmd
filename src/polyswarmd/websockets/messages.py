@@ -1,16 +1,19 @@
-import ujson as json
-
 from functools import lru_cache
-from typing import (TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, cast, Mapping, NewType)
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Mapping, NewType, Optional, cast, TypeVar
 
 from polyswarmartifact import ArtifactType
-from polyswarmartifact.schema import Bounty as BountyMetadata, Assertion as AssertionMetadata
+from polyswarmartifact.schema import Assertion as AssertionMetadata, Bounty as BountyMetadata
 from requests_futures.sessions import FuturesSession
+import ujson as json
 
-from .json_schema import (PSJSONSchema, SchemaExtraction, SchemaDef)
-
+from .json_schema import PSJSONSchema, SchemaDef, SchemaExtraction
 
 if TYPE_CHECKING:
+    try:
+        from typing import TypedDict
+    except ImportError:
+        from mypy_extensions import TypedDict
+
     Hash32 = NewType('Hash32', bytes)
     HexAddress = NewType('HexAddress', str)
     ChecksumAddress = NewType('ChecksumAddress', HexAddress)
@@ -25,8 +28,18 @@ if TYPE_CHECKING:
         address: ChecksumAddress
         blockHash: Hash32
         blockNumber: int
+
+    class _BaseMessage(TypedDict):
+        event: str
+        data: Any
+
+    class WebsocketMessageDict(Fields, total=False):
+        block_number: Optional[int]
+        txhash: Optional[str]
 else:
-    EventData = Any
+    EventData = Dict[Any, Any]
+    WebsocketMessageDict = Dict[Any, Any]
+
 
 class WebsocketMessage:
     "Represent a message that can be handled by polyswarm-client"
@@ -37,7 +50,7 @@ class WebsocketMessage:
     def __init__(self, data=None):
         self.message = json.dumps(self.to_message(data)).encode('ascii')
 
-    def to_message(self, data):
+    def to_message(self, data) -> WebsocketMessageDict:
         return {'event': self.event, 'data': data}
 
     def __bytes__(self) -> bytes:
@@ -144,6 +157,7 @@ class NewWithdrawal(EventLogMessage):
 def second_argument_to_dict(_ignore, obj):
     return dict(obj)
 
+
 extract_as_dict = {'extract': second_argument_to_dict}
 # The classes below have no defined extraction ('conversion') logic,
 # so they simply return the argument to `extract` as a `dict`
@@ -160,7 +174,7 @@ class WebsocketFilterMessage(WebsocketMessage, EventLogMessage):
 
     __slots__ = ('message')
 
-    def to_message(self, event: EventData):
+    def to_message(self, event: EventData) -> WebsocketMessageDict:
         return {
             'event': self.event,
             'data': self.extract(event.args),
@@ -222,12 +236,19 @@ class NewBounty(WebsocketFilterMessage):
                 'srckey': 'expirationBlock',
                 'type': 'string',
             },
-            'metadata': {}
+            'metadata': {
+                'type': 'string'
+            }
         }
     })
 
-    def to_message(self, event: EventData):
-        return pull_metadata(self.extract(event.args), validate=BountyMetadata.validate)
+    def to_message(self, event: EventData) -> WebsocketMessageDict:
+        return {
+            'event': self.event,
+            'data': pull_metadata(self.extract(event.args), validate=BountyMetadata.validate),
+            'block_number': event.blockNumber,
+            'txhash': event.transactionHash.hex()
+        }
 
 
 class NewAssertion(WebsocketFilterMessage):
@@ -260,12 +281,19 @@ class RevealedAssertion(WebsocketFilterMessage):
                 'type': 'string',
             },
             'verdicts': boolvector,
-            'metadata': {}
+            'metadata': {
+                'type': 'string'
+            }
         }
     })
 
-    def to_message(self, event: EventData):
-        return pull_metadata(self.extract(event.args), validate=AssertionMetadata.validate)
+    def to_message(self, event: EventData) -> WebsocketMessageDict:
+        return {
+            'event': self.event,
+            'data': pull_metadata(self.extract(event.args), validate=AssertionMetadata.validate),
+            'block_number': event.blockNumber,
+            'txhash': event.transactionHash.hex()
+        }
 
 
 class NewVote(WebsocketFilterMessage):
