@@ -30,7 +30,30 @@ def compose(f, g):
     return lambda x: f(g(x))
 
 
-class PSJSONSchema():
+class PSJSONSchema:
+    """Extract and format fields from a source `instance` object
+
+    This uses ordinary jsonschema manifests, with the addition of polyswarm-specific keys:
+
+        srckey: str - Get the field with the same name from `instance`
+        srckey: callable - Run this function with `instance` as an argument
+
+    If srckey is not present at all, it attempts to fetch the value from `source`
+    with the same name/key as the definition.
+
+    >>> make_range = lambda key, src: range(1, src[key])
+    >>> schema = PSJSONSchema({
+    ... 'properties': {
+    ...     'a': {'type':'string'},
+    ...     'b': {'type':'string', 'srckey': 'b_src'},
+    ...     'c': {'type':'string', 'srckey': 'c_src'},
+    ...     'x': {'type':'integer'},
+    ...     'range': {'type': 'array', 'items': 'string', 'srckey': make_range},
+    ...     'xs': {'type': 'array', 'items': 'integer' }}})
+    >>> instance = { 'a': "1", 'b_src': "2", 'c_src': 3, 'x': 4, 'xs': ["5","6"], 'range': 3 }
+    >>> schema.extract(instance)
+    {'a': '1', 'b': '2', 'c': '3', 'x': 4, 'range': ['1', '2'], 'xs': [5, 6]}
+    """
     schema: JSONSchema
     _extractor: Dict[str, Callable[[Any], Any]]
 
@@ -46,30 +69,6 @@ class PSJSONSchema():
         yield from self.schema.get('properties', {}).items()
 
     def extract(self, instance: Any) -> SchemaExtraction:
-        """Extract and format fields from a source `instance` object
-
-        This uses ordinary jsonschema manifests, with the addition of polyswarm-specific keys:
-
-            srckey: str - Get the field with the same name from `instance`
-            srckey: callable - Run this function with `instance` as an argument
-
-        If srckey is not present at all, it attempts to fetch the value from `source`
-        with the same name/key as the definition.
-
-        >>> make_range = lambda key, src: range(1, src[key])
-        >>> schema = PSJSONSchema({ \
-            'properties': { \
-                'a': {'type':'string'},  \
-                'b': {'type':'string', 'srckey': 'b_src'}, \
-                'c': {'type':'string', 'srckey': 'c_src'}, \
-                'x': {'type':'integer'}, \
-                'range': {'type': 'array', 'items': 'string', 'srckey': make_range}, \
-                'xs': {'type': 'array', 'items': 'integer' }}})
-        >>> instance = { 'a': "1", 'b_src': "2", 'c_src': 3, 'x': 4, \
-                        'xs': ["5","6"], 'range': 3 }
-        >>> schema.extract(instance)
-        {'a': '1', 'b': '2', 'c': '3', 'x': 4, 'range': ['1', '2'], 'xs': [5, 6]}
-        """
         return {k: fn(instance) for k, fn in self._extractor.items()}
 
     def build_extractor(self):
@@ -107,8 +106,3 @@ class PSJSONSchema():
     def build_annotations(self):
         for name, schema in self.visitor():
             yield {name: schema.get('type', Any)}
-
-
-if __name__ == "__main__":
-    import doctest
-    doctest.testmod()

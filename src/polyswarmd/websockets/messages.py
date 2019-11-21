@@ -1,5 +1,4 @@
-from functools import lru_cache
-from typing import (TYPE_CHECKING, Any, ClassVar, Dict, List, Mapping, NewType, Optional, cast)
+from typing import (TYPE_CHECKING, Any, ClassVar, Dict, List, Mapping, NewType, Optional, cast, Callable)
 import ujson as json
 
 from requests_futures.sessions import FuturesSession
@@ -69,11 +68,13 @@ class EventLogMessage:
     schema: ClassVar[PSJSONSchema]
     contract_event_name: ClassVar[str]
 
-    # The use of metaclasses complicates
+    # The use of metaclasses complicates type-checking and inheritance, so to set a dynamic
+    # class-property and type-checking annotations, we set it inside __init_subclass__.
     @classmethod
     def __init_subclass__(cls):
         super().__init_subclass__()
         cls.contract_event_name = cls.__name__
+        # extract the annotations from the jsonschema attached to the class (schema)
         if TYPE_CHECKING and 'schema' in cls.__dict__:
             cls.__annotations__ = cls.schema.build_annotations()
 
@@ -101,34 +102,38 @@ boolvector: SchemaDef = {
     'srckey': lambda k, e: int_to_boolvector(int(e[k]), e.numArtifacts)
 }
 
-# The functions below are commented out because they depend on configuration being loaded from PolyswarmD.
 
-session = FuturesSession(adapter_kwargs={'max_retries': 3})
-
-config: Optional[Dict[str, Any]] = None
-artifact_client = None
-redis = None
+# partially applied `substitute_metadata' with AI, redis & session prefilled.
+_substitute_metadata: Optional[Callable[[str, bool], Any]] = None
 
 
-# XXX this is about as hacky as it gets. We should extract configuration loading out.
-@lru_cache(15)
-def fetch_metadata(uri: str, validate):
-    from polyswarmd.bounties import substitute_metadata
-    global config
-    global redis
-    global artifact_client
-    if config is None:
+def fetch_metadata(msg: WebsocketMessageDict, validate=None) -> WebsocketMessageDict:
+    """Fetch metadata with URI from `msg', validate it and merge the result
+
+    >>> global _substitute_metadata
+    >>> _substitute_metadata = lambda uri, validate: { 'hello': uri }
+    >>> msg = {'event': 'test', 'data': { 'metadata': 'uri' }}
+    >>> fetch_metadata(msg, override=_substitute_metadata)
+    {'event': 'test', 'data': {'metadata': {'hello': 'uri'}}}
+    """
+    data = msg.get('data')
+    if not data:
+        return msg
+
+    global _substitute_metadata
+    if not _substitute_metadata:
         from polyswarmd import app
-        config = app.config
-    artifact_client = config['POLYSWARMD'].artifact_client
-    redis = config['POLYSWARMD'].redis
-    return substitute_metadata(uri, artifact_client, session, validate=validate, redis=redis)
+        from polyswarmd.bounties import substitute_metadata
+        config: Optional[Dict[str, Any]] = app.config
+        ai = config['POLYSWARMD'].artifact_client
+        session = FuturesSession(adapter_kwargs={'max_retries': 3})
+        redis = config['POLYSWARMD'].redis
 
+        def _substitute_metadata(uri: str, validate):
+            return substitute_metadata(uri, ai, session, validate=validate, redis=redis)
 
-def pull_metadata(data, validate=None):
-    if 'metadata' in data:
-        data['metadata'] = fetch_metadata(data['metadata'], validate)
-    return data
+    data.update(metadata=_substitute_metadata(data.get('metadata'), validate))
+    return msg
 
 
 class Transfer(EventLogMessage):
@@ -246,12 +251,7 @@ class NewBounty(WebsocketFilterMessage):
     })
 
     def to_message(self, event: EventData) -> WebsocketMessageDict:
-        return {
-            'event': self.event,
-            'data': pull_metadata(self.extract(event.args), validate=BountyMetadata.validate),
-            'block_number': event.blockNumber,
-            'txhash': event.transactionHash.hex()
-        }
+        return fetch_metadata(super().to_message(event), validate=BountyMetadata.validate)
 
 
 class NewAssertion(WebsocketFilterMessage):
@@ -291,12 +291,7 @@ class RevealedAssertion(WebsocketFilterMessage):
     })
 
     def to_message(self, event: EventData) -> WebsocketMessageDict:
-        return {
-            'event': self.event,
-            'data': pull_metadata(self.extract(event.args), validate=AssertionMetadata.validate),
-            'block_number': event.blockNumber,
-            'txhash': event.transactionHash.hex()
-        }
+        return fetch_metadata(super().to_message(event), validate=AssertionMetadata.validate)
 
 
 class NewVote(WebsocketFilterMessage):
