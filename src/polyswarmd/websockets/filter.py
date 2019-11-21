@@ -86,11 +86,7 @@ class FilterWrapper:
             # Spawn the next version of this instance
             greenlet = gevent.spawn(self.get_new_entries)
             try:
-                result = greenlet.get(block=True, timeout=120.0)
-            # KeyError generally arises when the JSONSchema describing a message is fed an invalid value.
-            except KeyError as e:
-                logger.exception(e)
-                continue
+                result = greenlet.get(block=True)
             # ConnectionError generally occurs when we cannot fetch events
             except (ConnectionError, gevent.Timeout):
                 logger.exception("Error thrown in get_new_entries")

@@ -70,10 +70,6 @@ class PSJSONSchema():
         """
         return {k: fn(instance) for k, fn in self._extractor.items()}
 
-    @classmethod
-    def map_type(cls, name):
-        return cls._TYPES[name]
-
     def build_extractor(self):
         "Return a dictionary of functions which each extract/format a def_name"
         extract_map = {}
@@ -97,18 +93,18 @@ class PSJSONSchema():
 
             itype = def_schema.get('items')
             if itype:
-                extract_fn = compose(partial(map, self.map_type(itype)), extract_fn)
+                extract_fn = compose(partial(map, self._TYPES[itype]), extract_fn)
 
             dtype = def_schema.get('type')
             if dtype:
-                extract_fn = compose(self.map_type(dtype), extract_fn)
+                extract_fn = compose(self._TYPES[dtype], extract_fn)
             extract_map[def_name] = extract_fn
 
         return extract_map
 
     def build_annotations(self):
         for name, schema in self.visitor():
-            yield {name: self.map_type(schema['type'])}
+            yield {name: schema.get('type', Any)}
 
 
 if __name__ == "__main__":

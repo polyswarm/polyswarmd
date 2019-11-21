@@ -67,13 +67,13 @@ class EventLogMessage:
     schema: ClassVar[PSJSONSchema]
     contract_event_name: ClassVar[str]
 
+    # The use of metaclasses complicates
     @classmethod
     def __init_subclass__(cls):
         super().__init_subclass__()
         cls.contract_event_name = cls.__name__
-        if 'schema' in cls.__dict__:
-            if TYPE_CHECKING:
-                cls.__annotations__ = cls.schema.build_annotations()
+        if TYPE_CHECKING and 'schema' in cls.__dict__:
+            cls.__annotations__ = cls.schema.build_annotations()
 
     @classmethod
     def extract(cls, instance: Mapping[Any, Any]) -> SchemaExtraction:

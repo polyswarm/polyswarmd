@@ -11,10 +11,12 @@ logger = logging.getLogger(__name__)
 FILTER_BITS = 8 * 256
 HASH_FUNCS = 8
 
+
 def get_chunks_for_bloom(value_hash):
     assert HASH_FUNCS * 2 <= len(value_hash)
     for i in range(0, HASH_FUNCS):
-        yield value_hash[2*i:2*(i + 1)]
+        yield value_hash[2*i:2*(i + 1)]  # noqa
+
 
 def chunk_to_bloom_bits(chunk):
     assert FILTER_BITS <= (1 << 16)

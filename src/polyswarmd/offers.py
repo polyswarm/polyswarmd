@@ -216,7 +216,10 @@ def post_join(guid):
     s = body['s']
 
     transactions = [
-        build_transaction(offer_msig.functions.joinAgreement(state, v, to_padded_hex(r), to_padded_hex(s)), base_nonce),
+        build_transaction(
+            offer_msig.functions.joinAgreement(state, v, to_padded_hex(r), to_padded_hex(s)),
+            base_nonce
+        ),
     ]
 
     return success({'transactions': transactions})
@@ -480,7 +483,7 @@ def create_state():
 
     body['token_address'] = str(g.chain.nectar_token.address)
 
-    if 'verdicts' in body and not 'mask' in body or 'mask' in body and not 'verdicts' in body:
+    if 'verdicts' in body and 'mask' not in body or 'mask' in body and 'verdicts' not in body:
         return failure('Invalid JSON: Both `verdicts` and `mask` properties must be sent')
     elif 'verdicts' in body and 'mask' in body:
         body['verdicts'] = bool_list_to_int(body['verdicts'])

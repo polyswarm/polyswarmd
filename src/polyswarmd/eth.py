@@ -51,7 +51,7 @@ class Debug(Module):
             return 'Transaction receipt indicates failure but trace succeeded'
 
         # Parse out the revert error code if it exists
-        # See https://solidity.readthedocs.io/en/v0.4.24/control-structures.html#error-handling-assert-require-revert-and-exceptions
+        # See https://solidity.readthedocs.io/en/v0.4.24/control-structures.html#error-handling-assert-require-revert-and-exceptions  # noqa: E501
         # Encode as if a function call to `Error(string)`
         rv = HexBytes(trace.get('returnValue'))
 
@@ -361,7 +361,7 @@ def events_from_transaction(txhash, chain):
             }
 
     # This code builds the return value from the list of (CONTRACT, [HANDLER, ...])
-    # a HANDLER is a tuple of (RESULT KEY, EXTRACTION CLASS). RESULT KEY is the key that will be used in the output dict,
+    # a HANDLER is a tuple of (RESULT KEY, EXTRACTION CLASS). RESULT KEY is the key that will be used in the result,
     # EXTRACTION CLASS is any class which inherits from `EventLogMessage'.
     # NOTE EXTRACTION CLASS's name is used to id the contract event, which is then pass to it's own `extract` fn
     # XXX The `extract' method is a conversion function also used to convert events for WebSocket consumption.

@@ -488,7 +488,7 @@ def get_bounties_guid_assertions_id(guid, id_):
     try:
         assertion = get_assertion(guid, id_, bounty['num_artifacts'])
         return success(assertion)
-    except:
+    except:  # noqa: E772
         return failure('Assertion not found', 404)
 
 
@@ -526,7 +526,7 @@ def get_bounties_guid_votes_id(guid, id_):
         vote = vote_to_dict(g.chain.bounty_registry.contract.functions.votesByGuid(guid.int, id_).call(),
                             bounty['num_artifacts'])
         return success(vote)
-    except:
+    except:  # noqa: E772
         return failure('Vote not found', 404)
 
 
@@ -544,6 +544,6 @@ def get_bounties_guid_bloom(guid):
             bloom_parts.append(g.chain.bounty_registry.contract.functions.bloomByGuid(guid.int, i).call())
         bloom = bloom_to_dict(bloom_parts)
         return success(bloom)
-    except:
+    except:  # noqa: E772
         logger.exception('Bloom not found')
         return failure('Bloom not found', 404)

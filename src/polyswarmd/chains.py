@@ -13,9 +13,11 @@ def chain(_func=None, chain_name=None, account_required=True):
     This decorator takes the chain passed as a request arg and modifies a set of globals.
        There are a few guarantees made by this function.
 
-       If any of the values for the given chain are missing, the decorator will skip the function and return an error to the user. (500)
+       If any of the values for the given chain are missing, the decorator will skip the function
+       and return an error to the user. (500)
        If the chain is not recognized, it will return an error to the user. (400)
-       If it is the home chain, the offer contract address and  bindings will also be validated, or an error returned. (500)
+       If it is the home chain, the offer contract address and bindings will also be validated, or
+       an error returned. (500)
     """
     @functools.wraps(_func)
     def decorator_wrapper(func):

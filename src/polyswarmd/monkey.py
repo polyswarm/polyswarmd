@@ -1,3 +1,6 @@
+"""
+   isort:skip_file
+"""
 from concurrent.futures import ThreadPoolExecutor
 
 import web3
