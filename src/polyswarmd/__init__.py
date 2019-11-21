@@ -14,6 +14,7 @@ from flask import Flask, g, request
 from flask_caching import Cache
 
 from polyswarmd.config import Config, is_service_reachable, DEFAULT_FALLBACK_SIZE
+from polyswarmd.logger import init_logging
 from polyswarmd.profiler import setup_profiler
 from polyswarmd.response import success, failure, install_error_handlers
 
