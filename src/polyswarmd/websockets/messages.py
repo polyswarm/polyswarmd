@@ -1,15 +1,5 @@
 from functools import lru_cache
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    ClassVar,
-    Dict,
-    List,
-    Mapping,
-    NewType,
-    Optional,
-    cast,
-)
+from typing import (TYPE_CHECKING, Any, ClassVar, Dict, List, Mapping, NewType, Optional, cast)
 import ujson as json
 
 from requests_futures.sessions import FuturesSession
@@ -142,14 +132,15 @@ def pull_metadata(data, validate=None):
 
 
 class Transfer(EventLogMessage):
-    schema = PSJSONSchema(
-        {'properties': {
+    schema = PSJSONSchema({
+        'properties': {
             'to': ethereum_address,
             'from': ethereum_address,
             'value': {
                 'type': 'string'
             }
-        }})
+        }
+    })
 
 
 class NewDeposit(EventLogMessage):
@@ -173,9 +164,9 @@ def second_argument_to_dict(_ignore, obj):
 extract_as_dict = {'extract': second_argument_to_dict}
 # The classes below have no defined extraction ('conversion') logic,
 # so they simply return the argument to `extract` as a `dict`
-OpenedAgreement = type('OpenedAgreement', (EventLogMessage, ), extract_as_dict)
-CanceledAgreement = type('CanceledAgreement', (EventLogMessage, ), extract_as_dict)
-JoinedAgreement = type('JoinedAgreement', (EventLogMessage, ), extract_as_dict)
+OpenedAgreement = type('OpenedAgreement', (EventLogMessage,), extract_as_dict)
+CanceledAgreement = type('CanceledAgreement', (EventLogMessage,), extract_as_dict)
+JoinedAgreement = type('JoinedAgreement', (EventLogMessage,), extract_as_dict)
 
 
 class WebsocketFilterMessage(WebsocketMessage, EventLogMessage):
@@ -310,12 +301,13 @@ class RevealedAssertion(WebsocketFilterMessage):
 
 class NewVote(WebsocketFilterMessage):
     event = 'vote'
-    schema = PSJSONSchema(
-        {'properties': {
+    schema = PSJSONSchema({
+        'properties': {
             'bounty_guid': bounty_guid,
             'voter': ethereum_address,
             'votes': boolvector
-        }})
+        }
+    })
 
 
 class QuorumReached(WebsocketFilterMessage):
@@ -325,12 +317,13 @@ class QuorumReached(WebsocketFilterMessage):
 
 class SettledBounty(WebsocketFilterMessage):
     event = 'settled_bounty'
-    schema = PSJSONSchema(
-        {'properties': {
+    schema = PSJSONSchema({
+        'properties': {
             'bounty_guid': bounty_guid,
             'settler': ethereum_address,
             'payout': uint256
-        }})
+        }
+    })
 
 
 class InitializedChannel(WebsocketFilterMessage):

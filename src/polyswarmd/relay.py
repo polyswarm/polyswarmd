@@ -60,7 +60,9 @@ def send_funds_from():
     amount = int(body['amount'])
 
     transactions = [
-        build_transaction(g.chain.nectar_token.contract.functions.transfer(erc20_relay_address, amount), base_nonce),
+        build_transaction(
+            g.chain.nectar_token.contract.functions.transfer(erc20_relay_address, amount), base_nonce
+        ),
     ]
 
     return success({'transactions': transactions})

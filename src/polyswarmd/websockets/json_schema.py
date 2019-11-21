@@ -12,13 +12,16 @@ SchemaType = str
 SchemaFormat = str
 SchemaExtraction = Dict[Any, Any]
 
-SchemaDef = TypedDict('SchemaDef', {
-    'type': SchemaType,
-    'format': SchemaFormat,
-    'enum': Iterable[Any],
-    'items': SchemaType,
-    'srckey': Union[str, Callable[[str, Any], Any]],
-}, total=False)
+SchemaDef = TypedDict(
+    'SchemaDef', {
+        'type': SchemaType,
+        'format': SchemaFormat,
+        'enum': Iterable[Any],
+        'items': SchemaType,
+        'srckey': Union[str, Callable[[str, Any], Any]],
+    },
+    total=False
+)
 
 JSONSchema = TypedDict('JSONSchema', {'properties': Mapping[str, SchemaDef]}, total=False)
 

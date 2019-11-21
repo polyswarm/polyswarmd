@@ -15,7 +15,7 @@ HASH_FUNCS = 8
 def get_chunks_for_bloom(value_hash):
     assert HASH_FUNCS * 2 <= len(value_hash)
     for i in range(0, HASH_FUNCS):
-        yield value_hash[2*i:2*(i + 1)]  # noqa
+        yield value_hash[2 * i:2 * (i+1)]  # noqa
 
 
 def chunk_to_bloom_bits(chunk):
@@ -62,20 +62,14 @@ class BloomFilter(numbers.Number):
     def __contains__(self, value):
         if not isinstance(value, bytes):
             raise TypeError("Value must be of type `bytes`")
-        return all(
-            self.value & bloom_bits
-            for bloom_bits
-            in get_bloom_bits(value)
-        )
+        return all(self.value & bloom_bits for bloom_bits in get_bloom_bits(value))
 
     def __index__(self):
         return operator.index(self.value)
 
     def _combine(self, other):
         if not isinstance(other, (int, BloomFilter)):
-            raise TypeError(
-                "The `or` operator is only supported for other `BloomFilter` instances"
-            )
+            raise TypeError("The `or` operator is only supported for other `BloomFilter` instances")
         return BloomFilter(int(self) | int(other))
 
     def __hash__(self):
@@ -89,9 +83,7 @@ class BloomFilter(numbers.Number):
 
     def _icombine(self, other):
         if not isinstance(other, (int, BloomFilter)):
-            raise TypeError(
-                "The `or` operator is only supported for other `BloomFilter` instances"
-            )
+            raise TypeError("The `or` operator is only supported for other `BloomFilter` instances")
         self.value |= int(other)
         return self
 

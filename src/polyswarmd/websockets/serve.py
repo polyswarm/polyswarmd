@@ -5,6 +5,7 @@ from .filter import FilterManager
 
 
 class EventServer(WebSocketApplication):
+
     def __init__(self, *args):
         super().__init__(*args)
         self.filter_manager = FilterManager()

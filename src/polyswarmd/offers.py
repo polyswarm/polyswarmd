@@ -60,9 +60,10 @@ def post_create_offer_channel():
 
     transactions = [
         build_transaction(
-            g.chain.offer_registry.contract.functions.initializeOfferChannel(guid.int, ambassador, expert,
-                                                                             settlement_period_length),
-            base_nonce),
+            g.chain.offer_registry.contract.functions.initializeOfferChannel(
+                guid.int, ambassador, expert, settlement_period_length
+            ), base_nonce
+        ),
     ]
 
     return success({'transactions': transactions})
@@ -71,7 +72,9 @@ def post_create_offer_channel():
 @offers.route('/<uuid:guid>/uri', methods=['POST'])
 @chain(chain_name='home')
 def post_uri(guid):
-    offer_channel = channel_to_dict(g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
+    offer_channel = channel_to_dict(
+        g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
+    )
     msig_address = offer_channel['msig_address']
     offer_msig = g.chain.offer_multisig.bind(msig_address)
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -99,7 +102,10 @@ def post_uri(guid):
     websocket_uri = body['websocketUri']
 
     transactions = [
-        build_transaction(offer_msig.functions.setCommunicationUri(g.chain.w3.toHex(text=websocket_uri)), base_nonce),
+        build_transaction(
+            offer_msig.functions.setCommunicationUri(g.chain.w3.toHex(text=websocket_uri)),
+            base_nonce
+        ),
     ]
 
     return success({'transactions': transactions})
@@ -109,7 +115,8 @@ def post_uri(guid):
 @chain(chain_name='home')
 def post_open(guid):
     offer_channel = channel_to_dict(
-        g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
+        g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
+    )
     msig_address = offer_channel['msig_address']
     offer_msig = g.chain.offer_multisig.bind(msig_address)
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -154,10 +161,14 @@ def post_open(guid):
     approve_amount = offer_info['ambassador_balance']
 
     transactions = [
-        build_transaction(g.chain.nectar_token.contract.functions.approve(msig_address, approve_amount), base_nonce),
         build_transaction(
-            offer_msig.functions.openAgreement(to_padded_hex(state), v, to_padded_hex(r), to_padded_hex(s)),
-            base_nonce + 1),
+            g.chain.nectar_token.contract.functions.approve(msig_address, approve_amount), base_nonce
+        ),
+        build_transaction(
+            offer_msig.functions.openAgreement(
+                to_padded_hex(state), v, to_padded_hex(r), to_padded_hex(s)
+            ), base_nonce + 1
+        ),
     ]
 
     return success({'transactions': transactions})
@@ -167,7 +178,8 @@ def post_open(guid):
 @chain(chain_name='home')
 def post_cancel(guid):
     offer_channel = channel_to_dict(
-        g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
+        g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
+    )
     msig_address = offer_channel['msig_address']
     offer_msig = g.chain.offer_multisig.bind(msig_address)
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -183,7 +195,9 @@ def post_cancel(guid):
 @offers.route('/<uuid:guid>/join', methods=['POST'])
 @chain(chain_name='home')
 def post_join(guid):
-    offer_channel = channel_to_dict(g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
+    offer_channel = channel_to_dict(
+        g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
+    )
     msig_address = offer_channel['msig_address']
     offer_msig = g.chain.offer_multisig.bind(msig_address)
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -237,7 +251,9 @@ def post_join(guid):
 @offers.route('/<uuid:guid>/close', methods=['POST'])
 @chain(chain_name='home')
 def post_close(guid):
-    offer_channel = channel_to_dict(g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
+    offer_channel = channel_to_dict(
+        g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
+    )
     msig_address = offer_channel['msig_address']
     offer_msig = g.chain.offer_multisig.bind(msig_address)
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -292,7 +308,9 @@ def post_close(guid):
 @offers.route('/<uuid:guid>/closeChallenged', methods=['POST'])
 @chain(chain_name='home')
 def post_close_challenged(guid):
-    offer_channel = channel_to_dict(g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
+    offer_channel = channel_to_dict(
+        g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
+    )
     msig_address = offer_channel['msig_address']
     offer_msig = g.chain.offer_multisig.bind(msig_address)
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -337,7 +355,9 @@ def post_close_challenged(guid):
     s = list(map(lambda s: g.chain.w3.toBytes(hexstr=s), body['s']))
 
     transactions = [
-        build_transaction(offer_msig.functions.closeAgreementWithTimeout(state, v, r, s), base_nonce),
+        build_transaction(
+            offer_msig.functions.closeAgreementWithTimeout(state, v, r, s), base_nonce
+        ),
     ]
 
     return success({'transactions': transactions})
@@ -347,7 +367,8 @@ def post_close_challenged(guid):
 @chain(chain_name='home')
 def post_settle(guid):
     offer_channel = channel_to_dict(
-        g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
+        g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
+    )
     msig_address = offer_channel['msig_address']
     offer_msig = g.chain.offer_multisig.bind(msig_address)
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -480,8 +501,8 @@ def create_state():
             }
         },
         'required': [
-            'close_flag', 'nonce', 'ambassador', 'expert', 'msig_address',
-            'ambassador_balance', 'expert_balance', 'guid', 'offer_amount'
+            'close_flag', 'nonce', 'ambassador', 'expert', 'msig_address', 'ambassador_balance',
+            'expert_balance', 'guid', 'offer_amount'
         ],
     }
 
@@ -504,7 +525,9 @@ def create_state():
 @offers.route('/<uuid:guid>/challenge', methods=['POST'])
 @chain(chain_name='home')
 def post_challange(guid):
-    offer_channel = channel_to_dict(g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
+    offer_channel = channel_to_dict(
+        g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
+    )
     msig_address = offer_channel['msig_address']
     offer_msig = g.chain.offer_multisig.bind(msig_address)
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -588,9 +611,7 @@ def get_websocket(guid):
     socket_uri = g.chain.w3.toText(socket_uri).replace('\u0000', '')
 
     if not validate_ws_url(socket_uri):
-        return failure(
-            'Contract does not have a valid WebSocket uri',
-            400)
+        return failure('Contract does not have a valid WebSocket uri', 400)
 
     return success({'websocket': socket_uri})
 

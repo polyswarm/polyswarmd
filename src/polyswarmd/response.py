@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 def install_error_handlers(app):
+
     def make_json_error(e):
         response = jsonify(message=str(e))
         response.status_code = e.code if isinstance(e, HTTPException) else 500

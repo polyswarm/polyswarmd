@@ -28,6 +28,7 @@ class WebSocket:
     """
     Wrapper around a WebSocket that has a queue of messages that can be sent from another greenlet.
     """
+
     def __init__(self, ws):
         """
         Create a wrapper around a WebSocket with a guid to easily identify it, and a queue of messages to send
@@ -88,7 +89,8 @@ def init_websockets(app):
     @chain(chain_name='home', account_required=False)
     def channel_events(ws, guid):
         offer_channel = channel_to_dict(
-            g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
+            g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
+        )
         msig_address = offer_channel['msig_address']
         offer_msig = g.chain.offer_multisig.bind(msig_address)
         filter_manager = FilterManager()

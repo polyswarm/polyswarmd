@@ -8,6 +8,7 @@ class AbstractArtifactServiceClient(ABC):
     Namely, checking the status of the service, adding and retrieving artifacts, wrapping artifacts in some
     logical grouping (directory-like) and finding the details
     """
+
     def __init__(self, name, reachable_endpoint):
         self.name = name
         self.reachable_endpoint = reachable_endpoint

@@ -145,18 +145,27 @@ class FilterManager:
             return
 
         # Setup Latest
-        self.register(chain.w3.eth.filter('latest'), messages.LatestEvent.make(chain.w3.eth), backoff=False)
+        self.register(
+            chain.w3.eth.filter('latest'), messages.LatestEvent.make(chain.w3.eth), backoff=False
+        )
 
         bounty_contract = chain.bounty_registry.contract
         self.register(
             bounty_contract.eventFilter(messages.NewBounty.contract_event_name),
             messages.NewBounty,
             # messages.NewBounty shouldn't wait or back-off from new bounties.
-            backoff=False)
+            backoff=False
+        )
 
         filter_events = [
-            messages.FeesUpdated, messages.WindowsUpdated, messages.NewAssertion, messages.NewVote,
-            messages.QuorumReached, messages.SettledBounty, messages.RevealedAssertion, messages.Deprecated
+            messages.FeesUpdated,
+            messages.WindowsUpdated,
+            messages.NewAssertion,
+            messages.NewVote,
+            messages.QuorumReached,
+            messages.SettledBounty,
+            messages.RevealedAssertion,
+            messages.Deprecated,
         ]
 
         for cls in filter_events:
@@ -166,4 +175,5 @@ class FilterManager:
         if offer_registry and offer_registry.contract:
             self.register(
                 offer_registry.contract.eventFilter(messages.InitializedChannel.contract_event_name),
-                messages.InitializedChannel)
+                messages.InitializedChannel
+            )

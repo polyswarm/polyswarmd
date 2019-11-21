@@ -20,6 +20,7 @@ def chain(_func=None, chain_name=None, account_required=True):
        If it is the home chain, the offer contract address and bindings will also be validated, or
        an error returned. (500)
     """
+
     @functools.wraps(_func)
     def decorator_wrapper(func):
 
