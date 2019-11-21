@@ -9,6 +9,7 @@ from eth_abi.exceptions import InsufficientDataBytes
 from eth.vm.forks.constantinople.transactions import (ConstantinopleTransaction)
 from flask import current_app as app, Blueprint, g, request
 from hexbytes import HexBytes
+from typing import Dict, Any, List, Tuple, Type
 from jsonschema.exceptions import ValidationError
 
 from polyswarmd import cache
@@ -124,7 +125,7 @@ def get_transactions():
     except ValidationError as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
-    ret = defaultdict(list)
+    ret: Dict[str, List[Any]] = defaultdict(list)
     for transaction in body['transactions']:
         event = events_from_transaction(HexBytes(transaction), g.chain.name)
         for k, v in event.items():
@@ -178,7 +179,7 @@ def post_transactions():
 
     errors = False
     results = []
-    decoded_txs = []
+    decoded_txs = []  # type: Any
     try:
         future = threadpool_executor.submit(decode_all, body['transactions'])
         decoded_txs = future.result()
@@ -364,6 +365,7 @@ def events_from_transaction(txhash, chain):
     # EXTRACTION CLASS is any class which inherits from `EventLogMessage'.
     # NOTE EXTRACTION CLASS's name is used to id the contract event, which is then pass to it's own `extract` fn
     # XXX The `extract' method is a conversion function also used to convert events for WebSocket consumption.
+    contracts: List[Tuple[Any, List[Tuple[str, Type[messages.EventLogMessage]]]]]
     contracts = [(g.chain.nectar_token.contract.events, [('transfers', messages.Transfer)]),
                  (g.chain.bounty_registry.contract.events, [('bounties', messages.NewBounty),
                                                             ('assertions', messages.NewAssertion),
@@ -382,10 +384,10 @@ def events_from_transaction(txhash, chain):
                                               ('offers_closed', messages.ClosedAgreement),
                                               ('offers_settled', messages.StartedSettle),
                                               ('offers_challenged', messages.SettleStateChallenged)]))
-    ret = {}
+    ret: Dict[str, List[Dict[str, Any]]] = {}
     for contract, processors in contracts:
         for key, extractor in processors:
-            filter_event = extractor.contract_event_name()
+            filter_event = extractor.contract_event_name
             contract_event = contract[filter_event]
             if not contract_event:
                 logger.warning("No contract event for: %s", filter_event)

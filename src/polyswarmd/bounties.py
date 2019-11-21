@@ -1,4 +1,5 @@
-import json
+import ujson as json
+from json import JSONDecodeError
 import jsonschema
 import logging
 import os
@@ -9,6 +10,7 @@ from jsonschema.exceptions import ValidationError
 from polyswarmartifact import ArtifactType
 from polyswarmartifact.schema import Assertion as AssertionMetadata, Bounty as BountyMetadata
 from requests import HTTPError
+from typing import List
 
 from polyswarmd import eth, cache, app
 from polyswarmd.artifacts.exceptions import ArtifactException
@@ -28,7 +30,7 @@ def calculate_bloom(artifacts):
         bf.add(h.encode('utf-8'))
 
     v = int(bf)
-    ret = []
+    ret: List[int] = []
     d = (1 << 256)
     for _ in range(FILTER_BITS // 256):
         ret.insert(0, v % d)
@@ -89,7 +91,7 @@ def substitute_metadata(uri, artifact_client, session, validate=AssertionMetadat
         if validate(content):
             return content
 
-    except json.JSONDecodeError:
+    except JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
         logger.warning('Metadata retrieved from IPFS does not match schema')
     except Exception:
@@ -295,7 +297,7 @@ def post_assertion_metadata():
         if not AssertionMetadata.validate(loaded_body, silent=True) and \
                 not BountyMetadata.validate(loaded_body, silent=True):
             return failure('Invalid metadata', 400)
-    except json.JSONDecodeError:
+    except JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
         return failure('Invalid Assertion metadata', 400)
 

@@ -1,7 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 
 import web3
-import os
 from gevent import monkey
 from requests_futures.sessions import FuturesSession
 

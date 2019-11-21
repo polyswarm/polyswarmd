@@ -1,16 +1,12 @@
 import gevent
-try:
-    import ujson as json
-except ImportError:
-    import json
+import ujson as json
 import jsonschema
 import time
 
-import gevent
-import jsonschema
 from flask_sockets import Sockets
+from typing import Dict, List
 from gevent.queue import Empty, Queue
-from geventwebsocket import WebSocketError
+from geventwebsocket import WebSocketError, WebSocket as BaseWebsocket
 from jsonschema.exceptions import ValidationError
 from polyswarmd.chains import chain
 from polyswarmd.utils import channel_to_dict, g, logging, state_to_dict, uuid
@@ -47,14 +43,13 @@ class WebSocket:
         return f'<Websocket UUID={str(self.guid)}>'
 
     def __eq__(self, other):
-        return isinstance(other, WebSocket) and \
-               other.guid == self.guid
+        return isinstance(other, WebSocket) and other.guid == self.guid
 
 
 def init_websockets(app):
     sockets = Sockets(app)
     start_time = time.time()
-    message_sockets = dict()
+    message_sockets: Dict[uuid.UUID, List[BaseWebsocket]] = dict()
 
     @sockets.route('/events')
     @chain(account_required=False)
@@ -72,7 +67,7 @@ def init_websockets(app):
                 msg = wrapper.queue.get(block=False)
                 ws.send(msg)
             except Empty:
-                # Anytime there are no new messages to send, check that the websocket is still connected with ws.receive
+                # Anytime there are no new messages to send, check that the websocket is still connected
                 with gevent.Timeout(.5, False):
                     logger.debug('Checking %s against timeout', wrapper)
                     # This raises WebSocketError if socket is closed, and does not block if there are no messages
@@ -87,20 +82,19 @@ def init_websockets(app):
     @sockets.route('/events/<uuid:guid>')
     @chain(chain_name='home', account_required=False)
     def channel_events(ws, guid):
-        offer_channel = channel_to_dict(g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
+        offer_channel = channel_to_dict(
+            g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
         msig_address = offer_channel['msig_address']
         offer_msig = g.chain.offer_multisig.bind(msig_address)
         filter_manager = FilterManager()
         for evt in [ClosedAgreement, StartedSettle, SettleStateChallenged]:
-            filter_manager.register(offer_msig.eventFilter(evt.filter_event), evt)
+            filter_manager.register(offer_msig.eventFilter(evt.contract_event_name), evt)
 
         with filter_manager.fetch() as results:
             for messages in results:
-                if len(self.websockets) == 0:
-                    return
+                if ws.closed:
+                    raise RuntimeError("WebSocket is closed")
                 for msg in messages:
-                    if ws.closed:
-                        raise RuntimeError("WebSocket is closed")
                     return ws.send(msg)
 
     # for receiving messages about offers that might need to be signed

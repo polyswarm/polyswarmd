@@ -15,13 +15,12 @@ class EventServer(WebSocketApplication):
         gevent.spawn(self.filter_poll)
 
     def filter_poll(self):
-        try:
-            self.filter_manager.event_pool(self.broadcast).join()
-        except Exception:
-            # XXX Break this out into separate logger call?
-            self.ws.handler.logger.exception('Exception in filter checks, restarting greenlet')
-            # Creates a new greenlet with all new filters and let's this one die.
-            gevent.spawn(self.filter_poll)
+        with self.filter_manager.fetch() as results:
+            for messages in results:
+                if self.websockets is None:
+                    return
+                for msg in messages:
+                    self.broadcast(msg)
 
     def broadcast(self, msg):
         for client in self.ws.handler.server.clients.values():

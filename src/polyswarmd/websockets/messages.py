@@ -1,81 +1,85 @@
-try:
-    import ujson as json
-except ImportError:
-    import json
-from typing import Any
+import ujson as json
+
+from functools import lru_cache
+from typing import (TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, cast, Mapping)
 
 from polyswarmartifact import ArtifactType
 from polyswarmartifact.schema import Bounty as BountyMetadata
+from requests_futures.sessions import FuturesSession
 
-from .json_schema import copy_with_schema
+from .json_schema import (PSJSONSchema)
+
+from ._types import (EventData, SchemaDef, SchemaExtraction)
 
 
 class WebsocketMessage:
     "Represent a message that can be handled by polyswarm-client"
     # This is the identifier used when building a websocket event identifier.
-    _ws_event: str
-    __slots__ = ('data')
+    event: ClassVar[str]
+    __slots__ = ('message')
 
-    def __init__(self, data={}):
-        if not self._ws_event:
-            raise ValueError("This class has no websocket event name")
-        self.data = json.dumps({'event': self.ws_event, 'data': data}).encode('ascii')
+    def __init__(self, data=None):
+        self.message = json.dumps(self.to_message(data)).encode('ascii')
 
-    @property
-    def ws_event(self) -> str:
-        return self._ws_event
+    def to_message(self, data):
+        return {'event': self.event, **({'data': data} if data else {})}
 
-    def __bytes__(self):
-        return self.data
+    def __bytes__(self) -> bytes:
+        return self.message
 
 
 class Connected(WebsocketMessage):
-    _ws_event = 'connected'
-
-
-EventLogEntry = Any
+    event = 'connected'
 
 
 class EventLogMessage:
-    _extraction_schema: str
+    "Extract `EventData` based on schema"
+
+    schema: ClassVar[PSJSONSchema]
+    contract_event_name: ClassVar[str]
 
     @classmethod
-    def extract(cls, source: EventLogEntry):
-        "Extract the fields indicated in _extraction_schema from the event log message"
-        return copy_with_schema(cls._extraction_schema, source)
+    def __init_subclass__(cls):
+        super().__init_subclass__()
+        cls.contract_event_name = cls.__name__
+        if 'schema' in cls.__dict__:
+            if TYPE_CHECKING:
+                cls.__annotations__ = cls.schema.build_annotations()
+        else:
+            # If there doesn't exist a schema, extract everything into a dictionary
+            cls.__dict__['extract'] = lambda cls, instance: dict(instance)
 
     @classmethod
-    def contract_event_name(cls) -> str:
-        "The event name used by web3 (e.g 'Transfer' or 'FeesUpdated')"
-        return str(cls.__name__)
-
-    def __repr__(self):
-        return f'<EventLogMessage contract_event_name={self.contract_event_name()}>'
+    def extract(cls, instance: Mapping[Any, Any]) -> SchemaExtraction:
+        "Extract the fields indicated in schema from the event log message"
+        return cls.schema.extract(instance)
 
 
 # Commonly used schema properties
-uint256 = {'type': 'integer'}
-guid = {'type': 'string', 'format': 'uuid', '$#convert': True}
-bounty_guid = {**guid, '$#from': 'bountyGuid'}
-ethereum_address = {'type': 'string', 'format': 'ethaddr'}
+uint256: SchemaDef = {'type': 'integer'}
+guid: SchemaDef = {'type': 'string', 'format': 'uuid'}
+bounty_guid: SchemaDef = cast(SchemaDef, {**guid, 'srckey': 'bountyGuid'})
+ethereum_address: SchemaDef = {'type': 'string', 'format': 'ethaddr'}
+
 
 # The fetch routine uses format to split into a bitvector, e.g format(16, "0>10b") => '0000010000'
-boolvector = {
+def int_to_boolvector(x: int, sz: int) -> List[bool]:
+    return [b != '0' for b in format(x, "0>" + str(sz) + "b")]
+
+
+boolvector: SchemaDef = {
     'type': 'array',
     'items': 'boolean',
-    '$#fetch': lambda e, k, *args: [b != '0' for b in format(int(e[k]), f"0>{e.numArtifacts}b")]
+    'srckey': lambda e, k, *args: int_to_boolvector(int(e[k]), e.numArtifacts)
 }
 
 # The functions below are commented out because they depend on configuration being loaded from PolyswarmD.
-from requests_futures.sessions import FuturesSession
 
 session = FuturesSession(adapter_kwargs={'max_retries': 3})
 
-config = None
+config: Optional[Dict[str, Any]] = None
 artifact_client = None
 redis = None
-
-from functools import lru_cache
 
 
 # XXX this is about as hacky as it gets. We should extract configuration loading out.
@@ -88,9 +92,8 @@ def fetch_metadata(uri: str, validate):
     if config is None:
         from polyswarmd import app
         config = app.config
-        artifact_client = config['POLYSWARMD'].artifact_client
-        redis = config['POLYSWARMD'].redis
-
+    artifact_client = config['POLYSWARMD'].artifact_client
+    redis = config['POLYSWARMD'].redis
     return substitute_metadata(uri, artifact_client, session, validate=validate, redis=redis)
 
 
@@ -101,138 +104,120 @@ def pull_metadata(data, validate=None):
 
 
 class Transfer(EventLogMessage):
-    _extraction_schema = {
-        'properties': {
+    schema = PSJSONSchema(
+        {'properties': {
             'to': ethereum_address,
             'from': ethereum_address,
             'value': {
-                'type': 'string',
-                '$#convert': True
+                'type': 'string'
             }
-        }
-    }
+        }})
 
 
 class NewDeposit(EventLogMessage):
-    _extraction_schema = {
-        'properties': {
-            'value': uint256,
-            'from': ethereum_address,
-        }
-    }
+    schema = PSJSONSchema({'properties': {
+        'value': uint256,
+        'from': ethereum_address,
+    }})
 
 
 class NewWithdrawal(EventLogMessage):
-    _extraction_schema = {
-        'properties': {
-            'to': ethereum_address,
-            'value': uint256,
-        }
-    }
+    schema = PSJSONSchema({'properties': {
+        'to': ethereum_address,
+        'value': uint256,
+    }})
 
 
 # The classes below have no defined extraction ('conversion') logic,
 # so they simply return the argument to `extract` as a `dict`
-extract_all = {'extract': property(lambda self, event: dict(event))}
-
-OpenedAgreement = type('OpenedAgreement', (EventLogMessage, ), extract_all)
-CanceledAgreement = type('CanceledAgreement', (EventLogMessage, ), extract_all)
-JoinedAgreement = type('JoinedAgreement', (EventLogMessage, ), extract_all)
-ClosedAgreement = type('ClosedAgreement', (EventLogMessage, ), extract_all)
-StartedSettle = type('StartedSettle', (EventLogMessage, ), extract_all)
+OpenedAgreement = type('OpenedAgreement', (EventLogMessage, ), {})
+CanceledAgreement = type('CanceledAgreement', (EventLogMessage, ), {})
+JoinedAgreement = type('JoinedAgreement', (EventLogMessage, ), {})
 
 
 class WebsocketFilterMessage(WebsocketMessage, EventLogMessage):
     """Websocket message interface for etherem event entries. """
-    _ws_event: str
-    _extraction_schema: dict
+    event: ClassVar[str]
+    schema: ClassVar[PSJSONSchema]
+    contract_event_name: ClassVar[str]
 
-    def __init__(self, event: EventLogEntry):
-        self.data = json.dumps({
-            'event': self.ws_event,
+    __slots__ = ('message')
+
+    def to_message(self, event: EventData):
+        return {
+            'event': self.event,
             'data': self.extract(event['args']),
-            'block_number': event.blockNumber,
-            'txhash': event.transactionHash.hex()
-        }).encode('ascii')
+            'block_number': event['blockNumber'],
+            'txhash': event['transactionHash'].hex()
+        }
 
     def __repr__(self):
-        return f'<WebsocketFilterMessage name={self.ws_event} contract_event_name={self.contract_event_name()}>'
+        return f'<{self.__class__.__name__} name={self.event}>'
 
 
 class FeesUpdated(WebsocketFilterMessage):
-    _ws_event = 'fee_update'
-    _extraction_schema = {
+    event = 'fee_update'
+    schema = PSJSONSchema({
         'properties': {
             'bounty_fee': {
-                **uint256, '$#from': 'bountyFee'
+                **uint256, 'srckey': 'bountyFee'
             },
             'assertion_fee': {
-                **uint256, '$#from': 'assertionFee'
+                **uint256, 'srckey': 'assertionFee'
             }
         },
-    }
+    })
 
 
 class WindowsUpdated(WebsocketFilterMessage):
-    _ws_event = 'window_update'
-    _extraction_schema = {
+    event = 'window_update'
+    schema = PSJSONSchema({
         'properties': {
             'assertion_reveal_window': {
-                **uint256, '$#from': 'assertionRevealWindow'
+                **uint256, 'srckey': 'assertionRevealWindow'
             },
             'arbiter_vote_window': {
-                **uint256, '$#from': 'arbiterVoteWindow'
+                **uint256, 'srckey': 'arbiterVoteWindow'
             }
         }
-    }
+    })
 
 
 class NewBounty(WebsocketFilterMessage):
-    _ws_event = 'bounty'
-
-    def __init__(self, event: EventLogEntry):
-        self.data = json.dumps({
-            'event': self.ws_event,
-            # We do this here and not in `extract` because this is specifically needed for websocket messages
-            'data': pull_metadata(self.extract(event['args']), validate=BountyMetadata.validate),
-            'block_number': event.blockNumber,
-            'txhash': event.transactionHash.hex()
-        }).encode('ascii')
-
-    _extraction_schema = {
+    event = 'bounty'
+    schema = PSJSONSchema({
         'properties': {
             'guid': guid,
             'artifact_type': {
                 'type': 'string',
-                'enum': [ArtifactType.to_string(t) for t in ArtifactType],
-                '$#convert': True,
-                '$#fetch': lambda e, k, *args: ArtifactType.to_string(ArtifactType(e.artifactType))
+                'enum': ['file', 'url'],
+                'srckey': lambda e: ArtifactType.to_string(ArtifactType(e.artifactType))
             },
             'author': ethereum_address,
             'amount': {
-                '$#convert': True,
                 'type': 'string',
             },
             'uri': {
                 'type': 'string',
-                '$#from': 'artifactURI'
+                'srckey': 'artifactURI'
             },
             'expiration': {
-                '$#from': 'expirationBlock',
+                'srckey': 'expirationBlock',
                 'type': 'string',
-                '$#convert': True,
             },
             'metadata': {
                 'type': 'string',
-                '$#convert': True
             }
         }
-    }
+    })
+
+    def to_message(self, event: EventData):
+        return pull_metadata(self.extract(event['args']), validate=BountyMetadata.validate)
 
 
 class NewAssertion(WebsocketFilterMessage):
-    _ws_event = 'assertion'
-    _extraction_schema = {
+    event = 'assertion'
+    schema = PSJSONSchema({
         'properties': {
             'bounty_guid': bounty_guid,
             'author': ethereum_address,
@@ -240,147 +225,143 @@ class NewAssertion(WebsocketFilterMessage):
             'bid': {
                 'type': 'array',
                 'items': 'string',
-                '$#convert': True,
             },
             'mask': boolvector,
             'commitment': {
                 'type': 'string',
-                '$#convert': True,
             },
         },
-    }
+    })
 
 
 class RevealedAssertion(WebsocketFilterMessage):
-    _ws_event = 'reveal'
-
-    def __init__(self, event: EventLogEntry):
-        self.data = json.dumps({
-            'event': self.ws_event,
-            # We do this here and not in `extract` because this is specifically needed for websocket messages
-            'data': pull_metadata(self.extract(event['args']), validate=BountyMetadata.validate),
-            'block_number': event.blockNumber,
-            'txhash': event.transactionHash.hex()
-        }).encode('ascii')
-
-    _extraction_schema = {
+    event = 'reveal'
+    schema = PSJSONSchema({
         'properties': {
             'bounty_guid': bounty_guid,
             'author': ethereum_address,
             'index': uint256,
             'nonce': {
                 'type': 'string',
-                '$#convert': True,
             },
             'verdicts': boolvector,
             'metadata': {
                 'type': 'string'
             }
         }
-    }
+    })
+
+    def to_message(self, event: EventData):
+        return pull_metadata(self.extract(event['args']))
 
 
 class NewVote(WebsocketFilterMessage):
-    _ws_event = 'vote'
-    _extraction_schema = {'properties': {'bounty_guid': bounty_guid, 'voter': ethereum_address, 'votes': boolvector}}
+    event = 'vote'
+    schema = PSJSONSchema(
+        {'properties': {
+            'bounty_guid': bounty_guid,
+            'voter': ethereum_address,
+            'votes': boolvector
+        }})
 
 
 class QuorumReached(WebsocketFilterMessage):
-    _ws_event = 'quorum'
-    _extraction_schema = {'properties': {'bounty_guid': bounty_guid}}
+    event = 'quorum'
+    schema = PSJSONSchema({'properties': {'bounty_guid': bounty_guid}})
 
 
 class SettledBounty(WebsocketFilterMessage):
-    _ws_event = 'settled_bounty'
-    _extraction_schema = {'properties': {'bounty_guid': bounty_guid, 'settler': ethereum_address, 'payout': uint256}}
+    event = 'settled_bounty'
+    schema = PSJSONSchema(
+        {'properties': {
+            'bounty_guid': bounty_guid,
+            'settler': ethereum_address,
+            'payout': uint256
+        }})
 
 
 class InitializedChannel(WebsocketFilterMessage):
-    _ws_event = 'initialized_channel'
-    _extraction_schema = {
+    event = 'initialized_channel'
+    schema = PSJSONSchema({
         'properties': {
             'ambassador': ethereum_address,
             'expert': ethereum_address,
             'guid': guid,
             'multi_signature': {
-                '$#from': 'msig',
-                **ethereum_address
+                **ethereum_address,
+                'srckey': 'msig',
             }
         }
-    }
+    })
 
 
 class ClosedAgreement(WebsocketFilterMessage):
-    _ws_event = 'closed_agreement'
-    _extraction_schema = {
+    event = 'closed_agreement'
+    schema = PSJSONSchema({
         'properties': {
             'ambassador': {
-                '$#from': '_ambassador',
-                **ethereum_address
+                **ethereum_address, 'srckey': '_ambassador'
             },
             'expert': {
-                '$#from': '_expert',
+                'srckey': '_expert',
                 **ethereum_address
             }
         }
-    }
+    })
 
 
 class StartedSettle(WebsocketFilterMessage):
-    _ws_event = 'settle_started'
-    _extraction_schema = {
+    event = 'settle_started'
+    schema = PSJSONSchema({
         'properties': {
             'initiator': ethereum_address,
             'nonce': {
-                '$#from': 'sequence',
+                'srckey': 'sequence',
                 **uint256
             },
             'settle_period_end': {
-                '$#from': 'settlementPeriodEnd',
+                'srckey': 'settlementPeriodEnd',
                 **uint256
             }
         }
-    }
+    })
 
 
 class SettleStateChallenged(WebsocketFilterMessage):
-    _ws_event = 'settle_challenged'
-    _extraction_schema = {
+    event = 'settle_challenged'
+    schema = PSJSONSchema({
         'properties': {
             'challenger': ethereum_address,
             'nonce': {
-                '$#from': 'sequence',
+                'srckey': 'sequence',
                 **uint256
             },
             'settle_period_end': {
-                '$#from': 'settlementPeriodEnd',
+                'srckey': 'settlementPeriodEnd',
                 **uint256
             }
         }
-    }
+    })
 
 
 class Deprecated(WebsocketFilterMessage):
-    _ws_event = 'deprecated'
+    event = 'deprecated'
+
+    def to_message(self, event: EventData):
+        return {}
 
 
 class LatestEvent(WebsocketFilterMessage):
-    _ws_event = 'block'
-    _chain = None
+    event = 'block'
+    contract_event_name = 'latest'
+    _chain: ClassVar[Any]
 
-    def __init__(self, event):
-        self.data = json.dumps({'event': self.ws_event, 'data': {'number': self.block_number}}).encode('ascii')
-
-    @classmethod
-    def contract_event_name(cls):
-        return 'latest'
+    def to_message(self, event: Any):
+        return {'event': self.event, 'data': {'number': self.block_number}}
 
     @property
     def block_number(self):
-        if self._chain:
-            return self._chain.blockNumber
-        else:
-            return -1
+        return self._chain.blockNumber
 
     @classmethod
     def make(cls, chain):

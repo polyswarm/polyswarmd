@@ -4,7 +4,7 @@ import logging
 import re
 import uuid
 
-import urllib3
+from urllib3.util import parse_url
 
 from polyswarmd.artifacts.client import AbstractArtifactServiceClient
 from polyswarmd.artifacts.exceptions import ArtifactSizeException, InvalidUriException, \
@@ -24,7 +24,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         reachable_endpoint = f"{self.base_uri}{'/api/v0/bootstrap'}"
         super().__init__('IPFS', reachable_endpoint)
         # Create IPFS client
-        url = urllib3.util.parse_url(self.base_uri)
+        url = parse_url(self.base_uri)
         self.client = ipfshttpclient.connect(f'/dns/{url.host}/tcp/{url.port}/{url.scheme}', session=True)
 
     @staticmethod

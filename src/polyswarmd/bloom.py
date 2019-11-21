@@ -76,6 +76,9 @@ class BloomFilter(numbers.Number):
             )
         return BloomFilter(int(self) | int(other))
 
+    def __hash__(self):
+        return hash(self.value)
+
     def __or__(self, other):
         return self._combine(other)
 

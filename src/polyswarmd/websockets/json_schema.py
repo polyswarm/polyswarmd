@@ -1,86 +1,93 @@
 import uuid
-from typing import Any, Dict, Iterable
-
-JSONSchema = Any
-
-
-def copy_with_schema(schema: JSONSchema, source: Any) -> Dict[str, Any]:
-    """Extract and format fields from a `source' object with jsonschema
-
-    It extends jsonschema with several special keys that control extraction from `source`:
-
-        $#fetch - Run a function with args=[source, key, property_schema]
-        $#from - Extract this key from `source'
-
-        $#convert - If present and True, format and convert the copied value
-
-    If neither $#fetch or $#from are present, it attempts to fetch the value from `source`
-    with the same name as the key.
-
-    >>> make_range = lambda src, key, schema: src['range']()
-    >>> schema = { \
-        'properties': { \
-            'a': {'type': 'string'},  \
-            'b': {'type': 'string', '$#from': 'b_src'}, \
-            'c': {'type': 'string', '$#from': 'c_src', '$#convert': True}, \
-            'x': {'type': 'integer'}, \
-            'fetch': { 'type': 'array', 'items': 'string', '$#convert': True, '$#fetch': make_range }, \
-            'xs': { \
-                'type': 'array', \
-                'items': 'integer', \
-                '$#convert': True }}}
-    >>> source = { 'a': "1", 'b_src': "2", 'c_src': 3, 'x': 4, 'xs': ["5","6"], 'range': lambda: range(1,3) }
-    >>> copy_with_schema(schema, source)
-    {'a': '1', 'b': '2', 'c': '3', 'x': 4, 'fetch': ['1', '2'], 'xs': [5, 6]}
-    """
-    result = {}
-    for key, pschema in schema['properties'].items():
-        value = None
-        if '$#from' in pschema:
-            value = source[pschema['$#from']]
-        elif '$#fetch' in pschema:
-            value = pschema['$#fetch'](source, key, pschema)
-        else:
-            try:
-                value = source[key]
-            except (AttributeError, IndexError, KeyError) as e:
-                raise KeyError('Schema key not found in source ', key, source, schema)
-
-        if pschema.get('$#convert'):
-            result[key] = _apply_conversion(_apply_format(value, pschema), pschema)
-        else:
-            result[key] = value
-
-    return result
+import operator
+from functools import partial
+from typing import Any, Callable, Dict, cast
+from ._types import JSONSchema, SchemaExtraction
 
 
-_formatters = {'uuid': lambda x: uuid.UUID(int=x)}
+def compose(f, g):
+    return lambda x: f(g(x))
 
 
-def _apply_format(value: Any, schema: JSONSchema) -> Any:
-    if 'format' in schema and schema['format'] in _formatters:
-        return _formatters[schema['format']](value)
-    return value
+class PSJSONSchema():
+    schema: JSONSchema
+    _extractor: Dict[str, Callable[[Any], Any]]
 
+    _TYPES = {'string': str, 'integer': int, 'number': float, 'bool': bool, 'boolean': bool, 'array': list}
 
-_conversions = {
-    'string': str,
-    'integer': int,
-    'number': float,
-    'bool': bool,
-    'boolean': bool,
-}
+    _FORMATTERS = {'uuid': lambda x: uuid.UUID(int=x), 'ethaddr': str}
 
+    def __init__(self, schema: Dict[str, Any]):
+        self.schema = cast(JSONSchema, schema)
+        self._extractor = self.build_extractor()
 
-def _apply_conversion(value: Any, schema: JSONSchema) -> Any:
-    dtype = schema.get('type')
-    itype = schema.get('items')
-    if dtype == 'array' and itype in _conversions:
-        # this should really be recursive, but we're not using nested item definitions yet.
-        return [_conversions[itype](v) for v in value]
-    if dtype in _conversions:
-        return _conversions[schema['type']](value)
-    return value
+    def visitor(self):
+        yield from self.schema.get('properties', {})
+
+    def extract(self, instance: Any) -> SchemaExtraction:
+        """Extract and format fields from a source `instance` object
+
+        This uses ordinary jsonschema manifests, with the addition of polyswarm-specific keys:
+
+            srckey: str - Get the field with the same name from `instance`
+            srckey: callable - Run this function with `instance` as an argument
+
+        If srckey is not present at all, it attempts to fetch the value from `source`
+        with the same name/key as the definition.
+
+        >>> make_range = lambda src: src['range']()
+        >>> schema = PSJSONSchema({ \
+            'properties': { \
+                'a': {'type':'string'},  \
+                'b': {'type':'string', 'srckey': 'b_src'}, \
+                'c': {'type':'string', 'srckey': 'c_src'}, \
+                'x': {'type':'integer'}, \
+                'fetch': {'type': 'array', 'items': 'string', 'srckey': make_range}, \
+                'xs': {'type': 'array', 'items': 'integer' }}})
+        >>> instance = { 'a': "1", 'b_src': "2", 'c_src': 3, 'x': 4, \
+                        'xs': ["5","6"], 'range': lambda: range(1,3) }
+        >>> schema.extract(instance)
+        {'a': '1', 'b': '2', 'c': '3', 'x': 4, 'fetch': ['1', '2'], 'xs': [5, 6]}
+        """
+        return {k: fn(instance) for k, fn in self._extractor.items()}
+
+    @classmethod
+    def map_type(cls, name):
+        return cls._TYPES[name]
+
+    def build_extractor(self):
+        "Return a dictionary of functions which each extract/format a def_name"
+        extract_map = {}
+        # This code works by mapping each formatting-task to a particular function and then applying
+        # them in series, e.g
+        #  {'type': 'uuid', 'srckey': 'SRC', 'format': 'uuid' }
+        # would be converted into (using the _TYPES and _FORMATTERS tables above)
+        #   str(uuid.UUID(int=operator.itemgetter('SRC')))
+        for def_name, def_schema in self.visitor():
+            # You may use a string to indicate where to look in the source map,
+            # and if none is provided, it will use the key/def_name by default
+            srckey = def_schema.get('srckey', def_name)
+            if type(srckey) is str:
+                extract_fn = operator.itemgetter(srckey)
+            elif callable(srckey):
+                extract_fn = srckey
+
+            fmt = def_schema.get('format')
+            if fmt:
+                extract_fn = compose(self._FORMATTERS[fmt], extract_fn)
+
+            itype = def_schema.get('items')
+            if itype:
+                extract_fn = compose(partial(map, self.map_type(itype)), extract_fn)
+
+            extract_fn = compose(self.map_type(def_schema['type']), extract_fn)
+            extract_map[def_name] = extract_fn
+
+        return extract_map
+
+    def build_annotations(self):
+        for name, schema in self.visitor():
+            yield {name: self.map_type(schema['type'])}
 
 
 if __name__ == "__main__":
