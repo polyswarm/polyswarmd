@@ -1,4 +1,4 @@
-FROM pypy:3-7-slim-stretch
+FROM pypy:3-7-stretch
 LABEL maintainer="PolySwarm Developers <info@polyswarm.io>"
 
 WORKDIR /usr/src/app
