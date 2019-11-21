@@ -89,7 +89,7 @@ class PSJSONSchema():
             if type(srckey) is str:
                 extract_fn = operator.itemgetter(srckey)
             elif callable(srckey):
-                extract_fn = srckey
+                extract_fn = partial(srckey, def_name)
 
             fmt = def_schema.get('format')
             if fmt:

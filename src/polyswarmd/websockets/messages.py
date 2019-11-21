@@ -87,7 +87,7 @@ def int_to_boolvector(x: int, sz: int) -> List[bool]:
 boolvector: SchemaDef = {
     'type': 'array',
     'items': 'boolean',
-    'srckey': lambda e, k, *args: int_to_boolvector(int(e[k]), e.numArtifacts)
+    'srckey': lambda k, e: int_to_boolvector(int(e[k]), e.numArtifacts)
 }
 
 # The functions below are commented out because they depend on configuration being loaded from PolyswarmD.
@@ -212,7 +212,7 @@ class NewBounty(WebsocketFilterMessage):
             'artifact_type': {
                 'type': 'string',
                 'enum': ['file', 'url'],
-                'srckey': lambda e: ArtifactType.to_string(ArtifactType(e.artifactType))
+                'srckey': lambda k, e: ArtifactType.to_string(ArtifactType(e.artifactType))
             },
             'author': ethereum_address,
             'amount': {
