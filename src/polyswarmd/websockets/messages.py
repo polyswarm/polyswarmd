@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Mapping, NewType, Optional, cast, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Mapping, NewType, Optional, cast
 
 from polyswarmartifact import ArtifactType
 from polyswarmartifact.schema import Assertion as AssertionMetadata, Bounty as BountyMetadata
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
         event: str
         data: Any
 
-    class WebsocketMessageDict(Fields, total=False):
+    class WebsocketMessageDict(_BaseMessage, total=False):
         block_number: Optional[int]
         txhash: Optional[str]
 else:
