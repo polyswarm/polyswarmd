@@ -1,5 +1,4 @@
 import logging
-import weakref
 from contextlib import contextmanager
 from random import gauss
 from typing import Callable, Iterable, NoReturn, Set, Any, Type, List
@@ -55,7 +54,7 @@ class FilterWrapper:
         if self.filter.web3.eth.uninstallFilter(self.filter_id):
             logger.debug("Uninstalled filter_id=%s", self.filter_id)
         else:
-            logger.warn("Could not uninstall filter<filter_id=%s>")
+            logger.warning("Could not uninstall filter<filter_id=%s>", self.filter_id)
 
     def compute_wait(self, ctr: int) -> float:
         """Compute the amount of wait time from a counter of (sequential) empty replies"""
@@ -108,7 +107,7 @@ class FilterWrapper:
             logger.debug("%s wait=%f", self.filter, wait)
 
 
-class FilterManager():
+class FilterManager:
     """Manages access to filtered Ethereum events."""
 
     wrappers: Set[FilterWrapper]
@@ -137,10 +136,7 @@ class FilterManager():
         """Return a queue of currently managed contract events"""
         try:
             queue = Queue()
-            # Greenlet's can continue to exist beyond the lifespan of
-            # the object itself. Failing to use a weakref here can prevent filters
-            # destructors from running
-            for wrapper in map(weakref.proxy, self.wrappers):
+            for wrapper in self.wrappers:
                 self.pool.spawn(wrapper.spawn_poll_loop, queue.put_nowait)
 
             yield queue
