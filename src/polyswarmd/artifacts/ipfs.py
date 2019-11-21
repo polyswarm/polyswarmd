@@ -1,14 +1,18 @@
-import base58
-import ipfshttpclient
 import logging
 import re
 import uuid
 
+import base58
+import ipfshttpclient
 from urllib3.util import parse_url
 
 from polyswarmd.artifacts.client import AbstractArtifactServiceClient
-from polyswarmd.artifacts.exceptions import ArtifactSizeException, InvalidUriException, \
-    ArtifactNotFoundException, ArtifactException
+from polyswarmd.artifacts.exceptions import (
+    ArtifactException,
+    ArtifactNotFoundException,
+    ArtifactSizeException,
+    InvalidUriException,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -1,12 +1,21 @@
-import uuid
-import jsonschema
 import logging
-from jsonschema.exceptions import ValidationError
+import uuid
+
 from flask import Blueprint, g, request
+import jsonschema
+from jsonschema.exceptions import ValidationError
+
 from polyswarmd.chains import chain
 from polyswarmd.eth import build_transaction
-from polyswarmd.response import success, failure
-from polyswarmd.utils import channel_to_dict, validate_ws_url, dict_to_state, state_to_dict, to_padded_hex, bool_list_to_int
+from polyswarmd.response import failure, success
+from polyswarmd.utils import (
+    bool_list_to_int,
+    channel_to_dict,
+    dict_to_state,
+    state_to_dict,
+    to_padded_hex,
+    validate_ws_url,
+)
 
 logger = logging.getLogger(__name__)
 offers = Blueprint('offers', __name__)

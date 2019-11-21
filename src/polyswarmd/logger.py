@@ -1,7 +1,7 @@
+from datetime import datetime
 import logging
 import signal
 
-from datetime import datetime
 from pythonjsonlogger import jsonlogger
 
 

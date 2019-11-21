@@ -1,8 +1,7 @@
 import gevent
+from geventwebsocket import Resource, WebSocketApplication, WebSocketServer
 
-from geventwebsocket import WebSocketServer, WebSocketApplication, Resource
-
-from .filter import (FilterManager)
+from .filter import FilterManager
 
 
 class EventServer(WebSocketApplication):

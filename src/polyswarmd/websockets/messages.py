@@ -1,10 +1,22 @@
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Mapping, NewType, Optional, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Dict,
+    List,
+    Mapping,
+    NewType,
+    Optional,
+    cast,
+)
+import ujson as json
+
+from requests_futures.sessions import FuturesSession
 
 from polyswarmartifact import ArtifactType
-from polyswarmartifact.schema import Assertion as AssertionMetadata, Bounty as BountyMetadata
-from requests_futures.sessions import FuturesSession
-import ujson as json
+from polyswarmartifact.schema import Assertion as AssertionMetadata
+from polyswarmartifact.schema import Bounty as BountyMetadata
 
 from .json_schema import PSJSONSchema, SchemaDef, SchemaExtraction
 

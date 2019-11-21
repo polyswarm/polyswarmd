@@ -1,23 +1,31 @@
 import json
-import jsonschema
 import logging
 import os
+from typing import List
 import uuid
 
 from flask import Blueprint, g, request
+import jsonschema
 from jsonschema.exceptions import ValidationError
-from polyswarmartifact import ArtifactType
-from polyswarmartifact.schema import Assertion as AssertionMetadata, Bounty as BountyMetadata
 from requests import HTTPError
-from typing import List
 
-from polyswarmd import eth, cache, app
+from polyswarmartifact import ArtifactType
+from polyswarmartifact.schema import Assertion as AssertionMetadata
+from polyswarmartifact.schema import Bounty as BountyMetadata
+from polyswarmd import app, cache, eth
 from polyswarmd.artifacts.exceptions import ArtifactException
+from polyswarmd.bloom import FILTER_BITS, BloomFilter
 from polyswarmd.chains import chain
-from polyswarmd.bloom import BloomFilter, FILTER_BITS
-from polyswarmd.eth import build_transaction, ZERO_ADDRESS
-from polyswarmd.response import success, failure
-from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, vote_to_dict, bloom_to_dict, sha3
+from polyswarmd.eth import ZERO_ADDRESS, build_transaction
+from polyswarmd.response import failure, success
+from polyswarmd.utils import (
+    assertion_to_dict,
+    bloom_to_dict,
+    bool_list_to_int,
+    bounty_to_dict,
+    sha3,
+    vote_to_dict,
+)
 
 logger = logging.getLogger(__name__)
 bounties = Blueprint('bounties', __name__)

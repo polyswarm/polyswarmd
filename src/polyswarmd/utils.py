@@ -1,12 +1,13 @@
 import codecs
 import logging
-import string
 import re
-import uuid
+import string
 from typing import Union
-from Crypto.Hash import keccak
+import uuid
 
+from Crypto.Hash import keccak
 from flask import g
+
 from polyswarmartifact import ArtifactType
 
 logger = logging.getLogger(__name__)

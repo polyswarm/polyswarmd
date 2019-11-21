@@ -1,8 +1,7 @@
-from typing import (Any, Callable, Dict, cast, Iterable, Union, Mapping)
-
-import uuid
-import operator
 from functools import partial
+import operator
+from typing import Any, Callable, Dict, Iterable, Mapping, Union, cast
+import uuid
 
 try:
     from typing import TypedDict

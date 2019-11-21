@@ -1,23 +1,24 @@
-import gevent
-import jsonschema
-import logging
-import rlp
-
 from collections import defaultdict
+import logging
+from typing import Any, Dict, List, Tuple, Type
+
+from eth.vm.forks.constantinople.transactions import ConstantinopleTransaction
 from eth_abi import decode_abi
 from eth_abi.exceptions import InsufficientDataBytes
-from eth.vm.forks.constantinople.transactions import (ConstantinopleTransaction)
-from flask import current_app as app, Blueprint, g, request
+from flask import Blueprint
+from flask import current_app as app
+from flask import g, request
+import gevent
 from hexbytes import HexBytes
-from typing import Dict, Any, List, Tuple, Type
+import jsonschema
 from jsonschema.exceptions import ValidationError
+import rlp
+from web3.module import Module
 
 from polyswarmd import cache
 from polyswarmd.chains import chain
-from polyswarmd.response import success, failure
+from polyswarmd.response import failure, success
 from polyswarmd.websockets import messages
-
-from web3.module import Module
 
 logger = logging.getLogger(__name__)
 

@@ -1,12 +1,12 @@
-import jsonschema
 import logging
-from jsonschema.exceptions import ValidationError
 
 from flask import Blueprint, g, request
+import jsonschema
+from jsonschema.exceptions import ValidationError
 
-from polyswarmd.response import success, failure
 from polyswarmd.chains import chain
 from polyswarmd.eth import build_transaction
+from polyswarmd.response import failure, success
 
 logger = logging.getLogger(__name__)
 relay = Blueprint('relay', __name__)

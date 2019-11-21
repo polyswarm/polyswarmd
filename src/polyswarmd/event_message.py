@@ -1,21 +1,26 @@
-import gevent
-import ujson as json
-import jsonschema
 import time
+from typing import Dict, List
+import ujson as json
 
 from flask_sockets import Sockets
-from typing import Dict, List
+import gevent
 from gevent.queue import Empty, Queue
 from geventwebsocket import WebSocketApplication, WebSocketError
+import jsonschema
 from jsonschema.exceptions import ValidationError
-from polyswarmd.chains import chain
-from polyswarmd.utils import channel_to_dict, g, logging, state_to_dict, uuid
 
 # normally, we `import polyswarmd.websockets.messages`, but due to the existing
 # `messages' method and the small number of imports, we import directly.
-from polyswarmd.websockets.messages import (ClosedAgreement, Connected, SettleStateChallenged, StartedSettle)
-
+from polyswarmd.chains import chain
+from polyswarmd.utils import channel_to_dict, g, logging, state_to_dict, uuid
 from polyswarmd.websockets.filter import FilterManager
+from polyswarmd.websockets.messages import (
+    ClosedAgreement,
+    Connected,
+    SettleStateChallenged,
+    StartedSettle,
+)
+
 logger = logging.getLogger(__name__)
 
 

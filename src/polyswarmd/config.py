@@ -1,23 +1,22 @@
-import ujson as json
 import logging
 import os
 import threading
 import time
-import requests
-
+import ujson as json
 from urllib.parse import urlparse
 
-import yaml
-import redis
 from consul import Consul
 from consul.base import Timeout
-from web3 import Web3, HTTPProvider
+import redis
+import requests
+from web3 import HTTPProvider, Web3
 from web3.exceptions import MismatchedABI
 from web3.middleware import geth_poa_middleware
+import yaml
 
 from polyswarmd.artifacts.ipfs import IpfsServiceClient
-from polyswarmd.utils import camel_case_to_snake_case
 from polyswarmd.rpc import EthereumRpc
+from polyswarmd.utils import camel_case_to_snake_case
 
 logger = logging.getLogger(__name__)
 

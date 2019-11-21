@@ -1,11 +1,17 @@
 import logging
 
-from flask import current_app as app, g, Blueprint, request
+from flask import Blueprint
+from flask import current_app as app
+from flask import g, request
 from requests import HTTPError
 
-from polyswarmd.artifacts.exceptions import InvalidUriException, ArtifactNotFoundException, ArtifactException, \
-    ArtifactSizeException
-from polyswarmd.response import success, failure
+from polyswarmd.artifacts.exceptions import (
+    ArtifactException,
+    ArtifactNotFoundException,
+    ArtifactSizeException,
+    InvalidUriException,
+)
+from polyswarmd.response import failure, success
 
 logger = logging.getLogger(__name__)
 artifacts = Blueprint('artifacts', __name__)

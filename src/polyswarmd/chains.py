@@ -1,7 +1,8 @@
 import functools
 import logging
 
-from flask import current_app as app, g, request
+from flask import current_app as app
+from flask import g, request
 
 from polyswarmd.response import failure
 

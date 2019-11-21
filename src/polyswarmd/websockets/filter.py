@@ -1,13 +1,12 @@
-import logging
 from contextlib import contextmanager
+import logging
 from random import gauss
-from typing import Callable, Iterable, NoReturn, Set, Any, Type, List
-
-from requests.exceptions import ConnectionError
+from typing import Any, Callable, Iterable, List, NoReturn, Set, Type
 
 import gevent
 from gevent.pool import Group
 from gevent.queue import Queue
+from requests.exceptions import ConnectionError
 
 from . import messages
 
