@@ -29,7 +29,7 @@ build:
      # try to download a cache image
      - docker pull $REPO_URL/$BASE_IMAGE_NAME:latest || true
      # explicitly pull the latest version of the dependant image
-     - docker pull python:3.6-jessie
+     - docker pull python:3.7-jessie
      - docker build
        -f docker/Dockerfile
        -t $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
