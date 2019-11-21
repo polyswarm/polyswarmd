@@ -1,15 +1,35 @@
 import ujson as json
 
 from functools import lru_cache
-from typing import (TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, cast, Mapping)
+from typing import (TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, cast, Mapping, NewType)
 
 from polyswarmartifact import ArtifactType
-from polyswarmartifact.schema import Bounty as BountyMetadata
+from polyswarmartifact.schema import Bounty as BountyMetadata, Assertion as AssertionMetadata
 from requests_futures.sessions import FuturesSession
 
-from .json_schema import (PSJSONSchema)
+from .json_schema import (PSJSONSchema, SchemaExtraction, SchemaDef)
 
-from ._types import (EventData, SchemaDef, SchemaExtraction)
+try:
+    from typing import TypedDict
+except ImportError:
+    from mypy_extensions import TypedDict
+
+
+Hash32 = NewType('Hash32', bytes)
+HexAddress = NewType('HexAddress', str)
+ChecksumAddress = NewType('ChecksumAddress', HexAddress)
+
+EventData = TypedDict(
+    'EventData', {
+        'args': Dict[str, Any],
+        'event': str,
+        'logIndex': int,
+        'transactionIndex': int,
+        'transactionHash': Hash32,
+        'address': ChecksumAddress,
+        'blockHash': Hash32,
+        'blockNumber': int,
+    })
 
 
 class WebsocketMessage:
@@ -45,9 +65,6 @@ class EventLogMessage:
         if 'schema' in cls.__dict__:
             if TYPE_CHECKING:
                 cls.__annotations__ = cls.schema.build_annotations()
-        else:
-            # If there doesn't exist a schema, extract everything into a dictionary
-            cls.__dict__['extract'] = lambda cls, instance: dict(instance)
 
     @classmethod
     def extract(cls, instance: Mapping[Any, Any]) -> SchemaExtraction:
@@ -128,11 +145,15 @@ class NewWithdrawal(EventLogMessage):
     }})
 
 
+def second_argument_to_dict(_ignore, obj):
+    return dict(obj)
+
+extract_as_dict = {'extract': second_argument_to_dict}
 # The classes below have no defined extraction ('conversion') logic,
 # so they simply return the argument to `extract` as a `dict`
-OpenedAgreement = type('OpenedAgreement', (EventLogMessage, ), {})
-CanceledAgreement = type('CanceledAgreement', (EventLogMessage, ), {})
-JoinedAgreement = type('JoinedAgreement', (EventLogMessage, ), {})
+OpenedAgreement = type('OpenedAgreement', (EventLogMessage, ), extract_as_dict)
+CanceledAgreement = type('CanceledAgreement', (EventLogMessage, ), extract_as_dict)
+JoinedAgreement = type('JoinedAgreement', (EventLogMessage, ), extract_as_dict)
 
 
 class WebsocketFilterMessage(WebsocketMessage, EventLogMessage):
@@ -252,7 +273,7 @@ class RevealedAssertion(WebsocketFilterMessage):
     })
 
     def to_message(self, event: EventData):
-        return pull_metadata(self.extract(event['args']))
+        return pull_metadata(self.extract(event['args']), validate=AssertionMetadata.validate)
 
 
 class NewVote(WebsocketFilterMessage):

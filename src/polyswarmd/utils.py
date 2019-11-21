@@ -55,6 +55,7 @@ def bloom_to_dict(bloom):
         'bloom': bloom,
     }
 
+
 def assertion_to_dict(assertion, num_artifacts):
     return {
         'author': assertion[0],

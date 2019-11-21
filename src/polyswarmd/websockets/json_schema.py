@@ -1,8 +1,27 @@
+from typing import (Any, Callable, Dict, cast, Iterable, Union, Mapping)
+
 import uuid
 import operator
 from functools import partial
-from typing import Any, Callable, Dict, cast
-from ._types import JSONSchema, SchemaExtraction
+
+try:
+    from typing import TypedDict
+except ImportError:
+    from mypy_extensions import TypedDict
+
+SchemaType = str
+SchemaFormat = str
+SchemaExtraction = Dict[Any, Any]
+
+SchemaDef = TypedDict('SchemaDef', {
+    'type': SchemaType,
+    'format': SchemaFormat,
+    'enum': Iterable[Any],
+    'items': SchemaType,
+    'srckey': Union[str, Callable[[Any], Any]],
+}, total=False)
+
+JSONSchema = TypedDict('JSONSchema', {'properties': Mapping[str, SchemaDef]}, total=False)
 
 
 def compose(f, g):
@@ -22,7 +41,7 @@ class PSJSONSchema():
         self._extractor = self.build_extractor()
 
     def visitor(self):
-        yield from self.schema.get('properties', {})
+        yield from self.schema.get('properties', {}).items()
 
     def extract(self, instance: Any) -> SchemaExtraction:
         """Extract and format fields from a source `instance` object

@@ -6,7 +6,7 @@ import time
 from flask_sockets import Sockets
 from typing import Dict, List
 from gevent.queue import Empty, Queue
-from geventwebsocket import WebSocketError, WebSocket as BaseWebsocket
+from geventwebsocket import WebSocketApplication, WebSocketError
 from jsonschema.exceptions import ValidationError
 from polyswarmd.chains import chain
 from polyswarmd.utils import channel_to_dict, g, logging, state_to_dict, uuid
@@ -49,7 +49,7 @@ class WebSocket:
 def init_websockets(app):
     sockets = Sockets(app)
     start_time = time.time()
-    message_sockets: Dict[uuid.UUID, List[BaseWebsocket]] = dict()
+    message_sockets: Dict[uuid.UUID, List[WebSocketApplication]] = dict()
 
     @sockets.route('/events')
     @chain(account_required=False)
