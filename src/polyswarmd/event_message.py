@@ -1,6 +1,7 @@
 import time
 from typing import Dict, List
-import ujson as json
+import json
+import ujson
 
 from flask_sockets import Sockets
 import gevent
@@ -9,8 +10,6 @@ from geventwebsocket import WebSocketApplication, WebSocketError
 import jsonschema
 from jsonschema.exceptions import ValidationError
 
-# normally, we `import polyswarmd.websockets.messages`, but due to the existing
-# `messages' method and the small number of imports, we import directly.
 from polyswarmd.chains import chain
 from polyswarmd.utils import channel_to_dict, g, logging, state_to_dict, uuid
 from polyswarmd.websockets.filter import FilterManager
@@ -31,7 +30,8 @@ class WebSocket:
 
     def __init__(self, ws):
         """
-        Create a wrapper around a WebSocket with a guid to easily identify it, and a queue of messages to send
+        Create a wrapper around a WebSocket with a guid to easily identify it, and a queue of
+        messages to send
         :param ws: gevent WebSocket to wrap
         """
         self.guid = uuid.uuid4()
@@ -76,7 +76,8 @@ def init_websockets(app):
                 # Anytime there are no new messages to send, check that the websocket is still connected
                 with gevent.Timeout(.5, False):
                     logger.debug('Checking %s against timeout', wrapper)
-                    # This raises WebSocketError if socket is closed, and does not block if there are no messages
+                    # This raises WebSocketError if socket is closed, and does not block if there
+                    # are no messages
                     ws.receive()
             except WebSocketError as e:
                 logger.error('Websocket %s closed %s', wrapper, e)
@@ -183,7 +184,7 @@ def init_websockets(app):
 
                 for message_websocket in message_sockets[guid]:
                     if not message_websocket.closed:
-                        message_websocket.send(json.dumps(ret))
+                        message_websocket.send(ujson.dumps(ret))
 
                 gevent.sleep(1)
             except WebSocketError:

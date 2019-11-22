@@ -2,7 +2,7 @@ import logging
 import os
 import threading
 import time
-import ujson as json
+import json
 from urllib.parse import urlparse
 
 from consul import Consul

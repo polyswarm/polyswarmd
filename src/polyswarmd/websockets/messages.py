@@ -1,5 +1,5 @@
 from typing import (TYPE_CHECKING, Any, ClassVar, Dict, List, Mapping, NewType, Optional, cast, Callable)
-import ujson as json
+import ujson
 
 from requests_futures.sessions import FuturesSession
 
@@ -52,7 +52,7 @@ class WebsocketMessage:
     __slots__ = ('message')
 
     def __init__(self, data=None):
-        self.message = json.dumps(self.to_message(data)).encode('ascii')
+        self.message = ujson.dumps(self.to_message(data)).encode('ascii')
 
     @classmethod
     def to_message(cls, data) -> WebsocketMessageDict:
