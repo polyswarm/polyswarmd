@@ -30,6 +30,9 @@ if TYPE_CHECKING:
         blockHash: Hash32
         blockNumber: int
 
+        def __getitem__(self, k):
+            ...
+
     class _BaseMessage(TypedDict):
         event: str
         data: Any
@@ -51,8 +54,9 @@ class WebsocketMessage:
     def __init__(self, data=None):
         self.message = json.dumps(self.to_message(data)).encode('ascii')
 
-    def to_message(self, data) -> WebsocketMessageDict:
-        return {'event': self.event, 'data': data}
+    @classmethod
+    def to_message(cls, data) -> WebsocketMessageDict:
+        return {'event': cls.event, 'data': data}
 
     def __bytes__(self) -> bytes:
         return self.message
@@ -88,18 +92,26 @@ class EventLogMessage:
 uint256: SchemaDef = {'type': 'integer'}
 guid: SchemaDef = {'type': 'string', 'format': 'uuid'}
 bounty_guid: SchemaDef = cast(SchemaDef, {**guid, 'srckey': 'bountyGuid'})
-ethereum_address: SchemaDef = {'type': 'string', 'format': 'ethaddr'}
+ethereum_address: SchemaDef = {'format': 'ethaddr'}
 
 
-# The fetch routine uses format to split into a bitvector, e.g format(16, "0>10b") => '0000010000'
-def int_to_boolvector(x: int, sz: int) -> List[bool]:
-    return [b != '0' for b in format(x, "0>" + str(sz) + "b")]
+def int_to_bool_list(i):
+    s = format(i, 'b')
+    return [x == '1' for x in s[::-1]]
+
+
+def safe_int_to_bool_list(num, max):
+    if int(num) == 0:
+        return [False] * int(max)
+    else:
+        converted = int_to_bool_list(num)
+        return converted + [False] * (max - len(converted))
 
 
 boolvector: SchemaDef = {
     'type': 'array',
     'items': 'boolean',
-    'srckey': lambda k, e: int_to_boolvector(int(e[k]), e.numArtifacts)
+    'srckey': lambda k, e: safe_int_to_bool_list(e[k], e['numArtifacts'])
 }
 
 
@@ -107,12 +119,11 @@ boolvector: SchemaDef = {
 _substitute_metadata: Optional[Callable[[str, bool], Any]] = None
 
 
-def fetch_metadata(msg: WebsocketMessageDict, validate=None) -> WebsocketMessageDict:
+def fetch_metadata(msg: WebsocketMessageDict, validate=None, override=None) -> WebsocketMessageDict:
     """Fetch metadata with URI from `msg', validate it and merge the result
 
-    >>> global _substitute_metadata
-    >>> _substitute_metadata = lambda uri, validate: { 'hello': uri }
     >>> msg = {'event': 'test', 'data': { 'metadata': 'uri' }}
+    >>> _substitute_metadata = lambda uri, validate: { 'hello': uri }
     >>> fetch_metadata(msg, override=_substitute_metadata)
     {'event': 'test', 'data': {'metadata': {'hello': 'uri'}}}
     """
@@ -122,15 +133,18 @@ def fetch_metadata(msg: WebsocketMessageDict, validate=None) -> WebsocketMessage
 
     global _substitute_metadata
     if not _substitute_metadata:
-        from polyswarmd import app
-        from polyswarmd.bounties import substitute_metadata
-        config: Optional[Dict[str, Any]] = app.config
-        ai = config['POLYSWARMD'].artifact_client
-        session = FuturesSession(adapter_kwargs={'max_retries': 3})
-        redis = config['POLYSWARMD'].redis
+        if override:
+            _substitute_metadata = override
+        else:
+            from polyswarmd import app
+            from polyswarmd.bounties import substitute_metadata
+            config: Optional[Dict[str, Any]] = app.config
+            ai = config['POLYSWARMD'].artifact_client
+            session = FuturesSession(adapter_kwargs={'max_retries': 3})
+            redis = config['POLYSWARMD'].redis
 
-        def _substitute_metadata(uri: str, validate):
-            return substitute_metadata(uri, ai, session, validate=validate, redis=redis)
+            def _substitute_metadata(uri: str, validate=None):
+                return substitute_metadata(uri, ai, session, validate=validate, redis=redis)
 
     data.update(metadata=_substitute_metadata(data.get('metadata'), validate))
     return msg
@@ -182,12 +196,13 @@ class WebsocketFilterMessage(WebsocketMessage, EventLogMessage):
 
     __slots__ = ('message')
 
-    def to_message(self, event: EventData) -> WebsocketMessageDict:
+    @classmethod
+    def to_message(cls, event: EventData) -> WebsocketMessageDict:
         return {
-            'event': self.event,
-            'data': self.extract(event.args),
-            'block_number': event.blockNumber,
-            'txhash': event.transactionHash.hex()
+            'event': cls.event,
+            'data': cls.extract(event['args']),
+            'block_number': event['blockNumber'],
+            'txhash': event['transactionHash'].hex()
         }
 
     def __repr__(self):
@@ -237,7 +252,6 @@ class NewBounty(WebsocketFilterMessage):
                 'type': 'string',
             },
             'uri': {
-                'type': 'string',
                 'srckey': 'artifactURI'
             },
             'expiration': {
@@ -250,11 +264,34 @@ class NewBounty(WebsocketFilterMessage):
         }
     })
 
-    def to_message(self, event: EventData) -> WebsocketMessageDict:
+    @classmethod
+    def to_message(cls, event: EventData) -> WebsocketMessageDict:
         return fetch_metadata(super().to_message(event), validate=BountyMetadata.validate)
 
 
 class NewAssertion(WebsocketFilterMessage):
+    """NewAssertion
+    >>> from pprint import pprint
+    >>> args = {
+    ... 'bountyGuid': 1,
+    ... 'author': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
+    ... 'index': 1,
+    ... 'bid': [1,2,3],
+    ... 'mask': 32,
+    ... 'commitment': 100,
+    ... 'numArtifacts': 4 }
+    >>> event = {'args': args, 'blockNumber': 1, 'transactionHash': (11).to_bytes(16, byteorder='big')}
+    >>> pprint(NewAssertion.to_message(event))
+    {'block_number': 1,
+     'data': {'author': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
+              'bid': ['1', '2', '3'],
+              'bounty_guid': '00000000-0000-0000-0000-000000000001',
+              'commitment': '100',
+              'index': 1,
+              'mask': [False, False, False, False, False, True]},
+     'event': 'assertion',
+     'txhash': '0000000000000000000000000000000b'}
+    """
     event = 'assertion'
     schema = PSJSONSchema({
         'properties': {
@@ -285,12 +322,12 @@ class RevealedAssertion(WebsocketFilterMessage):
             },
             'verdicts': boolvector,
             'metadata': {
-                'type': 'string'
             }
         }
     })
 
-    def to_message(self, event: EventData) -> WebsocketMessageDict:
+    @classmethod
+    def to_message(cls, event: EventData) -> WebsocketMessageDict:
         return fetch_metadata(super().to_message(event), validate=AssertionMetadata.validate)
 
 
@@ -388,8 +425,8 @@ class SettleStateChallenged(WebsocketFilterMessage):
 class Deprecated(WebsocketFilterMessage):
     event = 'deprecated'
 
-    def to_message(self, event: EventData):
-        return {}
+    def __bytes__(self):
+        return b'{}'
 
 
 class LatestEvent(WebsocketFilterMessage):
@@ -397,12 +434,9 @@ class LatestEvent(WebsocketFilterMessage):
     contract_event_name = 'latest'
     _chain: ClassVar[Any]
 
-    def to_message(self, event: Any):
-        return {'event': self.event, 'data': {'number': self.block_number}}
-
-    @property
-    def block_number(self):
-        return self._chain.blockNumber
+    @classmethod
+    def to_message(cls, event) -> WebsocketMessageDict:
+        return {'event': cls.event, 'data': {'number': cls._chain.blockNumber}}
 
     @classmethod
     def make(cls, chain):
