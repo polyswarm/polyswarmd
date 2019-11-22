@@ -125,7 +125,8 @@ class User(object):
 
         max_artifact_size = next((
             f['base_uses']
-            for f in j.get('account', {}).get('features', []) if f['tag'] == 'max_artifact_size'
+            for f in j.get('account', {}).get('features', [])
+            if f['tag'] == 'max_artifact_size'
         ), config.fallback_max_artifact_size)
 
         return cls(authorized=True, user_id=user_id, max_artifact_size=max_artifact_size)

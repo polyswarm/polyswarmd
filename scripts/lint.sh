@@ -31,8 +31,10 @@ lint() {
     cd "$root"
 
     mypy && \
-    yapf -r -d "$srcpath" && \
-    isort --recursive --diff "$srcpath"
+        yapf -r -d "$srcpath" && \
+        isort --recursive --diff "$srcpath" && \
+        cd "$srcpath/" &&\
+        python -m websockets
 
     exit $?
 }
@@ -40,7 +42,8 @@ lint() {
 inplace_update() {
     cd "$root"
 
-    yapf -r -i "$srcpath" && isort --recursive "$srcpath"
+    yapf -r -i "$srcpath"
+    isort --recursive "$srcpath"
 
     exit $?
 }

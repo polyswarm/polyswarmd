@@ -1,4 +1,15 @@
-from typing import (TYPE_CHECKING, Any, ClassVar, Dict, List, Mapping, NewType, Optional, cast, Callable)
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    List,
+    Mapping,
+    NewType,
+    Optional,
+    cast,
+)
 import ujson
 
 from requests_futures.sessions import FuturesSession
@@ -113,7 +124,6 @@ boolvector: SchemaDef = {
     'items': 'boolean',
     'srckey': lambda k, e: safe_int_to_bool_list(e[k], e['numArtifacts'])
 }
-
 
 # partially applied `substitute_metadata' with AI, redis & session prefilled.
 _substitute_metadata: Optional[Callable[[str, bool], Any]] = None
@@ -364,8 +374,7 @@ class RevealedAssertion(WebsocketFilterMessage):
                 'type': 'string',
             },
             'verdicts': boolvector,
-            'metadata': {
-            }
+            'metadata': {}
         }
     })
 

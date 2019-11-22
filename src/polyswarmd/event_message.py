@@ -1,6 +1,6 @@
+import json
 import time
 from typing import Dict, List
-import json
 import ujson
 
 from flask_sockets import Sockets

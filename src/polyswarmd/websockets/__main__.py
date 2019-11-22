@@ -1,4 +1,3 @@
-
 if __name__ == "__main__":
     import doctest
     from . import messages, json_schema
