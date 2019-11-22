@@ -151,6 +151,18 @@ def fetch_metadata(msg: WebsocketMessageDict, validate=None, override=None) -> W
 
 
 class Transfer(EventLogMessage):
+    """Transfer
+
+    >>> from pprint import pprint
+    >>> args = {
+    ... 'to': "0x00000000000000000000000000000001",
+    ... 'from': "0x00000000000000000000000000000002",
+    ... 'value': 1 }
+    >>> pprint(Transfer.extract(args))
+    {'from': '0x00000000000000000000000000000002',
+     'to': '0x00000000000000000000000000000001',
+     'value': '1'}
+    """
     schema = PSJSONSchema({
         'properties': {
             'to': ethereum_address,
@@ -163,6 +175,14 @@ class Transfer(EventLogMessage):
 
 
 class NewDeposit(EventLogMessage):
+    """NewDeposit
+
+    >>> args = {
+    ... 'from': "0x00000000000000000000000000000002",
+    ... 'value': 1 }
+    >>> NewDeposit.extract(args)
+    {'value': 1, 'from': '0x00000000000000000000000000000002'}
+    """
     schema = PSJSONSchema({'properties': {
         'value': uint256,
         'from': ethereum_address,
@@ -170,6 +190,15 @@ class NewDeposit(EventLogMessage):
 
 
 class NewWithdrawal(EventLogMessage):
+    """NewWithdrawal
+
+    >>> args = {
+    ... 'to': "0x00000000000000000000000000000001",
+    ... 'from': "0x00000000000000000000000000000002",
+    ... 'value': 1 }
+    >>> NewWithdrawal.extract(args)
+    {'to': '0x00000000000000000000000000000001', 'value': 1}
+    """
     schema = PSJSONSchema({'properties': {
         'to': ethereum_address,
         'value': uint256,
@@ -210,6 +239,13 @@ class WebsocketFilterMessage(WebsocketMessage, EventLogMessage):
 
 
 class FeesUpdated(WebsocketFilterMessage):
+    """FeesUpdated
+    >>> args = {
+    ... 'bountyFee': 5000000000000000,
+    ... 'assertionFee': 5000000000000000 }
+    >>> FeesUpdated.extract(args)
+    {'bounty_fee': 5000000000000000, 'assertion_fee': 5000000000000000}
+    """
     event = 'fee_update'
     schema = PSJSONSchema({
         'properties': {
@@ -224,6 +260,13 @@ class FeesUpdated(WebsocketFilterMessage):
 
 
 class WindowsUpdated(WebsocketFilterMessage):
+    """WindowsUpdated
+    >>> args = {
+    ... 'assertionRevealWindow': 100,
+    ... 'arbiterVoteWindow': 105 }
+    >>> WindowsUpdated.extract(args)
+    {'assertion_reveal_window': 100, 'arbiter_vote_window': 105}
+    """
     event = 'window_update'
     schema = PSJSONSchema({
         'properties': {

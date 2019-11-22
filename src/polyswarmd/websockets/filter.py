@@ -86,9 +86,14 @@ class FilterWrapper:
             greenlet = gevent.spawn(self.get_new_entries)
             try:
                 result = greenlet.get(block=True)
+            # LookupError generally occurs when our schema doesn't match the message
+            except LookupError:
+                logger.exception("LookupError inside spawn_poll_loop")
+                wait = 1
+                continue
             # ConnectionError generally occurs when we cannot fetch events
             except (ConnectionError, gevent.Timeout):
-                logger.exception("Error thrown in get_new_entries")
+                logger.exception("ConnectionError/timeout in spawn_poll_loop")
                 wait = self.compute_wait(ctr + 2)
                 continue
 
