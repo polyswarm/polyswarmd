@@ -115,7 +115,7 @@ class PSJSONSchema:
 
                 try:
                     annotations[name] = f'zv.{elt.__name__}'
-                except NameError:
+                except (NameError, LookupError, AttributeError):
                     annotations[name] = elt
             else:
                 annotations[name] = Any  # type: ignore
