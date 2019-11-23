@@ -28,7 +28,7 @@ class ContractFilter():
 
 
 FormatClass = Type[messages.WebsocketFilterMessage]
-Message = messages.WebsocketMessage
+Message = messages.WebsocketMessage[Any]
 
 
 class FilterWrapper:
@@ -162,7 +162,7 @@ class FilterManager:
             backoff=False
         )
 
-        filter_events = [
+        filter_events: List[FormatClass] = [
             messages.FeesUpdated,
             messages.WindowsUpdated,
             messages.NewAssertion,

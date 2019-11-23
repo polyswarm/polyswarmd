@@ -1,6 +1,6 @@
 import json
 import time
-from typing import Dict, List
+from typing import Any, Dict, List, Type
 import ujson
 
 from flask_sockets import Sockets
@@ -18,6 +18,7 @@ from polyswarmd.websockets.messages import (
     Connected,
     SettleStateChallenged,
     StartedSettle,
+    WebsocketFilterMessage,
 )
 
 logger = logging.getLogger(__name__)
@@ -95,7 +96,12 @@ def init_websockets(app):
         msig_address = offer_channel['msig_address']
         offer_msig = g.chain.offer_multisig.bind(msig_address)
         filter_manager = FilterManager()
-        for evt in [ClosedAgreement, StartedSettle, SettleStateChallenged]:
+        filter_events: Any[Type[WebsocketFilterMessage]] = [
+            ClosedAgreement,
+            StartedSettle,
+            SettleStateChallenged,
+        ]
+        for evt in filter_events:
             filter_manager.register(offer_msig.eventFilter(evt.contract_event_name), evt)
 
         with filter_manager.fetch() as results:

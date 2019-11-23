@@ -1,6 +1,6 @@
 from functools import partial
 import operator
-from typing import Any, Callable, Dict, Iterable, Mapping, Union, cast
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Union, cast
 import uuid
 
 try:
@@ -104,5 +104,19 @@ class PSJSONSchema:
         return extract_map
 
     def build_annotations(self):
+        annotations = {}
         for name, schema in self.visitor():
-            yield {name: schema.get('type', Any)}
+            type_name = schema.get('type')
+            if type_name:
+                if type_name == 'array':
+                    elt = List[self._TYPES.get(schema.get('items'), Any)]  # type: ignore
+                else:
+                    elt = self._TYPES.get(type_name, Any)
+
+                try:
+                    annotations[name] = f'zv.{elt.__name__}'
+                except NameError:
+                    annotations[name] = elt
+            else:
+                annotations[name] = Any  # type: ignore
+        return annotations

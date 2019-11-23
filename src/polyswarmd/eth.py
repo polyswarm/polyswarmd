@@ -433,8 +433,7 @@ def events_from_transaction(txhash, chain):
             # Now pull out the pertinent logs from the transaction receipt
             event_log = contract_event().processReceipt(receipt)
             if event_log:
-                # XXX I don't understand why ret.get is here, but I'm keeping it until I can understand why -zv
-                ret[key] = ret.get(key, []) + [extractor.extract(event_log[0]['args'])]
+                ret[key] = [extractor.extract(event_log[0]['args'])]
 
     return ret
 
