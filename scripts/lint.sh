@@ -24,9 +24,9 @@ Usage:
  $0 [options]
 
 Options:
-  -l				Lint $srcpath with mypy, isort & yapf.
-  -i				Apply destructive formatting with isort & yapf
-  --stubs		Generate mypy type stubs for websocket message clases from their JSONSchema
+  -l          Lint $srcpath with mypy, isort, yapf, flake8 and run doctests.
+  -i          Apply destructive formatting with isort & yapf
+  --stubs     Generate mypy type stubs for websocket message clases from their JSONSchema
 EOF
     fi
 }
