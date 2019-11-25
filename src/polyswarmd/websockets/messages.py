@@ -116,34 +116,15 @@ def _get_boolvector(k: str, e: EventData):
 
 boolvector: SchemaDef = {'type': 'array', 'items': 'boolean', 'srckey': _get_boolvector}
 
-# partially applied `substitute_metadata' with AI, redis & session prefilled.
-_substitute_metadata: Optional[Callable[[str, bool], Any]] = None
 
+class MetadataHandler:
+    # partially applied `substitute_metadata' with AI, redis & session prefilled.
+    _substitute_metadata: ClassVar[Optional[Callable[[str, bool], Any]]] = None
 
-def fetch_metadata(msg: WebsocketEventMessage[D], validate=None,
-                   override=None) -> WebsocketEventMessage[D]:
-    """Fetch metadata with URI from `msg', validate it and merge the result
-
-    doctest:
-    When the doctest runs, _substitute_metadata is already defined outside the doctest. This won't
-    trigger network IO
-
-    >>> msg = {'event': 'test', 'data': { 'metadata': 'uri' }}
-    >>> pprint(fetch_metadata(msg))
-    {'data': {'metadata': {'malware_family': 'EICAR',
-                           'scanner': {'environment': {'architecture': 'x86_64',
-                                                       'operating_system': 'Linux'}}}},
-     'event': 'test'}
-    """
-    data = msg.get('data')
-    if not data:
-        return msg
-
-    global _substitute_metadata
-    if not _substitute_metadata:
-        if override:
-            _substitute_metadata = override
-        else:
+    @classmethod
+    def initialize(cls):
+        """Create & assign a new implementation of _substitute_metadata"""
+        if not cls._substitute_metadata:
             from polyswarmd import app
             from polyswarmd.bounties import substitute_metadata
             config: Optional[Dict[str, Any]] = app.config
@@ -151,11 +132,40 @@ def fetch_metadata(msg: WebsocketEventMessage[D], validate=None,
             session = FuturesSession(adapter_kwargs={'max_retries': 3})
             redis = config['POLYSWARMD'].redis
 
-            def _substitute_metadata(uri: str, validate=None):
+            def _substitute_metadata_impl(uri: str, validate=None):
                 return substitute_metadata(uri, ai, session, validate=validate, redis=redis)
+            cls._substitute_metadata = _substitute_metadata_impl
 
-    data.update(metadata=_substitute_metadata(data.get('metadata'), validate))
-    return msg
+    @classmethod
+    def fetch(
+            cls,
+            msg: WebsocketEventMessage[D],
+            validate=AssertionMetadata.validate,
+            override=None
+    ) -> WebsocketEventMessage[D]:
+        """Fetch metadata with URI from `msg', validate it and merge the result
+
+        doctest:
+        When the doctest runs, _substitute_metadata is already defined outside the doctest. This won't
+        trigger network IO
+
+        >>> msg = {'event': 'test', 'data': { 'metadata': 'uri' }}
+        >>> MetadataHandler.fetch(msg, validate=None)
+        {'event': 'test', 'data': {'metadata': 'uri'}}
+        """
+        data = msg.get('data')
+        if not data:
+            return msg
+
+        data.update(metadata=cls.substitute_metadata(data.get('metadata'), validate))
+        return msg
+
+    @classmethod
+    def substitute_metadata(cls, *args, **kwargs):
+        "Handles the actual call to `_substitute_metadata`"
+        if not cls._substitute_metadata:
+            cls.initialize()
+        return cls._substitute_metadata(*args, **kwargs)
 
 
 class Transfer(EventLogMessage[TransferMessageData]):
@@ -325,6 +335,38 @@ class WindowsUpdated(WebsocketFilterMessage[WindowsUpdatedMessageData]):
 
 
 class NewBounty(WebsocketFilterMessage[NewBountyMessageData]):
+    """NewBounty
+
+    doctest:
+
+    >>> event = mkevent({
+    ... 'guid': 1066,
+    ... 'artifactType': 1,
+    ... 'author': addr1,
+    ... 'amount': 10,
+    ... 'artifactURI': '912bnadf01295',
+    ... 'expirationBlock': 118,
+    ... 'metadata': 'ZWassertionuri'})
+    >>> decoded_msg(NewBounty(event))
+    {'block_number': 117,
+     'data': {'amount': '10',
+              'artifact_type': 'url',
+              'author': '0x00000000000000000000000000000001',
+              'expiration': '118',
+              'guid': '00000000-0000-0000-0000-00000000042a',
+              'metadata': [{'bounty_id': 69540800813340,
+                            'extended_type': 'EICAR virus test files',
+                            'filename': 'eicar_true',
+                            'md5': '44d88612fea8a8f36de82e1278abb02f',
+                            'mimetype': 'text/plain',
+                            'sha1': '3395856ce81f2b7382dee72602f798b642f14140',
+                            'sha256': '275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f',
+                            'size': 68,
+                            'type': 'FILE'}],
+              'uri': '912bnadf01295'},
+     'event': 'bounty',
+     'txhash': '0000000000000000000000000000000b'}
+    """
     event: ClassVar[str] = 'bounty'
     schema: ClassVar[PSJSONSchema] = PSJSONSchema({
         'properties': {
@@ -332,7 +374,7 @@ class NewBounty(WebsocketFilterMessage[NewBountyMessageData]):
             'artifact_type': {
                 'type': 'string',
                 'enum': ['file', 'url'],
-                'srckey': lambda k, e: ArtifactType.to_string(ArtifactType(e.artifactType))
+                'srckey': lambda k, e: ArtifactType.to_string(ArtifactType(e['artifactType']))
             },
             'author': ethereum_address,
             'amount': {
@@ -353,7 +395,7 @@ class NewBounty(WebsocketFilterMessage[NewBountyMessageData]):
 
     @classmethod
     def to_message(cls, event) -> WebsocketEventMessage[NewBountyMessageData]:
-        return fetch_metadata(super().to_message(event), validate=BountyMetadata.validate)
+        return MetadataHandler.fetch(super().to_message(event), validate=BountyMetadata.validate)
 
 
 class NewAssertion(WebsocketFilterMessage[NewAssertionMessageData]):
@@ -403,7 +445,8 @@ class RevealedAssertion(WebsocketFilterMessage[RevealedAssertionMessageData]):
 
     doctest:
     When the doctest runs, _substitute_metadata is already defined outside the doctest. This won't
-    trigger network IO
+    trigger network IO.
+
 
     >>> event = mkevent({
     ... 'bountyGuid': 2,
@@ -412,15 +455,15 @@ class RevealedAssertion(WebsocketFilterMessage[RevealedAssertionMessageData]):
     ... 'verdicts': 128,
     ... 'nonce': 8,
     ... 'numArtifacts': 4,
-    ... 'metadata': 'EICAR',})
+    ... 'metadata': 'ZWbountyuri' })
     >>> decoded_msg(RevealedAssertion(event))
     {'block_number': 117,
      'data': {'author': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
               'bounty_guid': '00000000-0000-0000-0000-000000000002',
               'index': 10,
-              'metadata': {'malware_family': 'EICAR',
-                           'scanner': {'environment': {'architecture': 'x86_64',
-                                                       'operating_system': 'Linux'}}},
+              'metadata': [{'malware_family': 'EICAR',
+                            'scanner': {'environment': {'architecture': 'x86_64',
+                                                        'operating_system': 'Linux'}}}],
               'nonce': '8',
               'verdicts': [False, False, False, False, False, False, False, True]},
      'event': 'reveal',
@@ -443,7 +486,7 @@ class RevealedAssertion(WebsocketFilterMessage[RevealedAssertionMessageData]):
     @classmethod
     def to_message(cls: Any,
                    event: EventData) -> WebsocketEventMessage[RevealedAssertionMessageData]:
-        return fetch_metadata(super().to_message(event), validate=AssertionMetadata.validate)
+        return MetadataHandler.fetch(super().to_message(event), validate=AssertionMetadata.validate)
 
 
 class NewVote(WebsocketFilterMessage[NewVoteMessageData]):
