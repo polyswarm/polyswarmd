@@ -124,24 +124,21 @@ class MetadataHandler:
     @classmethod
     def initialize(cls):
         """Create & assign a new implementation of _substitute_metadata"""
-        if not cls._substitute_metadata:
-            from polyswarmd import app
-            from polyswarmd.bounties import substitute_metadata
-            config: Optional[Dict[str, Any]] = app.config
-            ai = config['POLYSWARMD'].artifact_client
-            session = FuturesSession(adapter_kwargs={'max_retries': 3})
-            redis = config['POLYSWARMD'].redis
+        from polyswarmd import app
+        from polyswarmd.bounties import substitute_metadata
+        config: Optional[Dict[str, Any]] = app.config
+        ai = config['POLYSWARMD'].artifact_client
+        session = FuturesSession(adapter_kwargs={'max_retries': 3})
+        redis = config['POLYSWARMD'].redis
 
-            def _substitute_metadata_impl(uri: str, validate=None):
-                return substitute_metadata(uri, ai, session, validate=validate, redis=redis)
-            cls._substitute_metadata = _substitute_metadata_impl
+        def _substitute_metadata_impl(uri: str, validate=None):
+            return substitute_metadata(uri, ai, session, validate=validate, redis=redis)
+
+        cls._substitute_metadata = _substitute_metadata_impl
 
     @classmethod
     def fetch(
-            cls,
-            msg: WebsocketEventMessage[D],
-            validate=AssertionMetadata.validate,
-            override=None
+        cls, msg: WebsocketEventMessage[D], validate=AssertionMetadata.validate, override=None
     ) -> WebsocketEventMessage[D]:
         """Fetch metadata with URI from `msg', validate it and merge the result
 
@@ -161,11 +158,11 @@ class MetadataHandler:
         return msg
 
     @classmethod
-    def substitute_metadata(cls, *args, **kwargs):
+    def substitute_metadata(cls, uri: str, validate):
         "Handles the actual call to `_substitute_metadata`"
         if not cls._substitute_metadata:
             cls.initialize()
-        return cls._substitute_metadata(*args, **kwargs)
+        return cls._substitute_metadata(uri, validate)
 
 
 class Transfer(EventLogMessage[TransferMessageData]):
