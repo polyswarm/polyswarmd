@@ -500,6 +500,11 @@ def create_state():
                 'minLength': 1
             }
         },
+        # If either 'mask' or 'verdicts' are present, both must be.
+        'dependencies': {
+            'mask': ['verdicts'],
+            'verdicts': ['mask']
+        },
         'required': [
             'close_flag', 'nonce', 'ambassador', 'expert', 'msig_address', 'ambassador_balance',
             'expert_balance', 'guid', 'offer_amount'
@@ -513,9 +518,7 @@ def create_state():
 
     body['token_address'] = str(g.chain.nectar_token.address)
 
-    if 'verdicts' in body and 'mask' not in body or 'mask' in body and 'verdicts' not in body:
-        return failure('Invalid JSON: Both `verdicts` and `mask` properties must be sent')
-    elif 'verdicts' in body and 'mask' in body:
+    if 'verdicts' in body and 'mask' in body:
         body['verdicts'] = bool_list_to_int(body['verdicts'])
         body['mask'] = bool_list_to_int(body['mask'])
 
