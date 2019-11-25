@@ -23,6 +23,28 @@ try:
 except ImportError:
     from mypy_extensions import TypedDict
 
+D = TypeVar('D')
+E = TypeVar('E')
+
+
+class EventData(Mapping):
+    "Event data returned from web3 filter requests"
+    args: Dict[str, Any]
+    event: str
+    logIndex: int
+    transactionIndex: int
+    transactionHash: bytes
+    address: str
+    blockHash: bytes
+    blockNumber: int
+
+
+class WebsocketEventMessage(Generic[D], Mapping):
+    "An Polyswarm WebSocket message"
+    event: str
+    data: D
+    block_number: Optional[int]
+    txhash: Optional[str]
 """
 
 
