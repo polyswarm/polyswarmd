@@ -80,7 +80,8 @@ class PSJSONSchema:
     }
     _FORMATTERS: ClassVar[Dict[str, Callable[[Any], Any]]] = {'uuid': to_int_uuid}
 
-    __slots__ = {'schema': JSONSchema, '_extractor': Dict[str, Callable[[Any], Any]]}
+    schema: JSONSchema
+    _extractor: Dict[str, Callable[[Any], Any]]
 
     def __init__(self, schema: Dict[str, Any]):
         self.schema = cast(JSONSchema, schema)

@@ -62,7 +62,7 @@ def init_websockets(app):
     @chain(account_required=False)
     def events(ws):
         rpc = g.chain.rpc
-        ws.send(Connected({'start_time': str(start_time)}))
+        ws.send(Connected.serialize_message({'start_time': str(start_time)}))
 
         wrapper = WebSocket(ws)
 

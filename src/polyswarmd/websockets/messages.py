@@ -45,17 +45,14 @@ class WebsocketMessage(Generic[D]):
     "Represent a message that can be handled by polyswarm-client"
     # This is the identifier used when building a websocket event identifier.
     event: ClassVar[str]
-    __slots__ = {'message': bytes}
 
-    def __init__(self, data: Any = None):
-        self.message = ujson.dumps(self.to_message(data)).encode('ascii')
+    @classmethod
+    def serialize_message(cls: Any, data: Any) -> bytes:
+        return ujson.dumps(cls.to_message(data)).encode('ascii')
 
     @classmethod
     def to_message(cls: Any, data: Any) -> WebsocketEventMessage[D]:
         return cast(WebsocketEventMessage, {'event': cls.event, 'data': data})
-
-    def __bytes__(self):
-        return self.message
 
 
 class Connected(WebsocketMessage[str]):
@@ -118,6 +115,16 @@ boolvector: SchemaDef = {'type': 'array', 'items': 'boolean', 'srckey': _get_boo
 
 
 class MetadataHandler:
+    """Handles calling polyswarmd.bounties.substitute_metadata, only available at runtime
+
+    doctest:
+    When the doctest runs, MetadataHandler._substitute_metadata is already defined outside this
+    doctest (in __main__.py). Running this as a doctest will not trigger network IO.
+
+    >>> msg = {'event': 'test', 'data': { 'metadata': 'uri' }}
+    >>> MetadataHandler.fetch(msg, validate=None)
+    {'event': 'test', 'data': {'metadata': 'uri'}}
+    """
     # partially applied `substitute_metadata' with AI, redis & session prefilled.
     _substitute_metadata: ClassVar[Optional[Callable[[str, bool], Any]]] = None
 
@@ -137,19 +144,9 @@ class MetadataHandler:
         cls._substitute_metadata = _substitute_metadata_impl
 
     @classmethod
-    def fetch(
-        cls, msg: WebsocketEventMessage[D], validate=AssertionMetadata.validate, override=None
-    ) -> WebsocketEventMessage[D]:
-        """Fetch metadata with URI from `msg', validate it and merge the result
-
-        doctest:
-        When the doctest runs, _substitute_metadata is already defined outside the doctest. This won't
-        trigger network IO
-
-        >>> msg = {'event': 'test', 'data': { 'metadata': 'uri' }}
-        >>> MetadataHandler.fetch(msg, validate=None)
-        {'event': 'test', 'data': {'metadata': 'uri'}}
-        """
+    def fetch(cls, msg: WebsocketEventMessage[D],
+              validate=AssertionMetadata.validate) -> WebsocketEventMessage[D]:
+        """Fetch metadata with URI from `msg', validate it and merge the result"""
         data = msg.get('data')
         if not data:
             return msg
@@ -262,8 +259,6 @@ class WebsocketFilterMessage(WebsocketMessage[D], EventLogMessage[D]):
     schema: ClassVar[PSJSONSchema]
     contract_event_name: ClassVar[str]
 
-    __slots__ = {'message': bytes}
-
     @classmethod
     def to_message(cls, event: EventData) -> WebsocketEventMessage[D]:
         return cast(
@@ -285,7 +280,7 @@ class FeesUpdated(WebsocketFilterMessage[FeesUpdatedMessageData]):
     doctest:
 
     >>> event = mkevent({'bountyFee': 5000000000000000, 'assertionFee': 5000000000000000 })
-    >>> decoded_msg(FeesUpdated(event))
+    >>> decoded_msg(FeesUpdated.serialize_message(event))
     {'block_number': 117,
      'data': {'assertion_fee': 5000000000000000, 'bounty_fee': 5000000000000000},
      'event': 'fee_update',
@@ -312,7 +307,7 @@ class WindowsUpdated(WebsocketFilterMessage[WindowsUpdatedMessageData]):
     >>> event = mkevent({
     ... 'assertionRevealWindow': 100,
     ... 'arbiterVoteWindow': 105 })
-    >>> decoded_msg(WindowsUpdated(event))
+    >>> decoded_msg(WindowsUpdated.serialize_message(event))
     {'block_number': 117,
      'data': {'arbiter_vote_window': 105, 'assertion_reveal_window': 100},
      'event': 'window_update',
@@ -335,6 +330,8 @@ class NewBounty(WebsocketFilterMessage[NewBountyMessageData]):
     """NewBounty
 
     doctest:
+    When the doctest runs, MetadataHandler._substitute_metadata is already defined outside this
+    doctest (in __main__.py). Running this as a doctest will not trigger network IO.
 
     >>> event = mkevent({
     ... 'guid': 1066,
@@ -344,7 +341,7 @@ class NewBounty(WebsocketFilterMessage[NewBountyMessageData]):
     ... 'artifactURI': '912bnadf01295',
     ... 'expirationBlock': 118,
     ... 'metadata': 'ZWassertionuri'})
-    >>> decoded_msg(NewBounty(event))
+    >>> decoded_msg(NewBounty.serialize_message(event))
     {'block_number': 117,
      'data': {'amount': '10',
               'artifact_type': 'url',
@@ -408,7 +405,7 @@ class NewAssertion(WebsocketFilterMessage[NewAssertionMessageData]):
     ... 'mask': 32,
     ... 'commitment': 100,
     ... 'numArtifacts': 4 })
-    >>> decoded_msg(NewAssertion(event))
+    >>> decoded_msg(NewAssertion.serialize_message(event))
     {'block_number': 117,
      'data': {'author': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
               'bid': ['1', '2', '3'],
@@ -441,8 +438,8 @@ class RevealedAssertion(WebsocketFilterMessage[RevealedAssertionMessageData]):
     """RevealedAssertion
 
     doctest:
-    When the doctest runs, _substitute_metadata is already defined outside the doctest. This won't
-    trigger network IO.
+    When the doctest runs, MetadataHandler._substitute_metadata is already defined outside this
+    doctest (in __main__.py). Running this as a doctest will not trigger network IO.
 
 
     >>> event = mkevent({
@@ -453,7 +450,7 @@ class RevealedAssertion(WebsocketFilterMessage[RevealedAssertionMessageData]):
     ... 'nonce': 8,
     ... 'numArtifacts': 4,
     ... 'metadata': 'ZWbountyuri' })
-    >>> decoded_msg(RevealedAssertion(event))
+    >>> decoded_msg(RevealedAssertion.serialize_message(event))
     {'block_number': 117,
      'data': {'author': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
               'bounty_guid': '00000000-0000-0000-0000-000000000002',
@@ -496,9 +493,7 @@ class NewVote(WebsocketFilterMessage[NewVoteMessageData]):
     ... 'voter': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
     ... 'votes': 128,
     ... 'numArtifacts': 4 })
-    >>> new_vote = NewVote(event)
-    >>> new_vote.contract_event_name
-    'NewVote'
+    >>> new_vote = NewVote.serialize_message(event)
     >>> decoded_msg(new_vote)
     {'block_number': 117,
      'data': {'bounty_guid': '00000000-0000-0000-0000-000000000002',
@@ -541,9 +536,7 @@ class InitializedChannel(WebsocketFilterMessage[InitializedChannelMessageData]):
     ... 'expert': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
     ... 'guid': 1,
     ... 'msig': '0x789246BB76D18C6C7f8bd8ac8423478795f71bf9' })
-    >>> msg = InitializedChannel(event)
-    >>> msg.contract_event_name
-    'InitializedChannel'
+    >>> msg = InitializedChannel.serialize_message(event)
     >>> decoded_msg(msg)
     {'block_number': 117,
      'data': {'ambassador': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
@@ -575,7 +568,7 @@ class ClosedAgreement(WebsocketFilterMessage[ClosedAgreementMessageData]):
     >>> event = mkevent({
     ... '_ambassador': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
     ... '_expert': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c', })
-    >>> pprint(ClosedAgreement.to_message(event))
+    >>> decoded_msg(ClosedAgreement.serialize_message(event))
     {'block_number': 117,
      'data': {'ambassador': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
               'expert': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c'},
@@ -638,9 +631,9 @@ class Deprecated(WebsocketFilterMessage[None]):
     >>> LatestEvent.make(chain1)
     <class 'websockets.messages.LatestEvent'>
     >>> event = mkevent({'a': 1, 'hello': 'world', 'should_not_be_here': True})
-    >>> msg = Deprecated(event)
-    >>> msg.contract_event_name
+    >>> Deprecated.contract_event_name
     'Deprecated'
+    >>> msg = Deprecated.serialize_message(event)
     >>> decoded_msg(msg)
     {'block_number': 117,
      'data': {},
@@ -669,9 +662,9 @@ class LatestEvent(WebsocketFilterMessage[LatestEventMessageData]):
     >>> LatestEvent.make(chain1)
     <class 'websockets.messages.LatestEvent'>
     >>> event = mkevent({'a': 1, 'hello': 'world', 'should_not_be_here': True})
-    >>> msg = LatestEvent(event)
-    >>> msg.contract_event_name
+    >>> LatestEvent.contract_event_name
     'latest'
+    >>> msg = LatestEvent.serialize_message(event)
     >>> decoded_msg(msg)
     {'data': {'number': 117}, 'event': 'block'}
     """

@@ -28,7 +28,7 @@ class ContractFilter():
 
 
 FormatClass = Type[messages.WebsocketFilterMessage]
-Message = messages.WebsocketMessage[Any]
+Message = bytes
 
 
 class FilterWrapper:
@@ -36,8 +36,6 @@ class FilterWrapper:
     filter: ContractFilter
     formatter: FormatClass
     backoff: bool
-
-    __slots__ = ('filter', 'formatter', 'backoff')
 
     def __init__(self, fltr: ContractFilter, formatter: FormatClass, backoff: bool):
         self.filter = fltr
@@ -71,7 +69,7 @@ class FilterWrapper:
         return abs(gauss(result, 0.1))
 
     def get_new_entries(self) -> Iterable[Message]:
-        return [self.formatter(e) for e in self.filter.get_new_entries()]
+        return [self.formatter.serialize_message(e) for e in self.filter.get_new_entries()]
 
     def spawn_poll_loop(self, callback: Callable[[Iterable[FormatClass]], NoReturn]):
         """Spawn a greenlet which polls the filter's contract events, passing results to `callback'"""

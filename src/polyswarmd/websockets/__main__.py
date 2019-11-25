@@ -91,7 +91,7 @@ def run_doctests():
         m=messages,
         extraglobs={
             'pprint': pprint,
-            'decoded_msg': lambda wsmsg: pprint(json.loads(bytes(wsmsg.message).decode('ascii'))),
+            'decoded_msg': lambda wsmsg: pprint(json.loads(wsmsg.decode('ascii'))),
             'mkevent': TestEvent,
             'addr1': "0x00000000000000000000000000000001",
             'addr2': "0x00000000000000000000000000000002",
