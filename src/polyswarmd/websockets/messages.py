@@ -621,7 +621,7 @@ class Deprecated(WebsocketFilterMessage[None]):
         )
 
 
-class LatestEvent(WebsocketFilterMessage[LatestEventMessageData]):
+class LatestEvent(WebsocketFilterMessage[Dict]):
     """LatestEvent
 
     doctest:
@@ -636,6 +636,7 @@ class LatestEvent(WebsocketFilterMessage[LatestEventMessageData]):
     {'data': {'number': 117}, 'event': 'block'}
     """
     event: ClassVar[str] = 'block'
+    contract_event_name: ClassVar[str] = 'latest'
     _chain: ClassVar[Any]
 
     @classmethod
