@@ -137,5 +137,6 @@ SettleStateChallengedMessageData = TypedDict(
     }
 )
 
-# Latest event's data type is not synthesized from a schema. If it's type changes, update gen_stubs.py
+# Latest event's data type is not synthesized from a schema.
+# If it's type changes, update gen_stubs.py
 LatestEventMessageData = TypedDict('LatestEventMessageData', {'number': int})

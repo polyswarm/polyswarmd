@@ -621,7 +621,7 @@ class Deprecated(WebsocketFilterMessage[None]):
         )
 
 
-class LatestEvent(WebsocketFilterMessage[Dict]):
+class LatestEvent(WebsocketFilterMessage[LatestEventMessageData]):
     """LatestEvent
 
     doctest:

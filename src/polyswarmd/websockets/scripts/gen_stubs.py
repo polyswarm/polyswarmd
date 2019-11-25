@@ -71,5 +71,6 @@ if __name__ == "__main__":
                 klass = inspect.getsource(scls)
                 print(gen_stub(scls, klass))
                 print("\n")
-    print("""# Latest event's data type is not synthesized from a schema. If it's type changes, update gen_stubs.py""")
+    print("# Latest event's data type is not synthesized from a schema.")
+    print("# If it's type changes, update gen_stubs.py")
     print("""LatestEventMessageData = TypedDict('LatestEventMessageData', {'number': int})""")
