@@ -72,8 +72,8 @@ class EventLogMessage(Generic[E]):
     # class-property and type-checking annotations, we set it inside __init_subclass__.
     @classmethod
     def __init_subclass__(cls):
-        super().__init_subclass__()
         cls.contract_event_name = cls.__name__
+        super().__init_subclass__()
 
     @classmethod
     def extract(cls: Any, instance: Mapping) -> E:
@@ -88,7 +88,7 @@ bounty_guid: SchemaDef = cast(SchemaDef, {**guid, 'srckey': 'bountyGuid'})
 ethereum_address: SchemaDef = {'format': 'ethaddr', 'type': 'string'}
 
 
-def int_to_bool_list(i):
+def _int_to_bool_list(i):
     s = format(i, 'b')
     return [x == '1' for x in s[::-1]]
 
@@ -97,15 +97,24 @@ def safe_int_to_bool_list(num, max):
     if int(num) == 0:
         return [False] * int(max)
     else:
-        converted = int_to_bool_list(num)
+        converted = _int_to_bool_list(num)
         return converted + [False] * (max - len(converted))
 
 
-boolvector: SchemaDef = {
-    'type': 'array',
-    'items': 'boolean',
-    'srckey': lambda k, e: safe_int_to_bool_list(e[k], e['numArtifacts'])
-}
+def _get_boolvector(k: str, e: EventData):
+    """Safely Convert in to "bool list"
+
+    >>> _get_boolvector('test', {'test': 128, 'numArtifacts': 9})
+    [False, False, False, False, False, False, False, True, False]
+    >>> _get_boolvector('test', {'test': 15, 'numArtifacts': 4})
+    [True, True, True, True]
+    >>> _get_boolvector('test', {'test': 127, 'numArtifacts': 8})
+    [True, True, True, True, True, True, True, False]
+    """
+    return safe_int_to_bool_list(e[k], e['numArtifacts'])
+
+
+boolvector: SchemaDef = {'type': 'array', 'items': 'boolean', 'srckey': _get_boolvector}
 
 # partially applied `substitute_metadata' with AI, redis & session prefilled.
 _substitute_metadata: Optional[Callable[[str, bool], Any]] = None
@@ -115,10 +124,16 @@ def fetch_metadata(msg: WebsocketEventMessage[D], validate=None,
                    override=None) -> WebsocketEventMessage[D]:
     """Fetch metadata with URI from `msg', validate it and merge the result
 
+    doctest:
+    When the doctest runs, _substitute_metadata is already defined outside the doctest. This won't
+    trigger network IO
+
     >>> msg = {'event': 'test', 'data': { 'metadata': 'uri' }}
-    >>> _substitute_metadata = lambda uri, validate: { 'hello': uri }
-    >>> fetch_metadata(msg, override=_substitute_metadata)
-    {'event': 'test', 'data': {'metadata': {'hello': 'uri'}}}
+    >>> pprint(fetch_metadata(msg))
+    {'data': {'metadata': {'malware_family': 'EICAR',
+                           'scanner': {'environment': {'architecture': 'x86_64',
+                                                       'operating_system': 'Linux'}}}},
+     'event': 'test'}
     """
     data = msg.get('data')
     if not data:
@@ -146,12 +161,9 @@ def fetch_metadata(msg: WebsocketEventMessage[D], validate=None,
 class Transfer(EventLogMessage[TransferMessageData]):
     """Transfer
 
-    >>> from pprint import pprint
-    >>> args = {
-    ... 'to': "0x00000000000000000000000000000001",
-    ... 'from': "0x00000000000000000000000000000002",
-    ... 'value': 1 }
-    >>> pprint(Transfer.extract(args))
+    doctest:
+
+    >>> pprint(Transfer.extract({'to': addr1, 'from': addr2, 'value': 1 }))
     {'from': '0x00000000000000000000000000000002',
      'to': '0x00000000000000000000000000000001',
      'value': '1'}
@@ -170,11 +182,12 @@ class Transfer(EventLogMessage[TransferMessageData]):
 class NewDeposit(EventLogMessage[NewDepositMessageData]):
     """NewDeposit
 
-    >>> args = {
-    ... 'from': "0x00000000000000000000000000000002",
-    ... 'value': 1 }
-    >>> NewDeposit.extract(args)
+    doctest:
+
+    >>> NewDeposit.extract({'from': addr2, 'value': 1 })
     {'value': 1, 'from': '0x00000000000000000000000000000002'}
+    >>> NewDeposit.contract_event_name
+    'NewDeposit'
     """
     schema: ClassVar[PSJSONSchema] = PSJSONSchema({
         'properties': {
@@ -187,12 +200,16 @@ class NewDeposit(EventLogMessage[NewDepositMessageData]):
 class NewWithdrawal(EventLogMessage[NewWithdrawalMessageData]):
     """NewWithdrawal
 
+    doctest:
+
     >>> args = {
     ... 'to': "0x00000000000000000000000000000001",
     ... 'from': "0x00000000000000000000000000000002",
     ... 'value': 1 }
     >>> NewWithdrawal.extract(args)
     {'to': '0x00000000000000000000000000000001', 'value': 1}
+    >>> NewWithdrawal.contract_event_name
+    'NewWithdrawal'
     """
     schema: ClassVar[PSJSONSchema] = PSJSONSchema({
         'properties': {
@@ -202,21 +219,30 @@ class NewWithdrawal(EventLogMessage[NewWithdrawalMessageData]):
     })
 
 
-class OpenedAgreement(EventLogMessage[Any]):
+class OpenedAgreement(EventLogMessage[Dict]):
+    """OpenedAgreement
+
+    doctest:
+
+    >>> OpenedAgreement.extract({ 'to': addr1, 'from': addr2, 'value': 1 })
+    {'to': '0x00000000000000000000000000000001', 'from': '0x00000000000000000000000000000002', 'value': 1}
+    >>> OpenedAgreement.contract_event_name
+    'OpenedAgreement'
+    """
 
     @classmethod
     def extract(_cls, instance):
         return dict(instance)
 
 
-class CanceledAgreement(EventLogMessage[Any]):
+class CanceledAgreement(EventLogMessage[Dict]):
 
     @classmethod
     def extract(_cls, instance):
         return dict(instance)
 
 
-class JoinedAgreement(EventLogMessage[Any]):
+class JoinedAgreement(EventLogMessage[Dict]):
 
     @classmethod
     def extract(_cls, instance):
@@ -236,7 +262,7 @@ class WebsocketFilterMessage(WebsocketMessage[D], EventLogMessage[D]):
         return cast(
             WebsocketEventMessage[D], {
                 'event': cls.event,
-                'data': cls.extract(event['args']),
+                'data': cls.extract(event.args),
                 'block_number': event['blockNumber'],
                 'txhash': event['transactionHash'].hex()
             }
@@ -248,11 +274,15 @@ class WebsocketFilterMessage(WebsocketMessage[D], EventLogMessage[D]):
 
 class FeesUpdated(WebsocketFilterMessage[FeesUpdatedMessageData]):
     """FeesUpdated
-    >>> args = {
-    ... 'bountyFee': 5000000000000000,
-    ... 'assertionFee': 5000000000000000 }
-    >>> FeesUpdated.extract(args)
-    {'bounty_fee': 5000000000000000, 'assertion_fee': 5000000000000000}
+
+    doctest:
+
+    >>> event = mkevent({'bountyFee': 5000000000000000, 'assertionFee': 5000000000000000 })
+    >>> decoded_msg(FeesUpdated(event))
+    {'block_number': 117,
+     'data': {'assertion_fee': 5000000000000000, 'bounty_fee': 5000000000000000},
+     'event': 'fee_update',
+     'txhash': '0000000000000000000000000000000b'}
     """
     event: ClassVar[str] = 'fee_update'
     schema: ClassVar[PSJSONSchema] = PSJSONSchema({
@@ -269,11 +299,17 @@ class FeesUpdated(WebsocketFilterMessage[FeesUpdatedMessageData]):
 
 class WindowsUpdated(WebsocketFilterMessage[WindowsUpdatedMessageData]):
     """WindowsUpdated
-    >>> args = {
+
+    doctest:
+
+    >>> event = mkevent({
     ... 'assertionRevealWindow': 100,
-    ... 'arbiterVoteWindow': 105 }
-    >>> WindowsUpdated.extract(args)
-    {'assertion_reveal_window': 100, 'arbiter_vote_window': 105}
+    ... 'arbiterVoteWindow': 105 })
+    >>> decoded_msg(WindowsUpdated(event))
+    {'block_number': 117,
+     'data': {'arbiter_vote_window': 105, 'assertion_reveal_window': 100},
+     'event': 'window_update',
+     'txhash': '0000000000000000000000000000000b'}
     """
     event: ClassVar[str] = 'window_update'
     schema: ClassVar[PSJSONSchema] = PSJSONSchema({
@@ -322,18 +358,19 @@ class NewBounty(WebsocketFilterMessage[NewBountyMessageData]):
 
 class NewAssertion(WebsocketFilterMessage[NewAssertionMessageData]):
     """NewAssertion
-    >>> from pprint import pprint
-    >>> args = {
+
+    doctest:
+
+    >>> event = mkevent({
     ... 'bountyGuid': 1,
     ... 'author': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
     ... 'index': 1,
     ... 'bid': [1,2,3],
     ... 'mask': 32,
     ... 'commitment': 100,
-    ... 'numArtifacts': 4 }
-    >>> event = {'args': args, 'blockNumber': 1, 'transactionHash': (11).to_bytes(16, byteorder='big')}
-    >>> pprint(NewAssertion.to_message(event))
-    {'block_number': 1,
+    ... 'numArtifacts': 4 })
+    >>> decoded_msg(NewAssertion(event))
+    {'block_number': 117,
      'data': {'author': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
               'bid': ['1', '2', '3'],
               'bounty_guid': '00000000-0000-0000-0000-000000000001',
@@ -362,6 +399,33 @@ class NewAssertion(WebsocketFilterMessage[NewAssertionMessageData]):
 
 
 class RevealedAssertion(WebsocketFilterMessage[RevealedAssertionMessageData]):
+    """RevealedAssertion
+
+    doctest:
+    When the doctest runs, _substitute_metadata is already defined outside the doctest. This won't
+    trigger network IO
+
+    >>> event = mkevent({
+    ... 'bountyGuid': 2,
+    ... 'author': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
+    ... 'index': 10,
+    ... 'verdicts': 128,
+    ... 'nonce': 8,
+    ... 'numArtifacts': 4,
+    ... 'metadata': 'EICAR',})
+    >>> decoded_msg(RevealedAssertion(event))
+    {'block_number': 117,
+     'data': {'author': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
+              'bounty_guid': '00000000-0000-0000-0000-000000000002',
+              'index': 10,
+              'metadata': {'malware_family': 'EICAR',
+                           'scanner': {'environment': {'architecture': 'x86_64',
+                                                       'operating_system': 'Linux'}}},
+              'nonce': '8',
+              'verdicts': [False, False, False, False, False, False, False, True]},
+     'event': 'reveal',
+     'txhash': '0000000000000000000000000000000b'}
+    """
     event: ClassVar[str] = 'reveal'
     schema: ClassVar[PSJSONSchema] = PSJSONSchema({
         'properties': {
@@ -383,6 +447,26 @@ class RevealedAssertion(WebsocketFilterMessage[RevealedAssertionMessageData]):
 
 
 class NewVote(WebsocketFilterMessage[NewVoteMessageData]):
+    """NewVote
+
+    doctest:
+
+    >>> event = mkevent({
+    ... 'bountyGuid': 2,
+    ... 'voter': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
+    ... 'votes': 128,
+    ... 'numArtifacts': 4 })
+    >>> new_vote = NewVote(event)
+    >>> new_vote.contract_event_name
+    'NewVote'
+    >>> decoded_msg(new_vote)
+    {'block_number': 117,
+     'data': {'bounty_guid': '00000000-0000-0000-0000-000000000002',
+              'voter': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
+              'votes': [False, False, False, False, False, False, False, True]},
+     'event': 'vote',
+     'txhash': '0000000000000000000000000000000b'}
+    """
     event: ClassVar[str] = 'vote'
     schema: ClassVar[PSJSONSchema] = PSJSONSchema({
         'properties': {
@@ -410,6 +494,25 @@ class SettledBounty(WebsocketFilterMessage[SettledBountyMessageData]):
 
 
 class InitializedChannel(WebsocketFilterMessage[InitializedChannelMessageData]):
+    """InitializedChannel
+
+    >>> event = mkevent({
+    ... 'ambassador': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
+    ... 'expert': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
+    ... 'guid': 1,
+    ... 'msig': '0x789246BB76D18C6C7f8bd8ac8423478795f71bf9' })
+    >>> msg = InitializedChannel(event)
+    >>> msg.contract_event_name
+    'InitializedChannel'
+    >>> decoded_msg(msg)
+    {'block_number': 117,
+     'data': {'ambassador': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
+              'expert': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
+              'guid': '00000000-0000-0000-0000-000000000001',
+              'multi_signature': '0x789246BB76D18C6C7f8bd8ac8423478795f71bf9'},
+     'event': 'initialized_channel',
+     'txhash': '0000000000000000000000000000000b'}
+    """
     event: ClassVar[str] = 'initialized_channel'
     schema: ClassVar[PSJSONSchema] = PSJSONSchema({
         'properties': {
@@ -425,6 +528,20 @@ class InitializedChannel(WebsocketFilterMessage[InitializedChannelMessageData]):
 
 
 class ClosedAgreement(WebsocketFilterMessage[ClosedAgreementMessageData]):
+    """ClosedAgreement
+
+    doctest:
+
+    >>> event = mkevent({
+    ... '_ambassador': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
+    ... '_expert': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c', })
+    >>> pprint(ClosedAgreement.to_message(event))
+    {'block_number': 117,
+     'data': {'ambassador': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
+              'expert': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c'},
+     'event': 'closed_agreement',
+     'txhash': '0000000000000000000000000000000b'}
+    """
     event: ClassVar[str] = 'closed_agreement'
     schema: ClassVar[PSJSONSchema] = PSJSONSchema({
         'properties': {
@@ -474,15 +591,51 @@ class SettleStateChallenged(WebsocketFilterMessage[SettleStateChallengedMessageD
 
 
 class Deprecated(WebsocketFilterMessage[None]):
+    """Deprecated
+
+    doctest:
+
+    >>> LatestEvent.make(chain1)
+    <class 'websockets.messages.LatestEvent'>
+    >>> event = mkevent({'a': 1, 'hello': 'world', 'should_not_be_here': True})
+    >>> msg = Deprecated(event)
+    >>> msg.contract_event_name
+    'Deprecated'
+    >>> decoded_msg(msg)
+    {'block_number': 117,
+     'data': {},
+     'event': 'deprecated',
+     'txhash': '0000000000000000000000000000000b'}
+    """
     event: ClassVar[str] = 'deprecated'
 
-    def __bytes__(self):
-        return b'{}'
+    @classmethod
+    def to_message(cls, event: EventData) -> WebsocketEventMessage[D]:
+        return cast(
+            WebsocketEventMessage[D], {
+                'event': 'deprecated',
+                'data': {},
+                'block_number': event['blockNumber'],
+                'txhash': event['transactionHash'].hex()
+            }
+        )
 
 
 class LatestEvent(WebsocketFilterMessage[LatestEventMessageData]):
+    """LatestEvent
+
+    doctest:
+
+    >>> LatestEvent.make(chain1)
+    <class 'websockets.messages.LatestEvent'>
+    >>> event = mkevent({'a': 1, 'hello': 'world', 'should_not_be_here': True})
+    >>> msg = LatestEvent(event)
+    >>> msg.contract_event_name
+    'latest'
+    >>> decoded_msg(msg)
+    {'data': {'number': 117}, 'event': 'block'}
+    """
     event: ClassVar[str] = 'block'
-    contract_event_name: ClassVar[str] = 'latest'
     _chain: ClassVar[Any]
 
     @classmethod
@@ -491,5 +644,6 @@ class LatestEvent(WebsocketFilterMessage[LatestEventMessageData]):
 
     @classmethod
     def make(cls, chain):
+        cls.contract_event_name = 'latest'
         cls._chain = chain
         return cls
