@@ -1,6 +1,17 @@
 from functools import partial
 import operator
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Union, cast
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    SupportsInt,
+    Union,
+    cast,
+)
 import uuid
 
 try:
@@ -27,7 +38,13 @@ JSONSchema = TypedDict('JSONSchema', {'properties': Mapping[str, SchemaDef]}, to
 
 
 def compose(f, g):
+    """"Return a function which which composes/pipes g(x) into f(x)"""
     return lambda x: f(g(x))
+
+
+def to_int_uuid(x: SupportsInt) -> uuid.UUID:
+    """"Return an uuid from an int-able value"""
+    return uuid.UUID(int=int(x))
 
 
 class PSJSONSchema:
@@ -54,12 +71,16 @@ class PSJSONSchema:
     >>> schema.extract(instance)
     {'a': '1', 'b': '2', 'c': '3', 'x': 4, 'range': ['1', '2'], 'xs': [5, 6]}
     """
-    schema: JSONSchema
-    _extractor: Dict[str, Callable[[Any], Any]]
+    _TYPES: ClassVar[Dict[str, Callable[[Any], Any]]] = {
+        'string': str,
+        'integer': int,
+        'number': float,
+        'boolean': bool,
+        'array': list
+    }
+    _FORMATTERS: ClassVar[Dict[str, Callable[[Any], Any]]] = {'uuid': to_int_uuid}
 
-    _TYPES = {'string': str, 'integer': int, 'number': float, 'boolean': bool, 'array': list}
-
-    _FORMATTERS = {'uuid': lambda x: uuid.UUID(int=x)}
+    __slots__ = {'schema': JSONSchema, '_extractor': Dict[str, Callable[[Any], Any]]}
 
     def __init__(self, schema: Dict[str, Any]):
         self.schema = cast(JSONSchema, schema)
@@ -72,7 +93,7 @@ class PSJSONSchema:
         return {k: fn(instance) for k, fn in self._extractor.items()}
 
     def build_extractor(self):
-        "Return a dictionary of functions which each extract/format a def_name"
+        """Return a dictionary of functions which each extract/format a def_name"""
         extract_map = {}
         # This code works by mapping each formatting-task to a particular function and then applying
         # them in series, e.g
@@ -104,6 +125,9 @@ class PSJSONSchema:
         return extract_map
 
     def build_annotations(self):
+        """Return a mypy function annotation for this schema
+
+        This is used by gen_stubs.py, not in application logic"""
         annotations = {}
         for name, schema in self.visitor():
             type_name = schema.get('type')
