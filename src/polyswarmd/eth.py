@@ -433,9 +433,10 @@ def events_from_transaction(txhash, chain):
                 logger.warning("No contract event for: %s", filter_event)
                 continue
             # Now pull out the pertinent logs from the transaction receipt
+            abi = contract_event._get_event_abi()
             for log in receipt['logs']:
                 try:
-                    event_log = get_event_data(contract_event._get_event_abi(), log)
+                    event_log = get_event_data(abi, log)
                     if event_log:
                         ret[key] = [extractor.extract(event_log['args'])]
                     break
