@@ -13,7 +13,8 @@ import gevent
 from hexbytes import HexBytes
 import rlp
 from web3.module import Module
-
+from web3.utils.events import get_event_data
+from web3.exceptions import MismatchedABI
 from polyswarmd import cache
 from polyswarmd.chains import chain
 from polyswarmd.response import failure, success
@@ -432,9 +433,15 @@ def events_from_transaction(txhash, chain):
                 logger.warning("No contract event for: %s", filter_event)
                 continue
             # Now pull out the pertinent logs from the transaction receipt
-            event_log = contract_event().processReceipt(receipt)
-            if event_log:
-                ret[key] = [extractor.extract(event_log[0]['args'])]
+            for log in receipt['logs']:
+                try:
+                    event_log = get_event_data(contract_event._get_event_abi(), log)
+                    if event_log:
+                        ret[key] = [extractor.extract(event_log['args'])]
+                    break
+                except MismatchedABI:
+                    continue
+
 
     return ret
 
