@@ -367,7 +367,7 @@ class NewBounty(WebsocketFilterMessage[NewBountyMessageData]):
             'guid': guid,
             'artifact_type': {
                 'type': 'string',
-                'enum': ['file', 'url'],
+                'enum': [name.lower() for name, value in ArtifactType.__members__.items()],
                 'srckey': lambda k, e: ArtifactType.to_string(ArtifactType(e['artifactType']))
             },
             'author': ethereum_address,

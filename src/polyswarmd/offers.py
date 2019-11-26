@@ -1,9 +1,8 @@
 import logging
 import uuid
 
+import fastjsonschema
 from flask import Blueprint, g, request
-import jsonschema
-from jsonschema.exceptions import ValidationError
 
 from polyswarmd.chains import chain
 from polyswarmd.eth import build_transaction
@@ -20,6 +19,25 @@ from polyswarmd.utils import (
 logger = logging.getLogger(__name__)
 offers = Blueprint('offers', __name__)
 
+_post_create_offer_channel_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'ambassador': {
+            'type': 'string',
+            'minLength': 42,
+        },
+        'expert': {
+            'type': 'string',
+            'minLength': 42,
+        },
+        'settlementPeriodLength': {
+            'type': 'integer',
+            'minimum': 0,
+        },
+    },
+    'required': ['ambassador', 'expert', 'settlementPeriodLength'],
+})
+
 
 @offers.route('', methods=['POST'])
 @chain(chain_name='home')
@@ -29,28 +47,9 @@ def post_create_offer_channel():
 
     body = request.get_json()
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'ambassador': {
-                'type': 'string',
-                'minLength': 42,
-            },
-            'expert': {
-                'type': 'string',
-                'minLength': 42,
-            },
-            'settlementPeriodLength': {
-                'type': 'integer',
-                'minimum': 0,
-            },
-        },
-        'required': ['ambassador', 'expert', 'settlementPeriodLength'],
-    }
-
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _post_create_offer_channel_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message)
 
     guid = uuid.uuid4()
@@ -69,6 +68,19 @@ def post_create_offer_channel():
     return success({'transactions': transactions})
 
 
+_post_uri_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'websocketUri': {
+            'type': 'string',
+            'minLength': 1,
+            'maxLength': 32
+        }
+    },
+    'required': ['websocketUri'],
+})
+
+
 @offers.route('/<uuid:guid>/uri', methods=['POST'])
 @chain(chain_name='home')
 def post_uri(guid):
@@ -82,21 +94,9 @@ def post_uri(guid):
 
     body = request.get_json()
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'websocketUri': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 32
-            }
-        },
-        'required': ['websocketUri'],
-    }
-
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _post_uri_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message)
 
     websocket_uri = body['websocketUri']
@@ -109,6 +109,30 @@ def post_uri(guid):
     ]
 
     return success({'transactions': transactions})
+
+
+_post_open_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'state': {
+            'type': 'string',
+            'minLength': 32,
+        },
+        'r': {
+            'type': 'string',
+            'minLength': 64,
+        },
+        'v': {
+            'type': 'integer',
+            'minimum': 0,
+        },
+        's': {
+            'type': 'string',
+            'minLength': 64
+        },
+    },
+    'required': ['state', 'r', 'v', 's'],
+})
 
 
 @offers.route('/<uuid:guid>/open', methods=['POST'])
@@ -124,32 +148,9 @@ def post_open(guid):
 
     body = request.get_json()
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'state': {
-                'type': 'string',
-                'minLength': 32,
-            },
-            'r': {
-                'type': 'string',
-                'minLength': 64,
-            },
-            'v': {
-                'type': 'integer',
-                'minimum': 0,
-            },
-            's': {
-                'type': 'string',
-                'minLength': 64
-            },
-        },
-        'required': ['state', 'r', 'v', 's'],
-    }
-
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _post_open_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message)
 
     state = body['state']
@@ -192,6 +193,30 @@ def post_cancel(guid):
     return success({'transactions': transactions})
 
 
+_post_join_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'state': {
+            'type': 'string',
+            'minLength': 32,
+        },
+        'r': {
+            'type': 'string',
+            'minLength': 64,
+        },
+        'v': {
+            'type': 'integer',
+            'minimum': 0,
+        },
+        's': {
+            'type': 'string',
+            'minLength': 64
+        },
+    },
+    'required': ['state', 'r', 'v', 's'],
+})
+
+
 @offers.route('/<uuid:guid>/join', methods=['POST'])
 @chain(chain_name='home')
 def post_join(guid):
@@ -205,32 +230,9 @@ def post_join(guid):
 
     body = request.get_json()
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'state': {
-                'type': 'string',
-                'minLength': 32,
-            },
-            'r': {
-                'type': 'string',
-                'minLength': 64,
-            },
-            'v': {
-                'type': 'integer',
-                'minimum': 0,
-            },
-            's': {
-                'type': 'string',
-                'minLength': 64
-            },
-        },
-        'required': ['state', 'r', 'v', 's'],
-    }
-
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _post_join_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message)
 
     state = body['state']
@@ -248,6 +250,33 @@ def post_join(guid):
     return success({'transactions': transactions})
 
 
+_post_close_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'state': {
+            'type': 'string',
+            'minLength': 32,
+        },
+        'r': {
+            'type': 'array',
+            'minLength': 2,
+            'maxLength': 2,
+        },
+        'v': {
+            'type': 'array',
+            'minLength': 2,
+            'maxLength': 2,
+        },
+        's': {
+            'type': 'array',
+            'minLength': 2,
+            'maxLength': 2,
+        },
+    },
+    'required': ['state', 'r', 'v', 's'],
+})
+
+
 @offers.route('/<uuid:guid>/close', methods=['POST'])
 @chain(chain_name='home')
 def post_close(guid):
@@ -261,35 +290,9 @@ def post_close(guid):
 
     body = request.get_json()
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'state': {
-                'type': 'string',
-                'minLength': 32,
-            },
-            'r': {
-                'type': 'array',
-                'minLength': 2,
-                'maxLength': 2,
-            },
-            'v': {
-                'type': 'array',
-                'minLength': 2,
-                'maxLength': 2,
-            },
-            's': {
-                'type': 'array',
-                'minLength': 2,
-                'maxLength': 2,
-            },
-        },
-        'required': ['state', 'r', 'v', 's'],
-    }
-
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _post_close_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message)
 
     state = g.chain.w3.toBytes(hexstr=body['state'])
@@ -302,6 +305,33 @@ def post_close(guid):
     ]
 
     return success({'transactions': transactions})
+
+
+_post_close_challenged_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'state': {
+            'type': 'string',
+            'minLength': 32,
+        },
+        'r': {
+            'type': 'array',
+            'minLength': 2,
+            'maxLength': 2,
+        },
+        'v': {
+            'type': 'array',
+            'minLength': 2,
+            'maxLength': 2,
+        },
+        's': {
+            'type': 'array',
+            'minLength': 2,
+            'maxLength': 2,
+        },
+    },
+    'required': ['state', 'r', 'v', 's'],
+})
 
 
 # for closing a challenged state with a timeout
@@ -318,35 +348,9 @@ def post_close_challenged(guid):
 
     body = request.get_json()
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'state': {
-                'type': 'string',
-                'minLength': 32,
-            },
-            'r': {
-                'type': 'array',
-                'minLength': 2,
-                'maxLength': 2,
-            },
-            'v': {
-                'type': 'array',
-                'minLength': 2,
-                'maxLength': 2,
-            },
-            's': {
-                'type': 'array',
-                'minLength': 2,
-                'maxLength': 2,
-            },
-        },
-        'required': ['state', 'r', 'v', 's'],
-    }
-
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _post_close_challenged_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message)
 
     state = g.chain.w3.toBytes(hexstr=body['state'])
@@ -363,6 +367,33 @@ def post_close_challenged(guid):
     return success({'transactions': transactions})
 
 
+_post_settle_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'state': {
+            'type': 'string',
+            'minLength': 32,
+        },
+        'r': {
+            'type': 'array',
+            'minLength': 2,
+            'maxLength': 2,
+        },
+        'v': {
+            'type': 'array',
+            'minLength': 2,
+            'maxLength': 2,
+        },
+        's': {
+            'type': 'array',
+            'minLength': 2,
+            'maxLength': 2,
+        },
+    },
+    'required': ['state', 'r', 'v', 's'],
+})
+
+
 @offers.route('/<uuid:guid>/settle', methods=['POST'])
 @chain(chain_name='home')
 def post_settle(guid):
@@ -376,35 +407,9 @@ def post_settle(guid):
 
     body = request.get_json()
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'state': {
-                'type': 'string',
-                'minLength': 32,
-            },
-            'r': {
-                'type': 'array',
-                'minLength': 2,
-                'maxLength': 2,
-            },
-            'v': {
-                'type': 'array',
-                'minLength': 2,
-                'maxLength': 2,
-            },
-            's': {
-                'type': 'array',
-                'minLength': 2,
-                'maxLength': 2,
-            },
-        },
-        'required': ['state', 'r', 'v', 's'],
-    }
-
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _post_settle_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message)
 
     state = g.chain.w3.toBytes(hexstr=body['state'])
@@ -419,101 +424,102 @@ def post_settle(guid):
     return success({'transactions': transactions})
 
 
+_create_state_schema = fastjsonschema.compile({
+    'type':
+        'object',
+    'properties': {
+        'close_flag': {
+            'type': 'integer',
+            'minimum': 0,
+            'maximum': 1
+        },
+        'nonce': {
+            'type': 'integer',
+            'minimum': 0,
+        },
+        'ambassador': {
+            'type': 'string',
+            'minLength': 1,
+        },
+        'expert': {
+            'type': 'string',
+            'minLength': 1,
+        },
+        'msig_address': {
+            'type': 'string',
+            'minLength': 1,
+        },
+        'ambassador_balance': {
+            'type': 'integer',
+            'minimum': 0,
+        },
+        'expert_balance': {
+            'type': 'integer',
+            'minimum': 0,
+        },
+        'guid': {
+            'type': 'string',
+            'minLength': 1,
+        },
+        'offer_amount': {
+            'type': 'integer',
+            'minimum': 0,
+        },
+        'artifact_hash': {
+            'type': 'string',
+            'minimum': 0,
+        },
+        'ipfs_hash': {
+            'type': 'string',
+            'minimum': 0,
+        },
+        'engagement_deadline': {
+            'type': 'string',
+            'minimum': 0,
+        },
+        'assertion_deadline': {
+            'type': 'string',
+            'minLength': 1
+        },
+        'mask': {
+            'type': 'array',
+            'maxItems': 256,
+            'items': {
+                'type': 'boolean',
+            },
+        },
+        'verdicts': {
+            'type': 'array',
+            'maxItems': 256,
+            'items': {
+                'type': 'boolean',
+            },
+        },
+        'meta_data': {
+            'type': 'string',
+            'minLength': 1
+        }
+    },
+    # If either 'mask' or 'verdicts' are present, both must be.
+    'dependencies': {
+        'mask': ['verdicts'],
+        'verdicts': ['mask']
+    },
+    'required': [
+        'close_flag', 'nonce', 'ambassador', 'expert', 'msig_address', 'ambassador_balance',
+        'expert_balance', 'guid', 'offer_amount'
+    ],
+})
+
+
 @offers.route('/state', methods=['POST'])
 @chain(chain_name='home')
 def create_state():
     body = request.get_json()
 
-    schema = {
-        'type':
-            'object',
-        'properties': {
-            'close_flag': {
-                'type': 'integer',
-                'minimum': 0,
-                'maximum': 1
-            },
-            'nonce': {
-                'type': 'integer',
-                'minimum': 0,
-            },
-            'ambassador': {
-                'type': 'string',
-                'minLength': 1,
-            },
-            'expert': {
-                'type': 'string',
-                'minLength': 1,
-            },
-            'msig_address': {
-                'type': 'string',
-                'minLength': 1,
-            },
-            'ambassador_balance': {
-                'type': 'integer',
-                'minimum': 0,
-            },
-            'expert_balance': {
-                'type': 'integer',
-                'minimum': 0,
-            },
-            'guid': {
-                'type': 'string',
-                'minLength': 1,
-            },
-            'offer_amount': {
-                'type': 'integer',
-                'minimum': 0,
-            },
-            'artifact_hash': {
-                'type': 'string',
-                'minimum': 0,
-            },
-            'ipfs_hash': {
-                'type': 'string',
-                'minimum': 0,
-            },
-            'engagement_deadline': {
-                'type': 'string',
-                'minimum': 0,
-            },
-            'assertion_deadline': {
-                'type': 'string',
-                'minLength': 1
-            },
-            'mask': {
-                'type': 'array',
-                'maxItems': 256,
-                'items': {
-                    'type': 'boolean',
-                },
-            },
-            'verdicts': {
-                'type': 'array',
-                'maxItems': 256,
-                'items': {
-                    'type': 'boolean',
-                },
-            },
-            'meta_data': {
-                'type': 'string',
-                'minLength': 1
-            }
-        },
-        # If either 'mask' or 'verdicts' are present, both must be.
-        'dependencies': {
-            'mask': ['verdicts'],
-            'verdicts': ['mask']
-        },
-        'required': [
-            'close_flag', 'nonce', 'ambassador', 'expert', 'msig_address', 'ambassador_balance',
-            'expert_balance', 'guid', 'offer_amount'
-        ],
-    }
-
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _create_state_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message)
 
     body['token_address'] = str(g.chain.nectar_token.address)
@@ -523,6 +529,33 @@ def create_state():
         body['mask'] = bool_list_to_int(body['mask'])
 
     return success({'state': dict_to_state(body)})
+
+
+_post_challange_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'state': {
+            'type': 'string',
+            'minLength': 32,
+        },
+        'r': {
+            'type': 'array',
+            'minLength': 2,
+            'maxLength': 2,
+        },
+        'v': {
+            'type': 'array',
+            'minLength': 2,
+            'maxLength': 2,
+        },
+        's': {
+            'type': 'array',
+            'minLength': 2,
+            'maxLength': 2,
+        },
+    },
+    'required': ['state', 'r', 'v', 's'],
+})
 
 
 @offers.route('/<uuid:guid>/challenge', methods=['POST'])
@@ -538,35 +571,9 @@ def post_challange(guid):
 
     body = request.get_json()
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'state': {
-                'type': 'string',
-                'minLength': 32,
-            },
-            'r': {
-                'type': 'array',
-                'minLength': 2,
-                'maxLength': 2,
-            },
-            'v': {
-                'type': 'array',
-                'minLength': 2,
-                'maxLength': 2,
-            },
-            's': {
-                'type': 'array',
-                'minLength': 2,
-                'maxLength': 2,
-            },
-        },
-        'required': ['state', 'r', 'v', 's'],
-    }
-
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _post_challange_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message)
 
     state = g.chain.w3.toBytes(hexstr=body['state'])
