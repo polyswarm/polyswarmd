@@ -4,9 +4,8 @@ import os
 from typing import List
 import uuid
 
+import fastjsonschema
 from flask import Blueprint, g, request
-import jsonschema
-from jsonschema.exceptions import ValidationError
 from requests import HTTPError
 
 from polyswarmartifact import ArtifactType
@@ -115,6 +114,38 @@ def substitute_metadata(
     return uri
 
 
+_post_bounties_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'artifact_type': {
+            'type': 'string',
+            'enum': [name.lower() for name, value in ArtifactType.__members__.items()]
+        },
+        'amount': {
+            'type': 'string',
+            'minLength': 1,
+            'maxLength': 100,
+            'pattern': r'^\d+$'
+        },
+        'uri': {
+            'type': 'string',
+            'minLength': 1,
+            'maxLength': 100,
+        },
+        'duration': {
+            'type': 'integer',
+            'minimum': 1,
+        },
+        'metadata': {
+            'type': 'string',
+            'minLength': 1,
+            'maxLength': 100,
+        }
+    },
+    'required': ['artifact_type', 'amount', 'uri', 'duration'],
+})
+
+
 @bounties.route('', methods=['POST'])
 @chain
 def post_bounties():
@@ -123,41 +154,10 @@ def post_bounties():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'artifact_type': {
-                'type': 'string',
-                'enum': [name.lower() for name, value in ArtifactType.__members__.items()]
-            },
-            'amount': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 100,
-                'pattern': r'^\d+$'
-            },
-            'uri': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 100,
-            },
-            'duration': {
-                'type': 'integer',
-                'minimum': 1,
-            },
-            'metadata': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 100,
-            }
-        },
-        'required': ['artifact_type', 'amount', 'uri', 'duration'],
-    }
-
     body = request.get_json()
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _post_bounties_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
     guid = uuid.uuid4()
@@ -262,33 +262,34 @@ def get_bounties_guid(guid):
     return success(bounty)
 
 
+_post_bounties_guid_vote_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'votes': {
+            'type': 'array',
+            'maxItems': 256,
+            'items': {
+                'type': 'boolean',
+            },
+        },
+        'valid_bloom': {
+            'type': 'boolean',
+        },
+    },
+    'required': ['votes', 'valid_bloom'],
+})
+
+
 @bounties.route('/<uuid:guid>/vote', methods=['POST'])
 @chain
 def post_bounties_guid_vote(guid):
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'votes': {
-                'type': 'array',
-                'maxItems': 256,
-                'items': {
-                    'type': 'boolean',
-                },
-            },
-            'valid_bloom': {
-                'type': 'boolean',
-            },
-        },
-        'required': ['votes', 'valid_bloom'],
-    }
-
     body = request.get_json()
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _post_bounties_guid_vote_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
     votes = bool_list_to_int(body['votes'])
@@ -348,54 +349,55 @@ def post_assertion_metadata():
     return response
 
 
+_post_bounties_guid_assertions_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'bid': {
+            'type': 'array',
+            'minItems': 0,
+            'maxItems': 256,
+            'items': {
+                'type': 'string',
+                'minLength': 1,
+                'maxLength': 100,
+                'pattern': r'^\d+$',
+            }
+        },
+        'mask': {
+            'type': 'array',
+            'maxItems': 256,
+            'items': {
+                'type': 'boolean',
+            },
+        },
+        'verdicts': {
+            'type': 'array',
+            'maxItems': 256,
+            'items': {
+                'type': 'boolean',
+            },
+        },
+        'commitment': {
+            'type': 'string',
+            'minLength': 1,
+            'maxLength': 100,
+            'pattern': r'^\d+$',
+        },
+    },
+    'required': ['bid', 'mask'],
+})
+
+
 @bounties.route('/<uuid:guid>/assertions', methods=['POST'])
 @chain
 def post_bounties_guid_assertions(guid):
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'bid': {
-                'type': 'array',
-                'minItems': 0,
-                'maxItems': 256,
-                'items': {
-                    'type': 'string',
-                    'minLength': 1,
-                    'maxLength': 100,
-                    'pattern': r'^\d+$',
-                }
-            },
-            'mask': {
-                'type': 'array',
-                'maxItems': 256,
-                'items': {
-                    'type': 'boolean',
-                },
-            },
-            'verdicts': {
-                'type': 'array',
-                'maxItems': 256,
-                'items': {
-                    'type': 'boolean',
-                },
-            },
-            'commitment': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 100,
-                'pattern': r'^\d+$',
-            },
-        },
-        'required': ['bid', 'mask'],
-    }
-
     body = request.get_json()
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _post_bounties_guid_assertions_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
     bid = [int(b) for b in body['bid']]
@@ -446,40 +448,41 @@ def post_bounties_guid_assertions(guid):
     return success(ret)
 
 
+_post_bounties_guid_assertions_id_reveal_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'nonce': {
+            'type': 'string',
+            'minLength': 1,
+            'maxLength': 100,
+            'pattern': r'^\d+$',
+        },
+        'verdicts': {
+            'type': 'array',
+            'maxItems': 256,
+            'items': {
+                'type': 'boolean',
+            },
+        },
+        'metadata': {
+            'type': 'string',
+            'maxLength': 1024,
+        },
+    },
+    'required': ['nonce', 'verdicts', 'metadata'],
+})
+
+
 @bounties.route('/<uuid:guid>/assertions/<int:id_>/reveal', methods=['POST'])
 @chain
 def post_bounties_guid_assertions_id_reveal(guid, id_):
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'nonce': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 100,
-                'pattern': r'^\d+$',
-            },
-            'verdicts': {
-                'type': 'array',
-                'maxItems': 256,
-                'items': {
-                    'type': 'boolean',
-                },
-            },
-            'metadata': {
-                'type': 'string',
-                'maxLength': 1024,
-            },
-        },
-        'required': ['nonce', 'verdicts', 'metadata'],
-    }
-
     body = request.get_json()
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _post_bounties_guid_assertions_id_reveal_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
     nonce = int(body['nonce'])

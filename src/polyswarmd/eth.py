@@ -5,13 +5,12 @@ from typing import Any, Dict, List, Tuple, Type
 from eth.vm.forks.constantinople.transactions import ConstantinopleTransaction
 from eth_abi import decode_abi
 from eth_abi.exceptions import InsufficientDataBytes
+import fastjsonschema
 from flask import Blueprint
 from flask import current_app as app
 from flask import g, request
 import gevent
 from hexbytes import HexBytes
-import jsonschema
-from jsonschema.exceptions import ValidationError
 import rlp
 from web3.module import Module
 
@@ -104,30 +103,31 @@ def get_pending_nonces():
     return success(nonces)
 
 
+_get_transactions_schema_validator = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'transactions': {
+            'type': 'array',
+            'maxItems': 10,
+            'items': {
+                'type': 'string',
+                'minLength': 2,
+                'maxLength': 66,
+                'pattern': r'^(0x)?[0-9a-fA-F]{64}$',
+            }
+        },
+    },
+    'required': ['transactions'],
+})
+
+
 @misc.route('/transactions', methods=['GET'])
 @chain
 def get_transactions():
-    schema = {
-        'type': 'object',
-        'properties': {
-            'transactions': {
-                'type': 'array',
-                'maxItems': 10,
-                'items': {
-                    'type': 'string',
-                    'minLength': 2,
-                    'maxLength': 66,
-                    'pattern': r'^(0x)?[0-9a-fA-F]{64}$',
-                }
-            },
-        },
-        'required': ['transactions'],
-    }
-
     body = request.get_json()
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _get_transactions_schema_validator(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
     ret: Dict[str, List[Any]] = defaultdict(list)
@@ -140,6 +140,23 @@ def get_transactions():
         logging.error('Got transaction errors: %s', ret['errors'])
         return failure(ret, 400)
     return success(ret)
+
+
+_post_transactions_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'transactions': {
+            'type': 'array',
+            'maxItems': 10,
+            'items': {
+                'type': 'string',
+                'minLength': 1,
+                'pattern': r'^[0-9a-fA-F]+$',
+            }
+        },
+    },
+    'required': ['transactions'],
+})
 
 
 @misc.route('/transactions', methods=['POST'])
@@ -156,26 +173,10 @@ def post_transactions():
         ) if c.address is not None
     }
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'transactions': {
-                'type': 'array',
-                'maxItems': 10,
-                'items': {
-                    'type': 'string',
-                    'minLength': 1,
-                    'pattern': r'^[0-9a-fA-F]+$',
-                }
-            },
-        },
-        'required': ['transactions'],
-    }
-
     body = request.get_json()
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _post_transactions_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
     withdrawal_only = not g.user and app.config['POLYSWARMD'].require_api_key

@@ -1,8 +1,7 @@
 import logging
 
+import fastjsonschema
 from flask import Blueprint, g, request
-import jsonschema
-from jsonschema.exceptions import ValidationError
 
 from polyswarmd import eth
 from polyswarmd.chains import chain
@@ -30,29 +29,30 @@ def get_staking_parameters():
     })
 
 
+_post_arbiter_staking_deposit_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'amount': {
+            'type': 'string',
+            'minLength': 1,
+            'maxLength': 100,
+            'pattern': r'^\d+$',
+        }
+    },
+    'required': ['amount'],
+})
+
+
 @staking.route('/deposit', methods=['POST'])
 @chain
 def post_arbiter_staking_deposit():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'amount': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 100,
-                'pattern': r'^\d+$',
-            }
-        },
-        'required': ['amount'],
-    }
-
     body = request.get_json()
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _post_arbiter_staking_deposit_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
     amount = int(body['amount'])
@@ -76,29 +76,29 @@ def post_arbiter_staking_deposit():
     return success({'transactions': transactions})
 
 
+_post_arbiter_staking_withdrawal_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'amount': {
+            'type': 'string',
+            'minLength': 1,
+            'maxLength': 100,
+            'pattern': r'^\d+$',
+        }
+    },
+    'required': ['amount'],
+})
+
+
 @staking.route('/withdraw', methods=['POST'])
 @chain
 def post_arbiter_staking_withdrawal():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
-
-    schema = {
-        'type': 'object',
-        'properties': {
-            'amount': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 100,
-                'pattern': r'^\d+$',
-            }
-        },
-        'required': ['amount'],
-    }
-
     body = request.get_json()
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _post_arbiter_staking_withdrawal_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
     amount = int(body['amount'])
