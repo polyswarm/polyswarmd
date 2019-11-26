@@ -1,25 +1,26 @@
-import gevent
-try:
-    import ujson as json
-except ImportError:
-    import json
-import jsonschema
+import json
 import time
+from typing import Any, Dict, List, Type
+import ujson
 
-import gevent
-import jsonschema
 from flask_sockets import Sockets
+import gevent
 from gevent.queue import Empty, Queue
-from geventwebsocket import WebSocketError
+from geventwebsocket import WebSocketApplication, WebSocketError
+import jsonschema
 from jsonschema.exceptions import ValidationError
+
 from polyswarmd.chains import chain
 from polyswarmd.utils import channel_to_dict, g, logging, state_to_dict, uuid
-
-# normally, we `import polyswarmd.websockets.messages`, but due to the existing
-# `messages' method and the small number of imports, we import directly.
-from polyswarmd.websockets.messages import (ClosedAgreement, Connected, SettleStateChallenged, StartedSettle)
-
 from polyswarmd.websockets.filter import FilterManager
+from polyswarmd.websockets.messages import (
+    ClosedAgreement,
+    Connected,
+    SettleStateChallenged,
+    StartedSettle,
+    WebsocketFilterMessage,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,9 +28,11 @@ class WebSocket:
     """
     Wrapper around a WebSocket that has a queue of messages that can be sent from another greenlet.
     """
+
     def __init__(self, ws):
         """
-        Create a wrapper around a WebSocket with a guid to easily identify it, and a queue of messages to send
+        Create a wrapper around a WebSocket with a guid to easily identify it, and a queue of
+        messages to send
         :param ws: gevent WebSocket to wrap
         """
         self.guid = uuid.uuid4()
@@ -47,20 +50,19 @@ class WebSocket:
         return f'<Websocket UUID={str(self.guid)}>'
 
     def __eq__(self, other):
-        return isinstance(other, WebSocket) and \
-               other.guid == self.guid
+        return isinstance(other, WebSocket) and other.guid == self.guid
 
 
 def init_websockets(app):
     sockets = Sockets(app)
     start_time = time.time()
-    message_sockets = dict()
+    message_sockets: Dict[uuid.UUID, List[WebSocketApplication]] = dict()
 
     @sockets.route('/events')
     @chain(account_required=False)
     def events(ws):
         rpc = g.chain.rpc
-        ws.send(Connected({'start_time': str(start_time)}))
+        ws.send(Connected.serialize_message({'start_time': str(start_time)}))
 
         wrapper = WebSocket(ws)
 
@@ -72,10 +74,11 @@ def init_websockets(app):
                 msg = wrapper.queue.get(block=False)
                 ws.send(msg)
             except Empty:
-                # Anytime there are no new messages to send, check that the websocket is still connected with ws.receive
+                # Anytime there are no new messages to send, check that the websocket is still connected
                 with gevent.Timeout(.5, False):
                     logger.debug('Checking %s against timeout', wrapper)
-                    # This raises WebSocketError if socket is closed, and does not block if there are no messages
+                    # This raises WebSocketError if socket is closed, and does not block if there
+                    # are no messages
                     ws.receive()
             except WebSocketError as e:
                 logger.error('Websocket %s closed %s', wrapper, e)
@@ -87,20 +90,25 @@ def init_websockets(app):
     @sockets.route('/events/<uuid:guid>')
     @chain(chain_name='home', account_required=False)
     def channel_events(ws, guid):
-        offer_channel = channel_to_dict(g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call())
+        offer_channel = channel_to_dict(
+            g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
+        )
         msig_address = offer_channel['msig_address']
         offer_msig = g.chain.offer_multisig.bind(msig_address)
         filter_manager = FilterManager()
-        for evt in [ClosedAgreement, StartedSettle, SettleStateChallenged]:
-            filter_manager.register(offer_msig.eventFilter(evt.filter_event), evt)
+        filter_events: Any[Type[WebsocketFilterMessage]] = [
+            ClosedAgreement,
+            StartedSettle,
+            SettleStateChallenged,
+        ]
+        for evt in filter_events:
+            filter_manager.register(offer_msig.eventFilter(evt.contract_event_name), evt)
 
         with filter_manager.fetch() as results:
             for messages in results:
-                if len(self.websockets) == 0:
-                    return
+                if ws.closed:
+                    raise RuntimeError("WebSocket is closed")
                 for msg in messages:
-                    if ws.closed:
-                        raise RuntimeError("WebSocket is closed")
                     return ws.send(msg)
 
     # for receiving messages about offers that might need to be signed
@@ -182,7 +190,7 @@ def init_websockets(app):
 
                 for message_websocket in message_sockets[guid]:
                     if not message_websocket.closed:
-                        message_websocket.send(json.dumps(ret))
+                        message_websocket.send(ujson.dumps(ret))
 
                 gevent.sleep(1)
             except WebSocketError:

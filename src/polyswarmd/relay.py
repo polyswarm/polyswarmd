@@ -1,12 +1,12 @@
-import jsonschema
 import logging
-from jsonschema.exceptions import ValidationError
 
 from flask import Blueprint, g, request
+import jsonschema
+from jsonschema.exceptions import ValidationError
 
-from polyswarmd.response import success, failure
 from polyswarmd.chains import chain
 from polyswarmd.eth import build_transaction
+from polyswarmd.response import failure, success
 
 logger = logging.getLogger(__name__)
 relay = Blueprint('relay', __name__)
@@ -60,7 +60,9 @@ def send_funds_from():
     amount = int(body['amount'])
 
     transactions = [
-        build_transaction(g.chain.nectar_token.contract.functions.transfer(erc20_relay_address, amount), base_nonce),
+        build_transaction(
+            g.chain.nectar_token.contract.functions.transfer(erc20_relay_address, amount), base_nonce
+        ),
     ]
 
     return success({'transactions': transactions})

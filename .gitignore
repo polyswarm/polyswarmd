@@ -20,3 +20,4 @@ polyswarm-relay/
 node_modules/
 docker/contracts
 docker/polyswarmd.yml
+.mypy_cache/

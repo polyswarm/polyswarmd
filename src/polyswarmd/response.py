@@ -1,11 +1,13 @@
 import logging
+
 from flask import jsonify
-from werkzeug.exceptions import default_exceptions, HTTPException
+from werkzeug.exceptions import HTTPException, default_exceptions
 
 logger = logging.getLogger(__name__)
 
 
 def install_error_handlers(app):
+
     def make_json_error(e):
         response = jsonify(message=str(e))
         response.status_code = e.code if isinstance(e, HTTPException) else 500

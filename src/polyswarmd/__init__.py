@@ -1,3 +1,6 @@
+"""
+   isort:skip_file
+"""
 import os
 from concurrent.futures import ThreadPoolExecutor
 from requests_futures.sessions import FuturesSession
@@ -6,6 +9,7 @@ from polyswarmd.monkey import patch_all
 patch_all()
 
 import datetime
+
 import functools
 import logging
 
@@ -13,13 +17,14 @@ from flask import Flask, g, request
 from flask_caching import Cache
 
 from polyswarmd.config import Config, is_service_reachable, DEFAULT_FALLBACK_SIZE
-from polyswarmd.logger import init_logging
+
+from polyswarmd.logger import init_logging  # noqa
+
 from polyswarmd.profiler import setup_profiler
 from polyswarmd.response import success, failure, install_error_handlers
 
 logger = logging.getLogger(__name__)
-
-cache = Cache(config={"CACHE_TYPE": "simple", "CACHE_DEFAULT_TIMEOUT": 30})
+cache: Cache = Cache(config={"CACHE_TYPE": "simple", "CACHE_DEFAULT_TIMEOUT": 30})
 
 # Set up our app object
 app = Flask(__name__)
@@ -79,11 +84,14 @@ def check_auth_response(api_response):
     try:
         return api_response.json()
     except ValueError:
-        logger.exception('Invalid response from API key management service, received: %s', api_response.encode())
+        logger.exception(
+            'Invalid response from API key management service, received: %s', api_response.encode()
+        )
         return None
 
 
 class User(object):
+
     def __init__(self, authorized=False, user_id=None, max_artifact_size=DEFAULT_FALLBACK_SIZE):
         self.authorized = authorized
         self.max_artifact_size = max_artifact_size
@@ -98,7 +106,9 @@ class User(object):
         r = get_auth(api_key, auth_uri)
         j = check_auth_response(r)
         if j is None:
-            return cls(authorized=False, user_id=None, max_artifact_size=config.fallback_max_artifact_size)
+            return cls(
+                authorized=False, user_id=None, max_artifact_size=config.fallback_max_artifact_size
+            )
 
         anonymous = j.get('anonymous', True)
         user_id = j.get('user_id') if not anonymous else None
@@ -108,11 +118,17 @@ class User(object):
         r = get_account(api_key, account_uri)
         j = check_auth_response(r)
         if j is None:
-            return cls(authorized=True, user_id=user_id, max_artifact_size=config.fallback_max_artifact_size)
+            return cls(
+                authorized=True,
+                user_id=user_id,
+                max_artifact_size=config.fallback_max_artifact_size
+            )
 
-        max_artifact_size = next(
-            (f['base_uses'] for f in j.get('account', {}).get('features', []) if f['tag'] == 'max_artifact_size'),
-            config.fallback_max_artifact_size)
+        max_artifact_size = next((
+            f['base_uses']
+            for f in j.get('account', {}).get('features', [])
+            if f['tag'] == 'max_artifact_size'
+        ), config.fallback_max_artifact_size)
 
         return cls(authorized=True, user_id=user_id, max_artifact_size=max_artifact_size)
 
@@ -194,10 +210,14 @@ def after_request(response):
     user = getattr(g, 'user', None)
 
     if response.status_code == 200:
-        logger.info('%s %s %s %s %s %s', datetime.datetime.now(), request.method, response.status_code, request.path,
-                    eth_address, user.user_id)
+        logger.info(
+            '%s %s %s %s %s %s', datetime.datetime.now(), request.method, response.status_code,
+            request.path, eth_address, user.user_id
+        )
     else:
-        logger.error('%s %s %s %s %s %s: %s', datetime.datetime.now(), request.method, response.status_code,
-                     request.path, eth_address, user.user_id, response.get_data())
+        logger.error(
+            '%s %s %s %s %s %s: %s', datetime.datetime.now(), request.method, response.status_code,
+            request.path, eth_address, user.user_id, response.get_data()
+        )
 
     return response

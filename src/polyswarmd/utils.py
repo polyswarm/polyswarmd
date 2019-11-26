@@ -1,12 +1,13 @@
 import codecs
 import logging
-import string
 import re
-import uuid
+import string
 from typing import Union
-from Crypto.Hash import keccak
+import uuid
 
+from Crypto.Hash import keccak
 from flask import g
+
 from polyswarmartifact import ArtifactType
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ def bloom_to_dict(bloom):
     return {
         'bloom': bloom,
     }
+
 
 def assertion_to_dict(assertion, num_artifacts):
     return {
@@ -145,8 +147,9 @@ def camel_case_to_snake_case(s):
 def to_padded_hex(val: Union[str, bool, int, bytes]) -> str:
     """
     Convert an argument to a hexadecimal string and zero-extend to 64 width"""
+
     def encode_hex(xs: bytes) -> str:
-        return codecs.encode(xs, "hex").decode("ascii") # type: ignore
+        return codecs.encode(xs, "hex").decode("ascii")  # type: ignore
 
     if isinstance(val, str):
         if val.startswith('0x'):
@@ -199,8 +202,7 @@ def dict_to_state(state_dict):
         state_str = state_str + to_padded_hex('')
 
     if 'engagement_deadline' in state_dict:
-        state_str = state_str + to_padded_hex(
-            state_dict['engagement_deadline'])
+        state_str = state_str + to_padded_hex(state_dict['engagement_deadline'])
     else:
         state_str = state_str + to_padded_hex('')
 
@@ -234,7 +236,9 @@ def validate_ws_url(uri):
         r'localhost|'  # localhost...
         r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
         r'(?::\d+)?'  # optional port
-        r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+        r'(?:/?|[/?]\S+)$',
+        re.IGNORECASE
+    )
 
     return re.match(regex, uri) is not None
 

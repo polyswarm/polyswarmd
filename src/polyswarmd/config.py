@@ -3,21 +3,20 @@ import logging
 import os
 import threading
 import time
-import requests
-
 from urllib.parse import urlparse
 
-import yaml
-import redis
 from consul import Consul
 from consul.base import Timeout
-from web3 import Web3, HTTPProvider
+import redis
+import requests
+from web3 import HTTPProvider, Web3
 from web3.exceptions import MismatchedABI
 from web3.middleware import geth_poa_middleware
+import yaml
 
 from polyswarmd.artifacts.ipfs import IpfsServiceClient
-from polyswarmd.utils import camel_case_to_snake_case
 from polyswarmd.rpc import EthereumRpc
+from polyswarmd.utils import camel_case_to_snake_case
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +86,7 @@ def wait_for_consul_key_deletion(client, key, recurse=False, index=0):
 
 
 class ContractConfig(object):
+
     def __init__(self, w3, name, abi, address=None):
         self.name = name
         self.w3 = w3
@@ -121,12 +121,17 @@ class ContractConfig(object):
                 logger.error('Expected version but no version reported for contract %s', self.name)
                 raise ValueError('No contract version reported')
             except ValueError:
-                logger.error('Invalid version specified for contract %s, require major.minor.patch as string',
-                             self.name)
+                logger.error(
+                    'Invalid version specified for contract %s, require major.minor.patch as string',
+                    self.name
+                )
                 raise ValueError('Invalid contract version reported')
 
             if len(version) != 3 or not min_version <= version < max_version:
-                logger.error("Received %s version %s.%s.%s, but expected version between %s.%s.%s and %s.%s.%s ", self.name, *version, *min_version, *max_version)
+                logger.error(
+                    "Received %s version %s.%s.%s, but expected version between %s.%s.%s and %s.%s.%s ",
+                    self.name, *version, *min_version, *max_version
+                )
                 raise ValueError('Unsupported contract version')
 
         if persistent:
@@ -150,8 +155,10 @@ class ContractConfig(object):
 class ChainConfig(object):
     session = requests.Session()
 
-    def __init__(self, name, eth_uri, chain_id, w3, nectar_token, bounty_registry, arbiter_staking, erc20_relay,
-                 offer_registry, offer_multisig, free):
+    def __init__(
+        self, name, eth_uri, chain_id, w3, nectar_token, bounty_registry, arbiter_staking,
+        erc20_relay, offer_registry, offer_multisig, free
+    ):
         self.name = name
         self.eth_uri = eth_uri
         self.chain_id = chain_id
@@ -172,10 +179,12 @@ class ChainConfig(object):
 
     @classmethod
     def from_contract_configs(cls, name, eth_uri, chain_id, w3, contract_configs, free):
-        return cls(name, eth_uri, chain_id, w3, contract_configs.get('NectarToken'),
-                   contract_configs.get('BountyRegistry'), contract_configs.get('ArbiterStaking'),
-                   contract_configs.get('ERC20Relay'), contract_configs.get('OfferRegistry'),
-                   contract_configs.get('OfferMultiSig'), free)
+        return cls(
+            name, eth_uri, chain_id, w3, contract_configs.get('NectarToken'),
+            contract_configs.get('BountyRegistry'), contract_configs.get('ArbiterStaking'),
+            contract_configs.get('ERC20Relay'), contract_configs.get('OfferRegistry'),
+            contract_configs.get('OfferMultiSig'), free
+        )
 
     @classmethod
     def from_config_file(cls, name, filename):
@@ -223,16 +232,20 @@ class ChainConfig(object):
         w3.middleware_stack.inject(geth_poa_middleware, layer=0)
 
         # TODO schema check json
-        expected_contracts = ['NectarToken', 'BountyRegistry', 'ArbiterStaking', 'ERC20Relay', 'OfferRegistry',
-                              'OfferMultiSig']
+        expected_contracts = [
+            'NectarToken', 'BountyRegistry', 'ArbiterStaking', 'ERC20Relay', 'OfferRegistry',
+            'OfferMultiSig'
+        ]
         contract_configs = {}
 
         base_key = key.rsplit('/', 1)[0] + '/'
         filter_k = {base_key + x for x in ('homechain', 'sidechain', 'config')}
 
         while True:
-            kvs = [x for x in fetch_from_consul_or_wait(consul_client, base_key, recurse=True)
-                   if x.get('Key') not in filter_k]
+            kvs = [
+                x for x in fetch_from_consul_or_wait(consul_client, base_key, recurse=True)
+                if x.get('Key') not in filter_k
+            ]
 
             for kv in kvs:
                 contract = json.loads(kv.get('Value').decode('utf-8'))
@@ -256,7 +269,9 @@ class ChainConfig(object):
             raise ValueError('Ethereum not reachable, is correct URI specified?')
 
         if self.chain_id != int(self.w3.version.network):
-            raise ValueError('Chain ID mismatch, expected %s got %s', self.chain_id, int(self.w3.version.network))
+            raise ValueError(
+                'Chain ID mismatch, expected %s got %s', self.chain_id, int(self.w3.version.network)
+            )
 
         if not self.nectar_token or not self.nectar_token.contract:
             raise ValueError('Invalid NectarToken contract or address')
@@ -280,14 +295,19 @@ class ChainConfig(object):
                 raise ValueError('Invalid OfferMultiSig contract')
 
     def __bind_child_contracts(self):
-        self.arbiter_staking.bind(address=self.bounty_registry.contract.functions.staking().call(), persistent=True)
+        self.arbiter_staking.bind(
+            address=self.bounty_registry.contract.functions.staking().call(), persistent=True
+        )
 
 
 class Config(object):
     session = requests.Session()
 
-    def __init__(self, community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config,
-                 sidechain_config, trace_transactions, profiler_enabled, redis_client, fallback_max_artifact_size):
+    def __init__(
+        self, community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config,
+        sidechain_config, trace_transactions, profiler_enabled, redis_client,
+        fallback_max_artifact_size
+    ):
         self.community = community
         # For now, there is no other option than IpfsServiceClient, but this will eventually be configurable
         self.artifact_client = IpfsServiceClient(ipfs_uri)
@@ -324,8 +344,11 @@ class Config(object):
         redis_uri = config.get('redis_uri', os.environ.get('REDIS_URI', None))
         redis_client = redis.Redis.from_url(redis_uri) if redis_uri else None
         fallback_max_artifact_size = config.get('fallback_max_artifact_size', DEFAULT_FALLBACK_SIZE)
-        return cls(commmunity, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
-                   trace_transactions, profiler_enabled, redis_client, fallback_max_artifact_size)
+        return cls(
+            commmunity, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config,
+            sidechain_config, trace_transactions, profiler_enabled, redis_client,
+            fallback_max_artifact_size
+        )
 
     @classmethod
     def from_config_file_search(cls):
@@ -348,8 +371,12 @@ class Config(object):
         consul_client = Consul(host=u.hostname, port=u.port, scheme=u.scheme, token=consul_token)
 
         community = os.environ['POLY_COMMUNITY_NAME']
-        homechain_config = ChainConfig.from_consul(consul_client, 'home', f'chain/{community}/homechain')
-        sidechain_config = ChainConfig.from_consul(consul_client, 'side', f'chain/{community}/sidechain')
+        homechain_config = ChainConfig.from_consul(
+            consul_client, 'home', f'chain/{community}/homechain'
+        )
+        sidechain_config = ChainConfig.from_consul(
+            consul_client, 'side', f'chain/{community}/sidechain'
+        )
 
         base_key = f'chain/{community}'
         config = fetch_from_consul_or_wait(consul_client, base_key + '/config').get('Value')
@@ -368,8 +395,11 @@ class Config(object):
         redis_client = redis.Redis.from_url(redis_uri) if redis_uri else None
         fallback_max_artifact_size = config.get('fallback_max_artifact_size', DEFAULT_FALLBACK_SIZE)
 
-        ret = cls(community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config, sidechain_config,
-                  trace_transactions, profiler_enabled, redis_client, fallback_max_artifact_size)
+        ret = cls(
+            community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config,
+            sidechain_config, trace_transactions, profiler_enabled, redis_client,
+            fallback_max_artifact_size
+        )
 
         # Watch for key deletion, if config is deleted die and restart with new config
         def watch_for_config_deletion(consul_client, key):
@@ -397,9 +427,13 @@ class Config(object):
             raise ValueError(f'{self.artifact_client.name} not reachable, is correct URI specified?')
 
         if self.artifact_limit < 1 or self.artifact_limit > 256:
-            raise ValueError('Artifact limit must be greater than 0 and cannot exceed contract limit of 256')
+            raise ValueError(
+                'Artifact limit must be greater than 0 and cannot exceed contract limit of 256'
+            )
 
-        if self.auth_uri and not is_service_reachable(self.session, f"{self.auth_uri}/communities/public"):
+        if self.auth_uri and not is_service_reachable(
+            self.session, f"{self.auth_uri}/communities/public"
+        ):
             raise ValueError('API key service not reachable, is correct URI specified?')
 
         if self.require_api_key and not self.auth_uri:

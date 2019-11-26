@@ -1,4 +1,4 @@
-FROM pypy:3.6-7.2-stretch
+FROM pypy:3-7-stretch
 LABEL maintainer="PolySwarm Developers <info@polyswarm.io>"
 
 WORKDIR /usr/src/app
@@ -11,7 +11,6 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt ./
 
 RUN set -x && pip install --no-cache-dir -r requirements.txt
-RUN set -x && pip install ujson gunicorn==19.9.0
 
 COPY . .
 RUN set -x && pip install .

@@ -1,12 +1,13 @@
-import jsonschema
 import logging
-from jsonschema.exceptions import ValidationError
+
 from flask import Blueprint, g, request
+import jsonschema
+from jsonschema.exceptions import ValidationError
 
 from polyswarmd import eth
-from polyswarmd.eth import build_transaction
 from polyswarmd.chains import chain
-from polyswarmd.response import success, failure
+from polyswarmd.eth import build_transaction
+from polyswarmd.response import failure, success
 
 logger = logging.getLogger(__name__)
 staking = Blueprint('staking', __name__)
@@ -18,7 +19,8 @@ def get_staking_parameters():
     minimum_stake = g.chain.arbiter_staking.contract.functions.MINIMUM_STAKE().call()
     maximum_stake = g.chain.arbiter_staking.contract.functions.MAXIMUM_STAKE().call()
     vote_ratio_numerator = g.chain.arbiter_staking.contract.functions.VOTE_RATIO_NUMERATOR().call()
-    vote_ratio_denominator = g.chain.arbiter_staking.contract.functions.VOTE_RATIO_DENOMINATOR().call()
+    vote_ratio_denominator = g.chain.arbiter_staking.contract.functions.VOTE_RATIO_DENOMINATOR(
+    ).call()
 
     return success({
         'minimum_stake': minimum_stake,
@@ -62,10 +64,13 @@ def post_arbiter_staking_deposit():
 
     transactions = [
         build_transaction(
-            g.chain.nectar_token.contract.functions.approve(g.chain.arbiter_staking.contract.address, amount),
-            base_nonce),
+            g.chain.nectar_token.contract.functions.approve(
+                g.chain.arbiter_staking.contract.address, amount
+            ), base_nonce
+        ),
         build_transaction(
-            g.chain.arbiter_staking.contract.functions.deposit(amount), base_nonce + 1),
+            g.chain.arbiter_staking.contract.functions.deposit(amount), base_nonce + 1
+        ),
     ]
 
     return success({'transactions': transactions})
@@ -104,8 +109,7 @@ def post_arbiter_staking_withdrawal():
         return failure('Exceeds withdrawal eligible %s' % available, 400)
 
     transactions = [
-        build_transaction(
-            g.chain.arbiter_staking.contract.functions.withdraw(amount), base_nonce),
+        build_transaction(g.chain.arbiter_staking.contract.functions.withdraw(amount), base_nonce),
     ]
 
     return success({'transactions': transactions})

@@ -1,14 +1,18 @@
-import base58
-import ipfshttpclient
 import logging
 import re
 import uuid
 
-import urllib3
+import base58
+import ipfshttpclient
+from urllib3.util import parse_url
 
 from polyswarmd.artifacts.client import AbstractArtifactServiceClient
-from polyswarmd.artifacts.exceptions import ArtifactSizeException, InvalidUriException, \
-    ArtifactNotFoundException, ArtifactException
+from polyswarmd.artifacts.exceptions import (
+    ArtifactException,
+    ArtifactNotFoundException,
+    ArtifactSizeException,
+    InvalidUriException,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +23,16 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
 
     Uses MFS for adding to directories, since limits on IPFS API requests prevent 256 file requests.
     """
+
     def __init__(self, base_uri):
         self.base_uri = base_uri
         reachable_endpoint = f"{self.base_uri}{'/api/v0/bootstrap'}"
         super().__init__('IPFS', reachable_endpoint)
         # Create IPFS client
-        url = urllib3.util.parse_url(self.base_uri)
-        self.client = ipfshttpclient.connect(f'/dns/{url.host}/tcp/{url.port}/{url.scheme}', session=True)
+        url = parse_url(self.base_uri)
+        self.client = ipfshttpclient.connect(
+            f'/dns/{url.host}/tcp/{url.port}/{url.scheme}', session=True
+        )
 
     @staticmethod
     def check_ls(artifacts, index, max_size=None):
@@ -69,7 +76,9 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         # add_str does not accept any way to set pin=False, so we have to remove in a second call
         try:
             self.client.pin.rm(ipfs_uri, timeout=1)
-        except (ipfshttpclient.exceptions.ErrorResponse, ipfshttpclient.exceptions.TimeoutError) as e:
+        except (
+            ipfshttpclient.exceptions.ErrorResponse, ipfshttpclient.exceptions.TimeoutError
+        ) as e:
             logger.warning('Got error when removing pin: %s', e)
             # Only seen when the pin didn't exist, not a big deal
             pass
@@ -100,10 +109,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         logger.info(f'Got artifact details {stat}')
 
         # Convert stats to snake_case
-        stats = {
-            re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', k).lower(): v
-            for k, v in stat.items()
-        }
+        stats = {re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', k).lower(): v for k, v in stat.items()}
         stats['name'] = name
 
         return stats
@@ -136,7 +142,8 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
             return [('', stats.get('Hash', ''), stats.get('DataSize'))]
 
         if ls:
-            links = [(l.get('Name', ''), l.get('Hash', ''), l.get('Size', 0)) for l in ls.get('Links', [])]
+            links = [(l.get('Name', ''), l.get('Hash', ''), l.get('Size', 0))
+                     for l in ls.get('Links', [])]
 
             if not links:
                 links = [('', stats.get('Hash', ''), stats.get('DataSize', 0))]

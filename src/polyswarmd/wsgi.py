@@ -1,6 +1,6 @@
 import logging
-import sys
 import os
+import sys
 
 from polyswarmd.logger import init_logging
 
@@ -14,11 +14,16 @@ def app(*args, **kwargs):
 
     log_level = os.environ.get('LOG_LEVEL', kwargs.get('log_level', 'WARNING'))
     log_level = getattr(logging, log_level.upper(), None)
-    if not isinstance(log_level, int):
-        logging.error('Invalid log level')
-        sys.exit(-1)
 
-    init_logging(log_format, log_level)
+    try:
+        init_logging(log_format, log_level)
+    except (TypeError, ValueError) as e:
+        logging.error('Invalid log level')
+        logging.exception(e)
+        sys.exit(10)
+    except Exception as e:
+        logging.exception(e)
+        sys.exit(-1)
 
     from polyswarmd import app as application
 

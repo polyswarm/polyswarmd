@@ -1,22 +1,31 @@
 import json
-import jsonschema
 import logging
 import os
+from typing import List
 import uuid
 
 from flask import Blueprint, g, request
+import jsonschema
 from jsonschema.exceptions import ValidationError
-from polyswarmartifact import ArtifactType
-from polyswarmartifact.schema import Assertion as AssertionMetadata, Bounty as BountyMetadata
 from requests import HTTPError
 
-from polyswarmd import eth, cache, app
+from polyswarmartifact import ArtifactType
+from polyswarmartifact.schema import Assertion as AssertionMetadata
+from polyswarmartifact.schema import Bounty as BountyMetadata
+from polyswarmd import app, cache, eth
 from polyswarmd.artifacts.exceptions import ArtifactException
+from polyswarmd.bloom import FILTER_BITS, BloomFilter
 from polyswarmd.chains import chain
-from polyswarmd.bloom import BloomFilter, FILTER_BITS
-from polyswarmd.eth import build_transaction, ZERO_ADDRESS
-from polyswarmd.response import success, failure
-from polyswarmd.utils import bool_list_to_int, bounty_to_dict, assertion_to_dict, vote_to_dict, bloom_to_dict, sha3
+from polyswarmd.eth import ZERO_ADDRESS, build_transaction
+from polyswarmd.response import failure, success
+from polyswarmd.utils import (
+    assertion_to_dict,
+    bloom_to_dict,
+    bool_list_to_int,
+    bounty_to_dict,
+    sha3,
+    vote_to_dict,
+)
 
 logger = logging.getLogger(__name__)
 bounties = Blueprint('bounties', __name__)
@@ -28,7 +37,7 @@ def calculate_bloom(artifacts):
         bf.add(h.encode('utf-8'))
 
     v = int(bf)
-    ret = []
+    ret: List[int] = []
     d = (1 << 256)
     for _ in range(FILTER_BITS // 256):
         ret.insert(0, v % d)
@@ -58,18 +67,24 @@ def get_assertion(guid, index, num_artifacts):
     session = app.config['REQUESTS_SESSION']
     assertion = assertion_to_dict(
         g.chain.bounty_registry.contract.functions.assertionsByGuid(guid.int, index).call(),
-        num_artifacts)
+        num_artifacts
+    )
 
-    bid = [str(b) for b in g.chain.bounty_registry.contract.functions.getBids(guid.int, index).call()]
+    bid = [
+        str(b) for b in g.chain.bounty_registry.contract.functions.getBids(guid.int, index).call()
+    ]
     assertion['bid'] = bid
-    assertion['metadata'] = substitute_metadata(assertion.get('metadata', ''), config.artifact_client, session,
-                                                redis=config.redis)
+    assertion['metadata'] = substitute_metadata(
+        assertion.get('metadata', ''), config.artifact_client, session, redis=config.redis
+    )
     return assertion
 
 
 # noinspection PyBroadException
 @cache.memoize(30)
-def substitute_metadata(uri, artifact_client, session, validate=AssertionMetadata.validate, redis=None):
+def substitute_metadata(
+    uri, artifact_client, session, validate=AssertionMetadata.validate, redis=None
+):
     """
     Download metadata from artifact service and validate it against the schema.
 
@@ -82,7 +97,9 @@ def substitute_metadata(uri, artifact_client, session, validate=AssertionMetadat
     """
     try:
         if artifact_client.check_uri(uri):
-            content = json.loads(artifact_client.get_artifact(uri, session=session, redis=redis).decode('utf-8'))
+            content = json.loads(
+                artifact_client.get_artifact(uri, session=session, redis=redis).decode('utf-8')
+            )
         else:
             content = json.loads(uri)
 
@@ -171,12 +188,16 @@ def post_bounties():
 
     transactions = [
         build_transaction(
-            g.chain.nectar_token.contract.functions.approve(g.chain.bounty_registry.contract.address, approve_amount),
-            base_nonce),
+            g.chain.nectar_token.contract.functions.approve(
+                g.chain.bounty_registry.contract.address, approve_amount
+            ), base_nonce
+        ),
         build_transaction(
-            g.chain.bounty_registry.contract.functions.postBounty(guid.int, artifact_type.value, amount, artifact_uri,
-                                                                  num_artifacts, duration_blocks, bloom, metadata),
-            base_nonce + 1),
+            g.chain.bounty_registry.contract.functions.postBounty(
+                guid.int, artifact_type.value, amount, artifact_uri, num_artifacts, duration_blocks,
+                bloom, metadata
+            ), base_nonce + 1
+        ),
     ]
 
     return success({'transactions': transactions})
@@ -189,11 +210,15 @@ def get_bounty_parameters():
     bounty_fee = g.chain.bounty_registry.contract.functions.bountyFee().call()
     assertion_fee = g.chain.bounty_registry.contract.functions.assertionFee().call()
     bounty_amount_minimum = g.chain.bounty_registry.contract.functions.BOUNTY_AMOUNT_MINIMUM().call()
-    assertion_bid_minimum = g.chain.bounty_registry.contract.functions.ASSERTION_BID_ARTIFACT_MINIMUM().call()
-    assertion_bid_maximum = g.chain.bounty_registry.contract.functions.ASSERTION_BID_ARTIFACT_MAXIMUM().call()
-    arbiter_lookback_range = g.chain.bounty_registry.contract.functions.ARBITER_LOOKBACK_RANGE().call()
+    assertion_bid_minimum = g.chain.bounty_registry.contract.functions.ASSERTION_BID_ARTIFACT_MINIMUM(
+    ).call()
+    assertion_bid_maximum = g.chain.bounty_registry.contract.functions.ASSERTION_BID_ARTIFACT_MAXIMUM(
+    ).call()
+    arbiter_lookback_range = g.chain.bounty_registry.contract.functions.ARBITER_LOOKBACK_RANGE(
+    ).call()
     max_duration = g.chain.bounty_registry.contract.functions.MAX_DURATION().call()
-    assertion_reveal_window = g.chain.bounty_registry.contract.functions.assertionRevealWindow().call()
+    assertion_reveal_window = g.chain.bounty_registry.contract.functions.assertionRevealWindow(
+    ).call()
     arbiter_vote_window = g.chain.bounty_registry.contract.functions.arbiterVoteWindow().call()
 
     return success({
@@ -215,11 +240,17 @@ def get_bounties_guid(guid):
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
     bounty = bounty_to_dict(
-        g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
+        g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call()
+    )
     metadata = bounty.get('metadata', None)
     if metadata:
-        metadata = substitute_metadata(metadata, config.artifact_client, session, validate=BountyMetadata.validate,
-                                       redis=config.redis)
+        metadata = substitute_metadata(
+            metadata,
+            config.artifact_client,
+            session,
+            validate=BountyMetadata.validate,
+            redis=config.redis
+        )
     else:
         metadata = None
     bounty['metadata'] = metadata
@@ -264,8 +295,10 @@ def post_bounties_guid_vote(guid):
     valid_bloom = bool(body['valid_bloom'])
 
     transactions = [
-        build_transaction(g.chain.bounty_registry.contract.functions.voteOnBounty(guid.int, votes, valid_bloom),
-                          base_nonce),
+        build_transaction(
+            g.chain.bounty_registry.contract.functions.voteOnBounty(guid.int, votes, valid_bloom),
+            base_nonce
+        ),
     ]
     return success({'transactions': transactions})
 
@@ -277,7 +310,9 @@ def post_bounties_guid_settle(guid):
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
 
     transactions = [
-        build_transaction(g.chain.bounty_registry.contract.functions.settleBounty(guid.int), base_nonce)
+        build_transaction(
+            g.chain.bounty_registry.contract.functions.settleBounty(guid.int), base_nonce
+        )
     ]
 
     return success({'transactions': transactions})
@@ -300,9 +335,7 @@ def post_assertion_metadata():
         return failure('Invalid Assertion metadata', 400)
 
     try:
-        uri = config.artifact_client.add_artifact(body,
-                                                  session,
-                                                  redis=config.redis)
+        uri = config.artifact_client.add_artifact(body, session, redis=config.redis)
         response = success(uri)
     except HTTPError as e:
         response = failure(e.response.content, e.response.status_code)
@@ -391,13 +424,20 @@ def post_bounties_guid_assertions(guid):
     else:
         commitment = int(commitment)
 
-    ret = {'transactions': [
-        build_transaction(
-            g.chain.nectar_token.contract.functions.approve(g.chain.bounty_registry.contract.address,
-                                                            approve_amount), base_nonce),
-        build_transaction(g.chain.bounty_registry.contract.functions.postAssertion(guid.int, bid, mask, commitment),
-                          base_nonce + 1),
-    ]}
+    ret = {
+        'transactions': [
+            build_transaction(
+                g.chain.nectar_token.contract.functions.approve(
+                    g.chain.bounty_registry.contract.address, approve_amount
+                ), base_nonce
+            ),
+            build_transaction(
+                g.chain.bounty_registry.contract.functions.postAssertion(
+                    guid.int, bid, mask, commitment
+                ), base_nonce + 1
+            ),
+        ]
+    }
 
     if nonce is not None:
         # Pass generated nonce onto user in response, used for reveal
@@ -448,8 +488,10 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 
     transactions = [
         build_transaction(
-            g.chain.bounty_registry.contract.functions.revealAssertion(guid.int, id_, nonce, verdicts, metadata),
-            base_nonce),
+            g.chain.bounty_registry.contract.functions.revealAssertion(
+                guid.int, id_, nonce, verdicts, metadata
+            ), base_nonce
+        ),
     ]
     return success({'transactions': transactions})
 
@@ -457,11 +499,14 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 @bounties.route('/<uuid:guid>/assertions', methods=['GET'])
 @chain
 def get_bounties_guid_assertions(guid):
-    bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
+    bounty = bounty_to_dict(
+        g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call()
+    )
     if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
 
-    num_assertions = g.chain.bounty_registry.contract.functions.getNumberOfAssertions(guid.int).call()
+    num_assertions = g.chain.bounty_registry.contract.functions.getNumberOfAssertions(guid.int
+                                                                                      ).call()
     assertions = []
     for i in range(num_assertions):
         try:
@@ -480,21 +525,25 @@ def get_bounties_guid_assertions(guid):
 @bounties.route('/<uuid:guid>/assertions/<int:id_>', methods=['GET'])
 @chain
 def get_bounties_guid_assertions_id(guid, id_):
-    bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
+    bounty = bounty_to_dict(
+        g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call()
+    )
     if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
 
     try:
         assertion = get_assertion(guid, id_, bounty['num_artifacts'])
         return success(assertion)
-    except:
+    except:  # noqa: E772
         return failure('Assertion not found', 404)
 
 
 @bounties.route('/<uuid:guid>/votes', methods=['GET'])
 @chain
 def get_bounties_guid_votes(guid):
-    bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
+    bounty = bounty_to_dict(
+        g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call()
+    )
     if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
 
@@ -505,7 +554,8 @@ def get_bounties_guid_votes(guid):
         try:
             vote = vote_to_dict(
                 g.chain.bounty_registry.contract.functions.votesByGuid(guid.int, i).call(),
-                bounty['num_artifacts'])
+                bounty['num_artifacts']
+            )
             votes.append(vote)
         except Exception:
             logger.exception('Could not retrieve vote')
@@ -517,15 +567,19 @@ def get_bounties_guid_votes(guid):
 @bounties.route('/<uuid:guid>/votes/<int:id_>', methods=['GET'])
 @chain
 def get_bounties_guid_votes_id(guid, id_):
-    bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
+    bounty = bounty_to_dict(
+        g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call()
+    )
     if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
 
     try:
-        vote = vote_to_dict(g.chain.bounty_registry.contract.functions.votesByGuid(guid.int, id_).call(),
-                            bounty['num_artifacts'])
+        vote = vote_to_dict(
+            g.chain.bounty_registry.contract.functions.votesByGuid(guid.int, id_).call(),
+            bounty['num_artifacts']
+        )
         return success(vote)
-    except:
+    except:  # noqa: E772
         return failure('Vote not found', 404)
 
 
@@ -533,16 +587,20 @@ def get_bounties_guid_votes_id(guid, id_):
 @cache.memoize(30)
 @chain
 def get_bounties_guid_bloom(guid):
-    bounty = bounty_to_dict(g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call())
+    bounty = bounty_to_dict(
+        g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call()
+    )
     if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
 
     try:
         bloom_parts = []
         for i in range(0, 8):
-            bloom_parts.append(g.chain.bounty_registry.contract.functions.bloomByGuid(guid.int, i).call())
+            bloom_parts.append(
+                g.chain.bounty_registry.contract.functions.bloomByGuid(guid.int, i).call()
+            )
         bloom = bloom_to_dict(bloom_parts)
         return success(bloom)
-    except:
+    except:  # noqa: E772
         logger.exception('Bloom not found')
         return failure('Bloom not found', 404)
