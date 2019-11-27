@@ -25,6 +25,7 @@ class EthereumRpc:
         Send a message to all connected WebSockets
         :param message: dict to be converted to json and sent
         """
+        # XXX This can be replaced with a broadcast inside the WebsocketHandlerApplication
         with self.websockets_lock:
             for ws in self.websockets:
                 ws.send(message)

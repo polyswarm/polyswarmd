@@ -1,8 +1,7 @@
 import logging
 
+import fastjsonschema
 from flask import Blueprint, g, request
-import jsonschema
-from jsonschema.exceptions import ValidationError
 
 from polyswarmd.chains import chain
 from polyswarmd.eth import build_transaction
@@ -32,29 +31,30 @@ def fees():
     return success({'fees': g.chain.erc20_relay.functions.fees().call()})
 
 
+_send_funds_from_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'amount': {
+            'type': 'string',
+            'minLength': 1,
+            'maxLength': 64,
+            'pattern': r'^\d+$',
+        },
+    },
+    'required': ['amount'],
+})
+
+
 def send_funds_from():
     # Grab correct versions by chain type
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
     erc20_relay_address = g.chain.w3.toChecksumAddress(g.chain.erc20_relay.address)
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'amount': {
-                'type': 'string',
-                'minLength': 1,
-                'maxLength': 64,
-                'pattern': r'^\d+$',
-            },
-        },
-        'required': ['amount'],
-    }
-
     body = request.get_json()
     try:
-        jsonschema.validate(body, schema)
-    except ValidationError as e:
+        _send_funds_from_schema(body)
+    except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
     amount = int(body['amount'])

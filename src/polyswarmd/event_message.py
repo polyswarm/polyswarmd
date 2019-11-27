@@ -3,12 +3,11 @@ import time
 from typing import Any, Dict, List, Type
 import ujson
 
+import fastjsonschema
 from flask_sockets import Sockets
 import gevent
 from gevent.queue import Empty, Queue
 from geventwebsocket import WebSocketApplication, WebSocketError
-import jsonschema
-from jsonschema.exceptions import ValidationError
 
 from polyswarmd.chains import chain
 from polyswarmd.utils import channel_to_dict, g, logging, state_to_dict, uuid
@@ -51,6 +50,38 @@ class WebSocket:
 
     def __eq__(self, other):
         return isinstance(other, WebSocket) and other.guid == self.guid
+
+
+_messages_schema = fastjsonschema.compile({
+    'type': 'object',
+    'properties': {
+        'type': {
+            'type': 'string',
+        },
+        'from_socket': {
+            'type': 'string',
+        },
+        'to_socket': {
+            'type': 'string',
+        },
+        'state': {
+            'type': 'string',
+        },
+        'artifact': {
+            'type': 'string',
+        },
+        'r': {
+            'type': 'string',
+        },
+        'v': {
+            'type': 'integer',
+        },
+        's': {
+            'type': 'string',
+        }
+    },
+    'required': ['type', 'state'],
+})
 
 
 def init_websockets(app):
@@ -128,42 +159,11 @@ def init_websockets(app):
                 if not msg:
                     break
 
-                schema = {
-                    'type': 'object',
-                    'properties': {
-                        'type': {
-                            'type': 'string',
-                        },
-                        'from_socket': {
-                            'type': 'string',
-                        },
-                        'to_socket': {
-                            'type': 'string',
-                        },
-                        'state': {
-                            'type': 'string',
-                        },
-                        'artifact': {
-                            'type': 'string',
-                        },
-                        'r': {
-                            'type': 'string',
-                        },
-                        'v': {
-                            'type': 'integer',
-                        },
-                        's': {
-                            'type': 'string',
-                        }
-                    },
-                    'required': ['type', 'state'],
-                }
-
                 body = json.loads(msg)
 
                 try:
-                    jsonschema.validate(body, schema)
-                except ValidationError:
+                    _messages_schema(body)
+                except fastjsonschema.JsonSchemaException:
                     logger.exception('Invalid JSON')
 
                 state_dict = state_to_dict(body['state'])

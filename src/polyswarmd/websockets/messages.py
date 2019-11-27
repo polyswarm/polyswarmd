@@ -206,11 +206,7 @@ class NewWithdrawal(EventLogMessage[NewWithdrawalMessageData]):
 
     doctest:
 
-    >>> args = {
-    ... 'to': "0x00000000000000000000000000000001",
-    ... 'from': "0x00000000000000000000000000000002",
-    ... 'value': 1 }
-    >>> NewWithdrawal.extract(args)
+    >>> NewWithdrawal.extract({'to': addr1, 'from': addr2, 'value': 1 })
     {'to': '0x00000000000000000000000000000001', 'value': 1}
     >>> NewWithdrawal.contract_event_name
     'NewWithdrawal'
@@ -367,7 +363,7 @@ class NewBounty(WebsocketFilterMessage[NewBountyMessageData]):
             'guid': guid,
             'artifact_type': {
                 'type': 'string',
-                'enum': ['file', 'url'],
+                'enum': [name.lower() for name, value in ArtifactType.__members__.items()],
                 'srckey': lambda k, e: ArtifactType.to_string(ArtifactType(e['artifactType']))
             },
             'author': ethereum_address,
@@ -493,8 +489,7 @@ class NewVote(WebsocketFilterMessage[NewVoteMessageData]):
     ... 'voter': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
     ... 'votes': 128,
     ... 'numArtifacts': 4 })
-    >>> new_vote = NewVote.serialize_message(event)
-    >>> decoded_msg(new_vote)
+    >>> decoded_msg(NewVote.serialize_message(event))
     {'block_number': 117,
      'data': {'bounty_guid': '00000000-0000-0000-0000-000000000002',
               'voter': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
@@ -513,11 +508,39 @@ class NewVote(WebsocketFilterMessage[NewVoteMessageData]):
 
 
 class QuorumReached(WebsocketFilterMessage[QuorumReachedMessageData]):
+    """QuorumReached
+
+    doctest:
+
+    >>> event = mkevent({'bountyGuid': 16577})
+    >>> decoded_msg(QuorumReached.serialize_message(event))
+    {'block_number': 117,
+     'data': {'bounty_guid': '00000000-0000-0000-0000-0000000040c1'},
+     'event': 'quorum',
+     'txhash': '0000000000000000000000000000000b'}
+    """
     event: ClassVar[str] = 'quorum'
     schema: ClassVar[PSJSONSchema] = PSJSONSchema({'properties': {'bounty_guid': bounty_guid}})
 
 
 class SettledBounty(WebsocketFilterMessage[SettledBountyMessageData]):
+    """SettledBounty
+
+    doctest:
+
+    >>> event = mkevent({
+    ... 'bountyGuid': 16577,
+    ... 'settler': addr1,
+    ... 'payout': 1000 })
+    >>> decoded_msg(SettledBounty.serialize_message(event))
+    {'block_number': 117,
+     'data': {'bounty_guid': '00000000-0000-0000-0000-0000000040c1',
+              'payout': 1000,
+              'settler': '0x00000000000000000000000000000001'},
+     'event': 'settled_bounty',
+     'txhash': '0000000000000000000000000000000b'}
+
+    """
     event: ClassVar[str] = 'settled_bounty'
     schema: ClassVar[PSJSONSchema] = PSJSONSchema({
         'properties': {
@@ -536,8 +559,7 @@ class InitializedChannel(WebsocketFilterMessage[InitializedChannelMessageData]):
     ... 'expert': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
     ... 'guid': 1,
     ... 'msig': '0x789246BB76D18C6C7f8bd8ac8423478795f71bf9' })
-    >>> msg = InitializedChannel.serialize_message(event)
-    >>> decoded_msg(msg)
+    >>> decoded_msg(InitializedChannel.serialize_message(event))
     {'block_number': 117,
      'data': {'ambassador': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
               'expert': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
@@ -590,6 +612,23 @@ class ClosedAgreement(WebsocketFilterMessage[ClosedAgreementMessageData]):
 
 
 class StartedSettle(WebsocketFilterMessage[StartedSettleMessageData]):
+    """StartedSettle
+
+    doctest:
+
+    >>> event = mkevent({
+    ... 'initiator': addr1,
+    ... 'sequence': 1688,
+    ... 'settlementPeriodEnd': 229 })
+    >>> decoded_msg(StartedSettle.serialize_message(event))
+    {'block_number': 117,
+     'data': {'initiator': '0x00000000000000000000000000000001',
+              'nonce': 1688,
+              'settle_period_end': 229},
+     'event': 'settle_started',
+     'txhash': '0000000000000000000000000000000b'}
+
+    """
     event: ClassVar[str] = 'settle_started'
     schema: ClassVar[PSJSONSchema] = PSJSONSchema({
         'properties': {
@@ -607,6 +646,22 @@ class StartedSettle(WebsocketFilterMessage[StartedSettleMessageData]):
 
 
 class SettleStateChallenged(WebsocketFilterMessage[SettleStateChallengedMessageData]):
+    """SettleStateChallenged
+
+    doctest:
+
+    >>> event = mkevent({
+    ... 'challenger': addr1,
+    ... 'sequence': 1688,
+    ... 'settlementPeriodEnd': 229 })
+    >>> decoded_msg(SettleStateChallenged.serialize_message(event))
+    {'block_number': 117,
+     'data': {'challenger': '0x00000000000000000000000000000001',
+              'nonce': 1688,
+              'settle_period_end': 229},
+     'event': 'settle_challenged',
+     'txhash': '0000000000000000000000000000000b'}
+    """
     event: ClassVar[str] = 'settle_challenged'
     schema: ClassVar[PSJSONSchema] = PSJSONSchema({
         'properties': {
@@ -628,13 +683,10 @@ class Deprecated(WebsocketFilterMessage[None]):
 
     doctest:
 
-    >>> LatestEvent.make(chain1)
-    <class 'websockets.messages.LatestEvent'>
     >>> event = mkevent({'a': 1, 'hello': 'world', 'should_not_be_here': True})
     >>> Deprecated.contract_event_name
     'Deprecated'
-    >>> msg = Deprecated.serialize_message(event)
-    >>> decoded_msg(msg)
+    >>> decoded_msg(Deprecated.serialize_message(event))
     {'block_number': 117,
      'data': {},
      'event': 'deprecated',
@@ -664,8 +716,7 @@ class LatestEvent(WebsocketFilterMessage[LatestEventMessageData]):
     >>> event = mkevent({'a': 1, 'hello': 'world', 'should_not_be_here': True})
     >>> LatestEvent.contract_event_name
     'latest'
-    >>> msg = LatestEvent.serialize_message(event)
-    >>> decoded_msg(msg)
+    >>> decoded_msg(LatestEvent.serialize_message(event))
     {'data': {'number': 117}, 'event': 'block'}
     """
     event: ClassVar[str] = 'block'
