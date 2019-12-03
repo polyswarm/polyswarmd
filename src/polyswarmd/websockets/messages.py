@@ -697,7 +697,7 @@ class Deprecated(WebsocketFilterMessage[DeprecatedData]):
     schema: ClassVar[PSJSONSchema] = PSJSONSchema({
         'properties': {
             'rollover': {
-                'type': 'bool'
+                'type': 'boolean'
             },
         }
     })
