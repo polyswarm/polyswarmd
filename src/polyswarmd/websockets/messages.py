@@ -20,6 +20,7 @@ from .json_schema import PSJSONSchema, SchemaDef
 from .message_types import (
     ClosedAgreementMessageData,
     D,
+    DeprecatedData,
     E,
     EventData,
     FeesUpdatedMessageData,
@@ -678,27 +679,51 @@ class SettleStateChallenged(WebsocketFilterMessage[SettleStateChallengedMessageD
     })
 
 
-class Deprecated(WebsocketFilterMessage[None]):
+class Deprecated(WebsocketFilterMessage[DeprecatedData]):
+    """Deprecated
+
+    doctest:
+
+    >>> event = mkevent({'rollover': True})
+    >>> Deprecated.contract_event_name
+    'Deprecated'
+    >>> decoded_msg(Deprecated.serialize_message(event))
+    {'block_number': 117,
+     'data': {'rollover': false},
+     'event': 'deprecated',
+     'txhash': '0000000000000000000000000000000b'}
+    """
+    event: ClassVar[str] = 'deprecated'
+    schema: ClassVar[PSJSONSchema] = PSJSONSchema({
+        'properties': {
+            'rollover': {
+                'type': 'bool'
+            },
+        }
+    })
+
+
+class Undeprecated(WebsocketFilterMessage[None]):
     """Deprecated
 
     doctest:
 
     >>> event = mkevent({'a': 1, 'hello': 'world', 'should_not_be_here': True})
-    >>> Deprecated.contract_event_name
-    'Deprecated'
-    >>> decoded_msg(Deprecated.serialize_message(event))
+    >>> Undeprecated.contract_event_name
+    'Undeprecated'
+    >>> decoded_msg(Undeprecated.serialize_message(event))
     {'block_number': 117,
      'data': {},
-     'event': 'deprecated',
+     'event': 'undeprecated',
      'txhash': '0000000000000000000000000000000b'}
     """
-    event: ClassVar[str] = 'deprecated'
+    event: ClassVar[str] = 'undeprecated'
 
     @classmethod
     def to_message(cls, event: EventData) -> WebsocketEventMessage[D]:
         return cast(
             WebsocketEventMessage[D], {
-                'event': 'deprecated',
+                'event': 'undeprecated',
                 'data': {},
                 'block_number': event['blockNumber'],
                 'txhash': event['transactionHash'].hex()

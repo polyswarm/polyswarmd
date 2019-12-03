@@ -137,6 +137,8 @@ SettleStateChallengedMessageData = TypedDict(
     }
 )
 
+DeprecatedData = TypedDict('DeprecatedData', {'rollover': bool})
+
 # Latest event's data type is not synthesized from a schema.
 # If it's type changes, update gen_stubs.py
 LatestEventMessageData = TypedDict('LatestEventMessageData', {'number': int})
