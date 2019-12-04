@@ -704,7 +704,7 @@ class Deprecated(WebsocketFilterMessage[DeprecatedData]):
 
 
 class Undeprecated(WebsocketFilterMessage[None]):
-    """Deprecated
+    """Undeprecated
 
     doctest:
 
