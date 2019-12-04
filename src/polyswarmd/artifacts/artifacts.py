@@ -19,13 +19,13 @@ artifacts = Blueprint('artifacts', __name__)
 
 def get_size(f):
     if f.content_length:
-        logger.info('Content length %s', f.content_length)
+        logger.debug('Content length %s', f.content_length)
         return f.content_length
 
     original_position = f.tell()
     f.seek(0, 2)
     size = f.tell()
-    logger.info('Seek length %s', size)
+    logger.debug('Seek length %s', size)
     f.seek(original_position)
     return size
 
