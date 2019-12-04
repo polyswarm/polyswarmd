@@ -41,7 +41,7 @@ def post_artifacts():
              for (i, f) in enumerate(request.files.getlist(key='file'))
              if 0 < f.content_length <= g.user.max_artifact_size]
     if len(files) < len(request.files.getlist(key='file')):
-        return failure('Some artifact exceeds max file size', 413)
+        return failure(f'Some artifact length is not between 0 bytes and max size of {g.user.max_artifact_size}', 413)
 
     if not files:
         return failure('No artifacts', 400)
