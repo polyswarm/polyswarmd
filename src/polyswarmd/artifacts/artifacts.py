@@ -17,6 +17,19 @@ logger = logging.getLogger(__name__)
 artifacts = Blueprint('artifacts', __name__)
 
 
+def get_size(f):
+    if f.content_length:
+        logger.info('Content length %s', f.content_length)
+        return f.content_length
+
+    original_position = f.tell()
+    f.seek(0, 2)
+    size = f.tell()
+    logger.info('Seek length %s', size)
+    f.seek(original_position)
+    return size
+
+
 @artifacts.route('/status', methods=['GET'])
 def get_artifacts_status():
     config = app.config['POLYSWARMD']
@@ -37,9 +50,14 @@ def post_artifacts():
     session = app.config['REQUESTS_SESSION']
 
     # Since we aren't using MAX_CONTENT_LENGTH anymore, we have to check each.
-    files = [(f'{i:06d}', f)
-             for (i, f) in enumerate(request.files.getlist(key='file'))
-             if 0 < f.content_length <= g.user.max_artifact_size]
+    try:
+        files = [(f'{i:06d}', f)
+                 for (i, f) in enumerate(request.files.getlist(key='file'))
+                 if 0 < get_size(f) <= g.user.max_artifact_size]
+    except (AttributeError, IOError):
+        logger.error('Error checking file size')
+        return failure('Unable to read file sizes', 400)
+
     if len(files) < len(request.files.getlist(key='file')):
         return failure(f'Some artifact length is not between 0 bytes and max size of {g.user.max_artifact_size}', 413)
 
