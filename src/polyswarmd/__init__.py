@@ -31,7 +31,7 @@ app = Flask(__name__)
 _config = Config.auto()
 app.config['POLYSWARMD'] = _config
 # Setting this value works even when Content-Length is omitted, we must have it
-app.config['MAX_ARTIFACT_SIZE'] = _config.max_artifact_size * _config.artifact_limit
+app.config['MAX_CONTENT_LENGTH'] = _config.max_artifact_size * _config.artifact_limit
 
 session = FuturesSession(executor=ThreadPoolExecutor(4), adapter_kwargs={'max_retries': 2})
 
