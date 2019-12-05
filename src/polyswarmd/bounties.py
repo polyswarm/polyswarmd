@@ -83,7 +83,7 @@ def get_assertion(guid, index, num_artifacts):
 
 @cache.memoize(60)
 def get_bounty_guids_page(bounty_registry, page):
-    return bounty_registry.getBountyGuids(page).call()
+    return bounty_registry.functions.getBountyGuids(page).call()
 
 
 @cache.memoize(60)
