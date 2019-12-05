@@ -9,9 +9,9 @@ from requests import HTTPError
 from polyswarmd.artifacts.exceptions import (
     ArtifactException,
     ArtifactNotFoundException,
-    ArtifactSizeException,
     InvalidUriException,
-)
+    ArtifactTooLargeException,
+    ArtifactEmptyException)
 from polyswarmd.response import failure, success
 
 logger = logging.getLogger(__name__)
@@ -27,19 +27,19 @@ def check_size(f, maxsize):
     >>> check_size(FileStorage(stream=StringIO('')), 1)
     Traceback (most recent call last):
     ...
-    polyswarmd.artifacts.exceptions.ArtifactSizeException: Artifact has no content
+    polyswarmd.artifacts.exceptions.ArtifactEmptyException
     >>> check_size(namedtuple('TestFile', 'content_length')(32), 64)
     True
     >>> check_size(namedtuple('TestFile', 'content_length')(16), 11)
     Traceback (most recent call last):
     ...
-    polyswarmd.artifacts.exceptions.ArtifactSizeException: Artifact exceeds maximum size
+    polyswarmd.artifacts.exceptions.ArtifactTooLargeException
     """
     size = get_size(f)
     if maxsize < size:
-        raise ArtifactSizeException('Artifact exceeds maximum size')
+        raise ArtifactTooLargeException()
     elif 0 >= size:
-        raise ArtifactSizeException('Artifact has no content')
+        raise ArtifactEmptyException()
 
     return True
 
@@ -90,8 +90,10 @@ def post_artifacts():
     except (AttributeError, IOError):
         logger.error('Error checking file size')
         return failure('Unable to read file sizes', 400)
-    except ArtifactSizeException as e:
-        return failure(f'{e.message}', 413)
+    except ArtifactTooLargeException as e:
+        return failure('Artifact too large', 413)
+    except ArtifactEmptyException:
+        return failure('Artifact empty', 400)
 
     if not files:
         return failure('No artifacts', 400)
@@ -145,7 +147,7 @@ def get_artifacts_identifier_id(identifier, id_):
         response = failure('Invalid artifact URI', 400)
     except ArtifactNotFoundException:
         response = failure(f'Artifact with URI {identifier}/{id_} not found', 404)
-    except ArtifactSizeException:
+    except ArtifactTooLargeException:
         response = failure(f'Artifact with URI {identifier}/{id_} too large', 400)
     except ArtifactException as e:
         response = failure(e.message, 500)
