@@ -1,5 +1,6 @@
 import logging
 
+from io import SEEK_END
 from flask import Blueprint
 from flask import current_app as app
 from flask import g, request
@@ -23,7 +24,7 @@ def get_size(f):
         return f.content_length
 
     original_position = f.tell()
-    f.seek(0, 2)
+    f.seek(0, SEEK_END)
     size = f.tell()
     logger.debug('Seek length %s', size)
     f.seek(original_position)
