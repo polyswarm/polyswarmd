@@ -26,6 +26,8 @@ from polyswarmd.utils import (
     vote_to_dict,
 )
 
+MAX_PAGES_PER_REQUEST = 3
+
 logger = logging.getLogger(__name__)
 bounties = Blueprint('bounties', __name__)
 
@@ -79,6 +81,16 @@ def get_assertion(guid, index, num_artifacts):
     return assertion
 
 
+@cache.memoize(60)
+def get_bounty_guids_page(bounty_registry, page):
+    return bounty_registry.getBountyGuids(page).call()
+
+
+@cache.memoize(60)
+def get_page_size(bounty_registry):
+    return bounty_registry.functions.PAGE_SIZE().call()
+
+
 # noinspection PyBroadException
 @cache.memoize(30)
 def substitute_metadata(
@@ -112,6 +124,30 @@ def substitute_metadata(
         logger.exception(f'Error getting metadata from {artifact_client.name}')
 
     return uri
+
+
+@bounties.route('', methods=['GET'])
+@chain
+@cache.memoize(60)
+def get_bounties():
+    page_size = get_page_size()
+    page = request.args.get('page', 0)
+    count = request.args.get('count', page_size)
+
+    page_size_multiplier = count / page_size
+    if count % page_size != 0 and page_size_multiplier <= MAX_PAGES_PER_REQUEST:
+        return failure(f'Count must be a multiple of page size {page_size}', 400)
+
+    guids = []
+    start_page = page * page_size_multiplier
+    for i in range(page_size_multiplier):
+        page_guids = get_bounty_guids_page(start_page + i)
+        if not page_guids:
+            break
+
+        guids.extend(page_guids)
+
+    return success(guids)
 
 
 _post_bounties_schema = fastjsonschema.compile({
