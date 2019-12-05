@@ -19,6 +19,16 @@ artifacts = Blueprint('artifacts', __name__)
 
 
 def get_size(f):
+    """Return ``f.content_length`` falling back to the position of ``f``'s stream end.
+
+    >>> from io import StringIO
+    >>> from werkzeug.datastructures import FileStorage
+    >>> get_size(FileStorage(stream=StringIO('A' * 16)))
+    16
+    >>> from collections import namedtuple
+    >>> get_size(namedtuple('TestFile', 'content_length')(32))
+    32
+    """
     if f.content_length:
         logger.debug('Content length %s', f.content_length)
         return f.content_length
