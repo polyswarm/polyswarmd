@@ -18,6 +18,32 @@ logger = logging.getLogger(__name__)
 artifacts = Blueprint('artifacts', __name__)
 
 
+def check_size(f, maxsize):
+    """Return True if size is between 0 and the user's maximum
+
+    >>> from collections import namedtuple
+    >>> from io import StringIO
+    >>> from werkzeug.datastructures import FileStorage
+    >>> check_size(FileStorage(stream=StringIO('')), 1)
+    Traceback (most recent call last):
+    ...
+    polyswarmd.artifacts.exceptions.ArtifactSizeException: Artifact has no content
+    >>> check_size(namedtuple('TestFile', 'content_length')(32), 64)
+    True
+    >>> check_size(namedtuple('TestFile', 'content_length')(16), 11)
+    Traceback (most recent call last):
+    ...
+    polyswarmd.artifacts.exceptions.ArtifactSizeException: Artifact exceeds maximum size
+    """
+    size = get_size(f)
+    if maxsize < size:
+        raise ArtifactSizeException('Artifact exceeds maximum size')
+    elif 0 >= size:
+        raise ArtifactSizeException('Artifact has no content')
+
+    return True
+
+
 def get_size(f):
     """Return ``f.content_length`` falling back to the position of ``f``'s stream end.
 
@@ -59,18 +85,13 @@ def get_artifacts_status():
 def post_artifacts():
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
-
-    # Since we aren't using MAX_CONTENT_LENGTH anymore, we have to check each.
     try:
-        files = [(f'{i:06d}', f)
-                 for (i, f) in enumerate(request.files.getlist(key='file'))
-                 if 0 < get_size(f) <= g.user.max_artifact_size]
+        files = [(f'{i:06d}', f) for (i, f) in enumerate(request.files.getlist(key='file')) if check_size(f, g.user.max_artifact_size)]
     except (AttributeError, IOError):
         logger.error('Error checking file size')
         return failure('Unable to read file sizes', 400)
-
-    if len(files) < len(request.files.getlist(key='file')):
-        return failure(f'Some artifact length is not between 0 bytes and max size of {g.user.max_artifact_size}', 413)
+    except ArtifactSizeException as e:
+        return failure(f'{e.message}', 413)
 
     if not files:
         return failure('No artifacts', 400)
