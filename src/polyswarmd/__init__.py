@@ -28,7 +28,10 @@ cache: Cache = Cache(config={"CACHE_TYPE": "simple", "CACHE_DEFAULT_TIMEOUT": 30
 
 # Set up our app object
 app = Flask(__name__)
-app.config['POLYSWARMD'] = Config.auto()
+_config = Config.auto()
+app.config['POLYSWARMD'] = _config
+# Setting this value works even when Content-Length is omitted, we must have it
+app.config['MAX_CONTENT_LENGTH'] = _config.max_artifact_size * _config.artifact_limit
 
 session = FuturesSession(executor=ThreadPoolExecutor(4), adapter_kwargs={'max_retries': 2})
 

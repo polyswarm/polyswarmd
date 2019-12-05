@@ -10,7 +10,7 @@ from polyswarmd.artifacts.client import AbstractArtifactServiceClient
 from polyswarmd.artifacts.exceptions import (
     ArtifactException,
     ArtifactNotFoundException,
-    ArtifactSizeException,
+    ArtifactTooLargeException,
     InvalidUriException,
 )
 
@@ -41,7 +41,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
 
         _, artifact, size = artifacts[index]
         if max_size and size > max_size:
-            raise ArtifactSizeException('Artifact size greater than maximum allowed')
+            raise ArtifactTooLargeException()
 
         return artifacts[index]
 
