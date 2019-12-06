@@ -88,7 +88,7 @@ def get_bounty_guids_page(page, page_size, redis=None):
     cached, guid_list = cache_contract_view(bounty_registry.contract.functions.getBountyGuids(page), key, redis,
                                             serialize=json.dumps, deserialize=json.loads)
 
-    logger.critical(f'Got page of {len(guid_list)} guids. Was it cached? {cached}')
+    logger.debug(f'Got page of {len(guid_list)} guids. Was it cached? {cached}')
     if cached and len(guid_list) != page_size:
         logger.debug('Invalidating bountyGuid cache')
         # If value was cached, but not full, it is the last page and will change regularly
@@ -102,7 +102,7 @@ def get_page_size(redis=None):
     bounty_registry = g.chain.bounty_registry
     key = f'{bounty_registry.contract.address}::PAGE_SIZE'
     cached, page_size = cache_contract_view(bounty_registry.contract.functions.PAGE_SIZE(), key, redis)
-    logger.critical(f'Got page size of {page_size}. Was it cached? {cached}')
+    logger.debug(f'Got page size of {page_size}. Was it cached? {cached}')
     return int(page_size)
 
 
