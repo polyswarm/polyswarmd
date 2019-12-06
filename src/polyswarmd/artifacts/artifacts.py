@@ -1,5 +1,6 @@
 import logging
 
+from io import SEEK_END
 from flask import Blueprint
 from flask import current_app as app
 from flask import g, request
@@ -8,13 +9,62 @@ from requests import HTTPError
 from polyswarmd.artifacts.exceptions import (
     ArtifactException,
     ArtifactNotFoundException,
-    ArtifactSizeException,
     InvalidUriException,
-)
+    ArtifactTooLargeException,
+    ArtifactEmptyException)
 from polyswarmd.response import failure, success
 
 logger = logging.getLogger(__name__)
 artifacts = Blueprint('artifacts', __name__)
+
+
+def check_size(f, maxsize):
+    """Return True if size is between 0 and the user's maximum
+
+    >>> from collections import namedtuple
+    >>> from io import StringIO
+    >>> from werkzeug.datastructures import FileStorage
+    >>> check_size(FileStorage(stream=StringIO('')), 1)
+    Traceback (most recent call last):
+    ...
+    polyswarmd.artifacts.exceptions.ArtifactEmptyException
+    >>> check_size(namedtuple('TestFile', 'content_length')(32), 64)
+    True
+    >>> check_size(namedtuple('TestFile', 'content_length')(16), 11)
+    Traceback (most recent call last):
+    ...
+    polyswarmd.artifacts.exceptions.ArtifactTooLargeException
+    """
+    size = get_size(f)
+    if maxsize < size:
+        raise ArtifactTooLargeException()
+    elif 0 >= size:
+        raise ArtifactEmptyException()
+
+    return True
+
+
+def get_size(f):
+    """Return ``f.content_length`` falling back to the position of ``f``'s stream end.
+
+    >>> from io import StringIO
+    >>> from werkzeug.datastructures import FileStorage
+    >>> get_size(FileStorage(stream=StringIO('A' * 16)))
+    16
+    >>> from collections import namedtuple
+    >>> get_size(namedtuple('TestFile', 'content_length')(32))
+    32
+    """
+    if f.content_length:
+        logger.debug('Content length %s', f.content_length)
+        return f.content_length
+
+    original_position = f.tell()
+    f.seek(0, SEEK_END)
+    size = f.tell()
+    logger.debug('Seek length %s', size)
+    f.seek(original_position)
+    return size
 
 
 @artifacts.route('/status', methods=['GET'])
@@ -35,13 +85,15 @@ def get_artifacts_status():
 def post_artifacts():
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
-
-    # Since we aren't using MAX_CONTENT_LENGTH anymore, we have to check each.
-    files = [(f'{i:06d}', f)
-             for (i, f) in enumerate(request.files.getlist(key='file'))
-             if f.content_length <= g.user.max_artifact_size]
-    if len(files) < len(request.files.getlist(key='file')):
-        return failure('Some artifact exceeds max file size', 413)
+    try:
+        files = [(f'{i:06d}', f) for (i, f) in enumerate(request.files.getlist(key='file')) if check_size(f, g.user.max_artifact_size)]
+    except (AttributeError, IOError):
+        logger.error('Error checking file size')
+        return failure('Unable to read file sizes', 400)
+    except ArtifactTooLargeException as e:
+        return failure('Artifact too large', 413)
+    except ArtifactEmptyException:
+        return failure('Artifact empty', 400)
 
     if not files:
         return failure('No artifacts', 400)
@@ -95,7 +147,7 @@ def get_artifacts_identifier_id(identifier, id_):
         response = failure('Invalid artifact URI', 400)
     except ArtifactNotFoundException:
         response = failure(f'Artifact with URI {identifier}/{id_} not found', 404)
-    except ArtifactSizeException:
+    except ArtifactTooLargeException:
         response = failure(f'Artifact with URI {identifier}/{id_} too large', 400)
     except ArtifactException as e:
         response = failure(e.message, 500)

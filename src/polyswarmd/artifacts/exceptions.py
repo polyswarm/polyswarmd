@@ -13,5 +13,9 @@ class ArtifactNotFoundException(ArtifactException):
     pass
 
 
-class ArtifactSizeException(ArtifactException):
+class ArtifactEmptyException(ArtifactException):
+    pass
+
+
+class ArtifactTooLargeException(ArtifactException):
     pass
