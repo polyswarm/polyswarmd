@@ -22,9 +22,9 @@ from polyswarmd.utils import (
     bloom_to_dict,
     bool_list_to_int,
     bounty_to_dict,
+    cache_contract_view,
     sha3,
-    vote_to_dict,
-)
+    vote_to_dict)
 
 MAX_PAGES_PER_REQUEST = 3
 
@@ -95,19 +95,6 @@ def get_page_size(redis=None):
     bounty_registry = g.chain.bounty_registry
     key = f'{bounty_registry.contract.address}::PAGE_SIZE'
     return int(cache_contract_view(bounty_registry.contract.functions.PAGE_SIZE(), key, redis))
-
-
-def cache_contract_view(contract_view, key, redis, serialize=None, deserialize=None):
-    if redis is None:
-        return contract_view.call()
-
-    if redis.exists(key):
-        response = redis.get(key)
-        return deserialize(response) if deserialize is not None else response
-    else:
-        response = contract_view.call()
-        redis.set(key, serialize(response) if serialize is not None else response, expire=30)
-        return response
 
 
 # noinspection PyBroadException

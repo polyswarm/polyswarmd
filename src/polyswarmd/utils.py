@@ -247,3 +247,16 @@ def sha3(data):
     h = keccak.new(digest_bits=256)
     h.update(data)
     return h.digest()
+
+
+def cache_contract_view(contract_view, key, redis, serialize=None, deserialize=None):
+    if redis is None:
+        return contract_view.call()
+
+    if redis.exists(key):
+        response = redis.get(key)
+        return deserialize(response) if deserialize is not None else response
+    else:
+        response = contract_view.call()
+        redis.set(key, serialize(response) if serialize is not None else response, expire=30)
+        return response
