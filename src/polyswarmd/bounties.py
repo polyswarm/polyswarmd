@@ -1,3 +1,4 @@
+import functools
 import json
 import logging
 import os
@@ -81,7 +82,6 @@ def get_assertion(guid, index, num_artifacts):
     return assertion
 
 
-@cache.memoize(30)
 def get_bounty_guids_page(page, redis=None):
     bounty_registry = g.chain.bounty_registry
     key = f'{bounty_registry.contract.address}::PAGE::{page}'
@@ -90,7 +90,6 @@ def get_bounty_guids_page(page, redis=None):
     return [str(uuid.UUID(int=guid)) for guid in guid_list]
 
 
-@cache.memoize(30)
 def get_page_size(redis=None):
     bounty_registry = g.chain.bounty_registry
     key = f'{bounty_registry.contract.address}::PAGE_SIZE'
@@ -132,18 +131,27 @@ def substitute_metadata(
     return uri
 
 
+def paginate(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        page = int(request.args.get('page', 0))
+        count = int(request.args.get('count', None))
+        return func(*args, **kwargs, page=page, count=count)
+    return wrapper
+
+
 @bounties.route('', methods=['GET'])
 @chain
+@paginate
 @cache.memoize(30)
-def get_bounties():
+def get_bounties(page, count):
     config = app.config['POLYSWARMD']
-
     page_size = get_page_size(config.redis)
-    page = request.args.get('page', 0)
-    count = request.args.get('count', page_size)
 
-    page_size_multiplier = count / page_size
-    if count % page_size != 0 and page_size_multiplier <= MAX_PAGES_PER_REQUEST:
+    count = count or page_size
+
+    page_size_multiplier = int(count / page_size)
+    if count % page_size != 0 or page_size_multiplier > MAX_PAGES_PER_REQUEST:
         return failure(f'Count must be a multiple of page size {page_size}', 400)
 
     guids = []
