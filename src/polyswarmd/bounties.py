@@ -81,14 +81,33 @@ def get_assertion(guid, index, num_artifacts):
     return assertion
 
 
-@cache.memoize(60)
-def get_bounty_guids_page(bounty_registry, page):
-    return bounty_registry.functions.getBountyGuids(page).call()
+@cache.memoize(30)
+def get_bounty_guids_page(page, redis=None):
+    bounty_registry = g.chain.bounty_registry
+    key = f'{bounty_registry.contract.address}::PAGE::{page}'
+    guid_list = cache_contract_view(bounty_registry.contract.functions.getBountyGuids(page), key, redis,
+                                    serialize=json.dumps, deserialize=json.loads)
+    return [str(uuid.UUID(int=guid)) for guid in guid_list]
 
 
-@cache.memoize(60)
-def get_page_size(bounty_registry):
-    return bounty_registry.functions.PAGE_SIZE().call()
+@cache.memoize(30)
+def get_page_size(redis=None):
+    bounty_registry = g.chain.bounty_registry
+    key = f'{bounty_registry.contract.address}::PAGE_SIZE'
+    return int(cache_contract_view(bounty_registry.contract.functions.PAGE_SIZE(), key, redis))
+
+
+def cache_contract_view(contract_view, key, redis, serialize=None, deserialize=None):
+    if redis is None:
+        return contract_view.call()
+
+    if redis.exists(key):
+        response = redis.get(key)
+        return deserialize(response) if deserialize is not None else response
+    else:
+        response = contract_view.call()
+        redis.set(key, serialize(response) if serialize is not None else response, expire=30)
+        return response
 
 
 # noinspection PyBroadException
@@ -128,9 +147,11 @@ def substitute_metadata(
 
 @bounties.route('', methods=['GET'])
 @chain
-@cache.memoize(60)
+@cache.memoize(30)
 def get_bounties():
-    page_size = get_page_size()
+    config = app.config['POLYSWARMD']
+
+    page_size = get_page_size(config.redis)
     page = request.args.get('page', 0)
     count = request.args.get('count', page_size)
 
@@ -141,7 +162,7 @@ def get_bounties():
     guids = []
     start_page = page * page_size_multiplier
     for i in range(page_size_multiplier):
-        page_guids = get_bounty_guids_page(start_page + i)
+        page_guids = get_bounty_guids_page(start_page + i, config.redis)
         if not page_guids:
             break
 
