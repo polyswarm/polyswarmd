@@ -12,9 +12,10 @@ from flask import g, request
 import gevent
 from hexbytes import HexBytes
 import rlp
+from web3.exceptions import MismatchedABI
 from web3.module import Module
 from web3.utils.events import get_event_data
-from web3.exceptions import MismatchedABI
+
 from polyswarmd import cache
 from polyswarmd.chains import chain
 from polyswarmd.response import failure, success
@@ -442,7 +443,6 @@ def events_from_transaction(txhash, chain):
                     break
                 except MismatchedABI:
                     continue
-
 
     return ret
 

@@ -20,6 +20,7 @@ from .json_schema import PSJSONSchema, SchemaDef
 from .message_types import (
     ClosedAgreementMessageData,
     D,
+    DeprecatedMessageData,
     E,
     EventData,
     FeesUpdatedMessageData,
@@ -36,6 +37,7 @@ from .message_types import (
     SettleStateChallengedMessageData,
     StartedSettleMessageData,
     TransferMessageData,
+    UndeprecatedMessageData,
     WebsocketEventMessage,
     WindowsUpdatedMessageData,
 )
@@ -678,32 +680,40 @@ class SettleStateChallenged(WebsocketFilterMessage[SettleStateChallengedMessageD
     })
 
 
-class Deprecated(WebsocketFilterMessage[None]):
+class Deprecated(WebsocketFilterMessage[DeprecatedMessageData]):
     """Deprecated
 
     doctest:
 
-    >>> event = mkevent({'a': 1, 'hello': 'world', 'should_not_be_here': True})
+    >>> event = mkevent({'rollover': True})
     >>> Deprecated.contract_event_name
     'Deprecated'
     >>> decoded_msg(Deprecated.serialize_message(event))
     {'block_number': 117,
-     'data': {},
+     'data': {'rollover': True},
      'event': 'deprecated',
      'txhash': '0000000000000000000000000000000b'}
     """
     event: ClassVar[str] = 'deprecated'
+    schema: ClassVar[PSJSONSchema] = PSJSONSchema({'properties': {'rollover': {'type': 'boolean'}}})
 
-    @classmethod
-    def to_message(cls, event: EventData) -> WebsocketEventMessage[D]:
-        return cast(
-            WebsocketEventMessage[D], {
-                'event': 'deprecated',
-                'data': {},
-                'block_number': event['blockNumber'],
-                'txhash': event['transactionHash'].hex()
-            }
-        )
+
+class Undeprecated(WebsocketFilterMessage[UndeprecatedMessageData]):
+    """Undeprecated
+
+    doctest:
+
+    >>> Undeprecated.contract_event_name
+    'Undeprecated'
+    >>> event = mkevent({'a': 1, 'hello': 'world', 'should_not_be_here': True})
+    >>> decoded_msg(Undeprecated.serialize_message(event))
+    {'block_number': 117,
+     'data': {},
+     'event': 'undeprecated',
+     'txhash': '0000000000000000000000000000000b'}
+    """
+    event: ClassVar[str] = 'undeprecated'
+    schema: ClassVar[PSJSONSchema] = PSJSONSchema({'properties': {}})
 
 
 class LatestEvent(WebsocketFilterMessage[LatestEventMessageData]):
