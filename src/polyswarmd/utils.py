@@ -250,6 +250,16 @@ def sha3(data):
 
 
 def cache_contract_view(contract_view, key, redis, serialize=None, deserialize=None):
+    """Returns response from chain, or from redis cache
+
+    >>> from collections import namedtuple
+    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', None)
+    '12'
+    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'exists'))(lambda k: '13', lambda k: True))
+    '13'
+    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, expire: None, lambda k: False))
+    '12'
+    """
     if redis is None:
         return contract_view.call()
 
