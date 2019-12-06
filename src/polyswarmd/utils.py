@@ -254,15 +254,15 @@ def cache_contract_view(contract_view, key, redis, serialize=None, deserialize=N
 
     >>> from collections import namedtuple
     >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', None)
-    '12'
+    (False, '12')
     >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'exists'))(lambda k: '13', lambda k: True))
-    '13'
-    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, expire: None, lambda k: False))
-    '12'
-    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, expire: None, lambda k: True), invalidate=True)
-    '12'
-    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, expire: None, lambda k: True), invalidate=False)
-    '13'
+    (True, '13')
+    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, ex: None, lambda k: False))
+    (False, '12')
+    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, ex: None, lambda k: True), invalidate=True)
+    (False, '12')
+    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, ex: None, lambda k: True), invalidate=False)
+    (True, '13')
     """
     if redis is None:
         return False, contract_view.call()
