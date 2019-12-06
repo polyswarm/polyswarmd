@@ -82,18 +82,28 @@ def get_assertion(guid, index, num_artifacts):
     return assertion
 
 
-def get_bounty_guids_page(page, redis=None):
+def get_bounty_guids_page(page, page_size, redis=None):
     bounty_registry = g.chain.bounty_registry
     key = f'{bounty_registry.contract.address}::PAGE::{page}'
-    guid_list = cache_contract_view(bounty_registry.contract.functions.getBountyGuids(page), key, redis,
-                                    serialize=json.dumps, deserialize=json.loads)
+    cached, guid_list = cache_contract_view(bounty_registry.contract.functions.getBountyGuids(page), key, redis,
+                                            serialize=json.dumps, deserialize=json.loads)
+
+    logger.critical(f'Got page of {len(guid_list)} guids. Was it cached? {cached}')
+    if cached and len(guid_list) != page_size:
+        logger.debug('Invalidating bountyGuid cache')
+        # If value was cached, but not full, it is the last page and will change regularly
+        cached, guid_list = cache_contract_view(bounty_registry.contract.functions.getBountyGuids(page), key, redis,
+                                                serialize=json.dumps, deserialize=json.loads, invalidate=True)
+
     return [str(uuid.UUID(int=guid)) for guid in guid_list]
 
 
 def get_page_size(redis=None):
     bounty_registry = g.chain.bounty_registry
     key = f'{bounty_registry.contract.address}::PAGE_SIZE'
-    return int(cache_contract_view(bounty_registry.contract.functions.PAGE_SIZE(), key, redis))
+    cached, page_size = cache_contract_view(bounty_registry.contract.functions.PAGE_SIZE(), key, redis)
+    logger.critical(f'Got page size of {page_size}. Was it cached? {cached}')
+    return int(page_size)
 
 
 # noinspection PyBroadException
@@ -131,24 +141,13 @@ def substitute_metadata(
     return uri
 
 
-def paginate(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        page = int(request.args.get('page', 0))
-        count = int(request.args.get('count', None))
-        return func(*args, **kwargs, page=page, count=count)
-    return wrapper
-
-
 @bounties.route('', methods=['GET'])
 @chain
-@paginate
-@cache.memoize(30)
-def get_bounties(page, count):
+def get_bounties():
     config = app.config['POLYSWARMD']
     page_size = get_page_size(config.redis)
-
-    count = count or page_size
+    page = int(request.args.get('page', 0))
+    count = int(request.args.get('count', page_size))
 
     page_size_multiplier = int(count / page_size)
     if count % page_size != 0 or page_size_multiplier > MAX_PAGES_PER_REQUEST:
@@ -157,7 +156,7 @@ def get_bounties(page, count):
     guids = []
     start_page = page * page_size_multiplier
     for i in range(page_size_multiplier):
-        page_guids = get_bounty_guids_page(start_page + i, config.redis)
+        page_guids = get_bounty_guids_page(start_page + i, page_size, config.redis)
         if not page_guids:
             break
 
