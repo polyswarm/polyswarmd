@@ -323,7 +323,7 @@ class Config(object):
         self.profiler_enabled = profiler_enabled
         self.redis = redis_client
         self.fallback_max_artifact_size = fallback_max_artifact_size
-        self.max_artifact_size = max_artifact_size
+        self.max_artifact_size = int(max_artifact_size)
 
         self.__validate()
 
@@ -345,8 +345,7 @@ class Config(object):
         redis_uri = config.get('redis_uri', os.environ.get('REDIS_URI', None))
         redis_client = redis.Redis.from_url(redis_uri) if redis_uri else None
         fallback_max_artifact_size = config.get('fallback_max_artifact_size', DEFAULT_FALLBACK_SIZE)
-        max_artifact_size = config.get('max_artifact_size', int(os.environ.get('MAX_ARTIFACT_SIZE',
-                                                                               DEFAULT_FALLBACK_SIZE)))
+        max_artifact_size = config.get('max_artifact_size', os.environ.get('MAX_ARTIFACT_SIZE', DEFAULT_FALLBACK_SIZE))
         return cls(
             commmunity, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config,
             sidechain_config, trace_transactions, profiler_enabled, redis_client,
