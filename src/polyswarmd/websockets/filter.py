@@ -64,15 +64,14 @@ class FilterWrapper:
             # backoff 'exponentially'
             exp = (1 << max(0, ctr - 2)) - 1
             result = min(max_wait, max(min_wait, exp))
+            return abs(gauss(result, 0.1))
         else:
-            result = min_wait
+            return min_wait
 
-        return abs(gauss(result, 0.1))
-
-    def get_new_entries(self) -> Iterable[Message]:
+    def get_new_entries(self) -> List[Message]:
         return [self.formatter.serialize_message(e) for e in self.filter.get_new_entries()]
 
-    def spawn_poll_loop(self, callback: Callable[[Iterable[FormatClass]], NoReturn]):
+    def spawn_poll_loop(self, callback: Callable[[Iterable[Message]], NoReturn]):
         """Spawn a greenlet which polls the filter's contract events, passing results to `callback'"""
         ctr: int = 0  # number of loops since the last non-empty response
         wait: float = 0.0  # The amount of time this loop will wait.
@@ -81,17 +80,15 @@ class FilterWrapper:
             ctr += 1
             # XXX spawn_later prevents easily killing the pool. Use `wait` here.
             gevent.sleep(wait)
-            # Spawn the next version of this instance
-            greenlet = gevent.spawn(self.get_new_entries)
             try:
-                result = greenlet.get(block=True)
+                result = self.get_new_entries()
             # LookupError generally occurs when our schema doesn't match the message
             except LookupError:
                 logger.exception("LookupError inside spawn_poll_loop")
                 wait = 1
                 continue
             # ConnectionError generally occurs when we cannot fetch events
-            except (ConnectionError, gevent.Timeout):
+            except ConnectionError:
                 logger.exception("ConnectionError/timeout in spawn_poll_loop")
                 wait = self.compute_wait(ctr + 2)
                 continue
