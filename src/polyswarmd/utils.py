@@ -247,3 +247,30 @@ def sha3(data):
     h = keccak.new(digest_bits=256)
     h.update(data)
     return h.digest()
+
+
+def cache_contract_view(contract_view, key, redis, serialize=None, deserialize=None, invalidate=False):
+    """Returns tuple with boolean to indicate chached, and the response from chain, or from redis cache
+
+    >>> from collections import namedtuple
+    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', None)
+    (False, '12')
+    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'exists'))(lambda k: '13', lambda k: True))
+    (True, '13')
+    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, ex: None, lambda k: False))
+    (False, '12')
+    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, ex: None, lambda k: True), invalidate=True)
+    (False, '12')
+    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, ex: None, lambda k: True), invalidate=False)
+    (True, '13')
+    """
+    if redis is None:
+        return False, contract_view.call()
+
+    if redis.exists(key) and not invalidate:
+        response = redis.get(key)
+        return True, deserialize(response) if deserialize is not None else response
+    else:
+        response = contract_view.call()
+        redis.set(key, serialize(response) if serialize is not None else response, ex=600)
+        return False, response
