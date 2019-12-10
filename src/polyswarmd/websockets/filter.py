@@ -1,19 +1,19 @@
 from contextlib import contextmanager
-import logging
+from gevent.pool import Group
+from gevent.queue import Queue
 from random import gauss
+from requests.exceptions import ConnectionError
 from typing import Any, Callable, Iterable, List, NoReturn, Set, Type
 
 import gevent
-from gevent.pool import Group
-from gevent.queue import Queue
-from requests.exceptions import ConnectionError
+import logging
 
 from . import messages
 
 logger = logging.getLogger(__name__)
 
 
-class ContractFilter():
+class ContractFilter:
     callbacks: List[Callable[..., Any]]
     stopped: bool
     poll_interval: float
@@ -32,13 +32,15 @@ Message = bytes
 
 
 class FilterWrapper:
-    "A utility class which wraps a contract filter with websocket-messaging features"
+    """A utility class which wraps a contract filter with websocket-messaging features"""
     filter: ContractFilter
+    filter_installer = Callable[[], ContractFilter]
     formatter: FormatClass
     backoff: bool
 
-    def __init__(self, fltr: ContractFilter, formatter: FormatClass, backoff: bool):
-        self.filter = fltr
+    def __init__(self, filter_installer: Callable[[], ContractFilter], formatter: FormatClass, backoff: bool):
+        self.filter = filter_installer()
+        self.filter_installer = filter_installer
         self.formatter = formatter
         self.backoff = backoff
 
@@ -56,9 +58,8 @@ class FilterWrapper:
     def compute_wait(self, ctr: int) -> float:
         """Compute the amount of wait time from a counter of (sequential) empty replies"""
         min_wait = 0.5
-        max_wait = 8.0
+        max_wait = 4.0
 
-        result: float = 1.0
         if self.backoff:
             # backoff 'exponentially'
             exp = (1 << max(0, ctr - 2)) - 1
@@ -94,6 +95,12 @@ class FilterWrapper:
                 logger.exception("ConnectionError/timeout in spawn_poll_loop")
                 wait = self.compute_wait(ctr + 2)
                 continue
+            # ValueError generally occurs when Geth removed the filter
+            except ValueError:
+                logger.exception("Filter removed by Ethereum client")
+                self.filter = self.filter_installer()
+                wait = 1
+                continue
 
             # Reset the ctr if we recieved a non-empty response or we shouldn't backoff
             if len(result) != 0:
@@ -115,9 +122,9 @@ class FilterManager:
         self.wrappers = set()
         self.pool = Group()
 
-    def register(self, fltr: ContractFilter, fmt_cls: FormatClass, backoff: bool = True):
+    def register(self, filter_installer: Callable[[], ContractFilter], fmt_cls: FormatClass, backoff: bool = True):
         """Add a new filter, with an optional associated WebsocketMessage-serializer class"""
-        wrapper = FilterWrapper(fltr, fmt_cls, backoff)
+        wrapper = FilterWrapper(filter_installer, fmt_cls, backoff)
         self.wrappers.add(wrapper)
         logger.debug('Registered new filter: %s', wrapper)
 
@@ -149,12 +156,14 @@ class FilterManager:
 
         # Setup Latest
         self.register(
-            chain.w3.eth.filter('latest'), messages.LatestEvent.make(chain.w3.eth), backoff=False
+            lambda: chain.w3.eth.filter('latest'),
+            messages.LatestEvent.make(chain.w3.eth),
+            backoff=False
         )
 
         bounty_contract = chain.bounty_registry.contract
         self.register(
-            bounty_contract.eventFilter(messages.NewBounty.contract_event_name),
+            lambda: bounty_contract.eventFilter(messages.NewBounty.contract_event_name),
             messages.NewBounty,
             # messages.NewBounty shouldn't wait or back-off from new bounties.
             backoff=False
@@ -169,14 +178,15 @@ class FilterManager:
             messages.SettledBounty,
             messages.RevealedAssertion,
             messages.Deprecated,
+            messages.Undeprecated,
         ]
 
         for cls in filter_events:
-            self.register(bounty_contract.eventFilter(cls.contract_event_name), cls)
+            self.register(lambda: bounty_contract.eventFilter(cls.contract_event_name), cls)
 
         offer_registry = chain.offer_registry
         if offer_registry and offer_registry.contract:
             self.register(
-                offer_registry.contract.eventFilter(messages.InitializedChannel.contract_event_name),
+                lambda: offer_registry.contract.eventFilter(messages.InitializedChannel.contract_event_name),
                 messages.InitializedChannel
             )
