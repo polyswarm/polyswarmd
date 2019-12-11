@@ -1,4 +1,3 @@
-import functools
 import json
 import logging
 import os
@@ -25,7 +24,8 @@ from polyswarmd.utils import (
     bounty_to_dict,
     cache_contract_view,
     sha3,
-    vote_to_dict)
+    vote_to_dict,
+)
 
 MAX_PAGES_PER_REQUEST = 3
 
@@ -85,15 +85,26 @@ def get_assertion(guid, index, num_artifacts):
 def get_bounty_guids_page(page, page_size, redis=None):
     bounty_registry = g.chain.bounty_registry
     key = f'{bounty_registry.contract.address}::PAGE::{page}'
-    cached, guid_list = cache_contract_view(bounty_registry.contract.functions.getBountyGuids(page), key, redis,
-                                            serialize=json.dumps, deserialize=json.loads)
+    cached, guid_list = cache_contract_view(
+        bounty_registry.contract.functions.getBountyGuids(page),
+        key,
+        redis,
+        serialize=json.dumps,
+        deserialize=json.loads
+    )
 
     logger.debug(f'Got page of {len(guid_list)} guids. Was it cached? {cached}')
     if cached and len(guid_list) != page_size:
         logger.debug('Invalidating bountyGuid cache')
         # If value was cached, but not full, it is the last page and will change regularly
-        cached, guid_list = cache_contract_view(bounty_registry.contract.functions.getBountyGuids(page), key, redis,
-                                                serialize=json.dumps, deserialize=json.loads, invalidate=True)
+        cached, guid_list = cache_contract_view(
+            bounty_registry.contract.functions.getBountyGuids(page),
+            key,
+            redis,
+            serialize=json.dumps,
+            deserialize=json.loads,
+            invalidate=True
+        )
 
     return [str(uuid.UUID(int=guid)) for guid in guid_list]
 
@@ -101,7 +112,9 @@ def get_bounty_guids_page(page, page_size, redis=None):
 def get_page_size(redis=None):
     bounty_registry = g.chain.bounty_registry
     key = f'{bounty_registry.contract.address}::PAGE_SIZE'
-    cached, page_size = cache_contract_view(bounty_registry.contract.functions.PAGE_SIZE(), key, redis)
+    cached, page_size = cache_contract_view(
+        bounty_registry.contract.functions.PAGE_SIZE(), key, redis
+    )
     logger.debug(f'Got page size of {page_size}. Was it cached? {cached}')
     return int(page_size)
 
@@ -153,7 +166,7 @@ def get_bounties():
     if count % page_size != 0 or page_size_multiplier > MAX_PAGES_PER_REQUEST:
         return failure(f'Count must be a multiple of page size {page_size}', 400)
 
-    guids = []
+    guids: List[str] = []
     start_page = page * page_size_multiplier
     for i in range(page_size_multiplier):
         page_guids = get_bounty_guids_page(start_page + i, page_size, config.redis)

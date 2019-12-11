@@ -721,12 +721,13 @@ class LatestEvent(WebsocketFilterMessage[LatestEventMessageData]):
 
     doctest:
 
-    >>> LatestEvent.make(chain1)
+    >>> LE = LatestEvent.make(chain1)
+    >>> LE
     <class 'websockets.messages.LatestEvent'>
     >>> event = mkevent({'a': 1, 'hello': 'world', 'should_not_be_here': True})
-    >>> LatestEvent.contract_event_name
+    >>> LE.contract_event_name
     'latest'
-    >>> decoded_msg(LatestEvent.serialize_message(event))
+    >>> decoded_msg(LE.serialize_message(event))
     {'data': {'number': 117}, 'event': 'block'}
     """
     event: ClassVar[str] = 'block'

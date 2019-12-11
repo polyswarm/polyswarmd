@@ -249,7 +249,9 @@ def sha3(data):
     return h.digest()
 
 
-def cache_contract_view(contract_view, key, redis, serialize=None, deserialize=None, invalidate=False):
+def cache_contract_view(
+    contract_view, key, redis, serialize=None, deserialize=None, invalidate=False
+):
     """Returns tuple with boolean to indicate chached, and the response from chain, or from redis cache
 
     >>> from collections import namedtuple

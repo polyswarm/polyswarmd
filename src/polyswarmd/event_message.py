@@ -135,7 +135,7 @@ def init_websockets(app):
             SettleStateChallenged,
         ]
         for evt in filter_events:
-            filter_manager.register(lambda: offer_msig.eventFilter(evt.contract_event_name), evt)
+            filter_manager.register(offer_msig.eventFilter, evt)
 
         with filter_manager.fetch() as results:
             for messages in results:
