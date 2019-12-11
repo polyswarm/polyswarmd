@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 import logging
 from random import gauss
-from typing import Any, Callable, ClassVar, Iterable, List, NoReturn, Set, Type
+from typing import Any, Callable, Iterable, List, NoReturn, Set, Type
 
 import gevent
 from gevent.pool import Group
@@ -37,17 +37,18 @@ class FilterWrapper:
     filter: ContractFilter
     formatter: FormatClass
     backoff: bool
-    _installer_key: ClassVar[str] = '_installer_key'
 
     def __init__(self, filter_installer: FilterInstaller, formatter: FormatClass, backoff: bool):
         self.formatter = formatter
         self.backoff = backoff
-        self.__dict__[self._installer_key] = filter_installer
-        self.filter = self.filter_installer()
+        self._filter_installer = filter_installer
+        self.filter = self.create_filter()
 
-    def filter_installer(self) -> ContractFilter:
-        """Install the filter from the filter creation fn passed at obj creation"""
-        installer = self.__dict__[self._installer_key]
+    def create_filter(self) -> ContractFilter:
+        """Return a new filter
+
+        NOTE: this function is here instead of directly assigned in __init__ to appease mypy"""
+        installer: FilterInstaller = self._filter_installer
         return installer(self.formatter.contract_event_name)
 
     def compute_wait(self, ctr: int) -> float:
@@ -90,7 +91,7 @@ class FilterWrapper:
             # ValueError generally occurs when Geth removed the filter
             except ValueError:
                 logger.exception("Filter removed by Ethereum client")
-                self.filter = self.filter_installer()
+                self.filter = self.create_filter()
                 wait = 1
                 continue
 

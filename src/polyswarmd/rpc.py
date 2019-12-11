@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class WebsocketConnectionAbortedError(Exception):
-    """Exception thrown when broadcast cannot send to can clients"""
+    """Exception thrown when no clients exist to broadcast to"""
     pass
 
 
