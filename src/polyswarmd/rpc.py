@@ -1,8 +1,10 @@
 from signal import SIGQUIT
+from typing import AnyStr, List, Optional, SupportsBytes, Union
 
 import gevent
 from gevent.lock import BoundedSemaphore
 
+from polyswarmd.event_message import WebSocket
 from polyswarmd.utils import logging
 from polyswarmd.websockets.filter import FilterManager
 
@@ -19,13 +21,13 @@ class EthereumRpc:
     This class periodically polls several geth filters, and multicasts the results across any open WebSockets
     """
     filter_manager = FilterManager()
+    websockets: Optional[List[WebSocket]] = None
+    websockets_lock: BoundedSemaphore = BoundedSemaphore(1)
 
     def __init__(self, chain):
         self.chain = chain
-        self.websockets_lock = BoundedSemaphore(1)
-        self.websockets = None
 
-    def broadcast(self, message):
+    def broadcast(self, message: Union[AnyStr, SupportsBytes]):
         """
         Send a message to all connected WebSockets
         :param message: dict to be converted to json and sent
@@ -52,18 +54,21 @@ class EthereumRpc:
             logger.exception("Shutting down poll()")
             self.filter_manager.flush()
             self.websockets = None
+        except gevent.GreenletExit:
+            logger.exception('Greenlet killed, not restarting')
         except Exception:
             logger.exception('Exception in filter checks, restarting greenlet')
             # Creates a new greenlet with all new filters and let's this one die.
             gevent.spawn(self.poll)
 
-    def register(self, ws):
+    def register(self, ws: WebSocket):
         """
         Register a WebSocket with the rpc nodes
         Gets all events going forward
         :param ws: WebSocket wrapper to register
         """
         with self.websockets_lock:
+            logger.debug('Registering WebSocket %s', id(ws))
             if self.websockets is None:
                 self.websockets = [ws]
                 logger.debug('First WebSocket registered, starting greenlet')
@@ -73,13 +78,13 @@ class EthereumRpc:
             else:
                 self.websockets.append(ws)
 
-    def unregister(self, ws):
+    def unregister(self, ws: WebSocket):
         """
         Remove a Websocket wrapper object
         :param ws: WebSocket to remove
         """
-        logger.debug('Unregistering WebSocket %s', ws)
+        logger.debug('Unregistering WebSocket %s', id(ws))
         with self.websockets_lock:
             if ws in self.websockets:
-                logger.debug('Removing WebSocket %s', ws)
+                logger.debug('Removing WebSocket %s', id(ws))
                 self.websockets.remove(ws)
