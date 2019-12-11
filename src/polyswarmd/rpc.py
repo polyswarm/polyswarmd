@@ -30,7 +30,7 @@ class EthereumRpc:
         """
         # XXX This can be replaced with a broadcast inside the WebsocketHandlerApplication
         with self.websockets_lock:
-            logger.critical("I have %s websockets on %s", len(self.websockets), repr(self))
+            logger.debug("I have %s websockets on %s", len(self.websockets), repr(self))
             for ws in self.websockets:
                 try:
                     ws.send(message)

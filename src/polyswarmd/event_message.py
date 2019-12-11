@@ -94,7 +94,7 @@ def init_websockets(app):
     def events(ws):
         rpc = g.chain.rpc
         ws.send(Connected.serialize_message({'start_time': str(start_time)}))
-        logger.critical("Websocket connection on %s", repr(g.chain))
+        logger.debug("Websocket connection on %s", repr(g.chain))
 
         wrapper = WebSocket(ws)
 
@@ -105,7 +105,7 @@ def init_websockets(app):
                 # Try to read a message off the queue, and then send over the websocket.
                 msg = wrapper.queue.get(block=False)
                 ws.send(msg)
-                logger.critical("Sent message %s to %s", msg, repr(ws))
+                logger.debug("Sent message %s to %s", msg, repr(ws))
             except Empty:
                 # Anytime there are no new messages to send, check that the websocket is still connected
                 with gevent.Timeout(.5, False):
