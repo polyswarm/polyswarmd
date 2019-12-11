@@ -53,11 +53,19 @@ class EthereumRpc:
             logger.exception("Shutting down poll()")
             self.websockets = None
         except gevent.GreenletExit:
-            logger.exception('Greenlet killed, not restarting')
+            logger.exception(
+                'Greenlet killed, not restarting. Outstanding websockets: %d', len(self.websockets)
+            )
+            # if the greenlet is killed, we need to destroy the websocket connections (if any exist)
+            self.websockets = None
         except Exception:
-            logger.exception('Exception in filter checks, restarting greenlet')
+            logger.exception(
+                'Exception in filter checks, restarting greenlet. Outstanding websockets: %d',
+                len(self.websockets)
+            )
             # Creates a new greenlet with all new filters and let's this one die.
-            gevent.spawn(self.poll)
+            greenlet = gevent.spawn(self.poll)
+            gevent.signal(SIGQUIT, greenlet.kill)
 
     def register(self, ws: WebSocket):
         """
