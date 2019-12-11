@@ -20,10 +20,15 @@ class EthereumRpc:
     websockets_lock: BoundedSemaphore
 
     def __init__(self, chain):
+        self.chain = chain
         self.filter_manager = FilterManager()
         self.websockets = None
         self.websockets_lock = BoundedSemaphore(1)
         self.chain = chain
+
+    def broadcast(self, message: Union[AnyStr, SupportsBytes]):
+    def __repr__(self):
+        return f"<EthereumRPC Chain={self.chain}>"
 
     def broadcast(self, message: Union[AnyStr, SupportsBytes]):
         """
@@ -31,11 +36,16 @@ class EthereumRpc:
         :param message: dict to be converted to json and sent
         """
         # XXX This can be replaced with a broadcast inside the WebsocketHandlerApplication
+        logger.debug("I have %s websockets on %s", len(self.websockets), repr(self))
         with self.websockets_lock:
             if len(self.websockets) == 0:
                 raise WebsocketConnectionAbortedError
             for ws in self.websockets:
-                ws.send(message)
+                try:
+                    ws.send(message)
+                except Exception:
+                    logger.exception('Error adding message to the queue')
+                    continue
 
     # noinspection PyBroadException
     def poll(self):

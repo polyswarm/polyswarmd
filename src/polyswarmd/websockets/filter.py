@@ -1,12 +1,12 @@
 from contextlib import contextmanager
-import logging
+from gevent.pool import Group
+from gevent.queue import Queue
 from random import gauss
+from requests.exceptions import ConnectionError
 from typing import Any, Callable, Iterable, List, NoReturn, Set, Type
 
 import gevent
-from gevent.pool import Group
-from gevent.queue import Queue
-from requests.exceptions import ConnectionError
+import logging
 
 from . import messages
 
@@ -35,6 +35,7 @@ FilterInstaller = Callable[[str], ContractFilter]
 class FilterWrapper:
     """A utility class which wraps a contract filter with websocket-messaging features"""
     filter: ContractFilter
+    filter_installer = Callable[[], ContractFilter]
     formatter: FormatClass
     backoff: bool
 
@@ -84,9 +85,15 @@ class FilterWrapper:
                 wait = 1
                 continue
             # ConnectionError generally occurs when we cannot fetch events
-            except ConnectionError:
+            except (ConnectionError, TimeoutError):
                 logger.exception("ConnectionError/timeout in spawn_poll_loop")
-                wait = self.compute_wait(ctr + 2)
+                wait = self.compute_wait(ctr)
+                continue
+            # ValueError generally occurs when Geth removed the filter
+            except ValueError:
+                logger.exception("Filter removed by Ethereum client")
+                self.filter = self.filter_installer()
+                wait = 1
                 continue
             # ValueError generally occurs when Geth removed the filter
             except ValueError:
@@ -95,12 +102,11 @@ class FilterWrapper:
                 wait = 1
                 continue
 
-            # Reset the ctr if we recieved a non-empty response or we shouldn't backoff
+            # Reset the ctr if we received a non-empty response or we shouldn't backoff
             if len(result) != 0:
                 ctr = 0
                 callback(result)
 
-            # We add gaussian randomness so that requests are queued all-at-once.
             wait = self.compute_wait(ctr)
             logger.debug("%s wait=%f", self.filter, wait)
 
