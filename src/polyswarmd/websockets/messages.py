@@ -6,6 +6,7 @@ from typing import (
     Generic,
     Mapping,
     Optional,
+    Type,
     cast,
 )
 import ujson
@@ -722,13 +723,16 @@ class LatestEvent(WebsocketFilterMessage[LatestEventMessageData]):
     doctest:
 
     >>> LE = LatestEvent.make(chain1)
-    >>> LE
-    <class 'websockets.messages.LatestEvent'>
+    >>> LA = LatestEvent.make(chain2)
     >>> event = mkevent({'a': 1, 'hello': 'world', 'should_not_be_here': True})
     >>> LE.contract_event_name
     'latest'
+    >>> LA.contract_event_name
+    'latest'
     >>> decoded_msg(LE.serialize_message(event))
     {'data': {'number': 117}, 'event': 'block'}
+    >>> decoded_msg(LA.serialize_message(event))
+    {'data': {'number': 220}, 'event': 'block'}
     """
     event: ClassVar[str] = 'block'
     contract_event_name: ClassVar[str] = 'latest'
@@ -740,6 +744,9 @@ class LatestEvent(WebsocketFilterMessage[LatestEventMessageData]):
 
     @classmethod
     def make(cls, chain):
-        cls.contract_event_name = 'latest'
-        cls._chain = chain
-        return cls
+        ncls: Type[LatestEvent] = type(
+            f'LatestEvent_{id(chain)}', LatestEvent.__bases__, dict(LatestEvent.__dict__)
+        )
+        ncls.contract_event_name = 'latest'
+        ncls._chain = chain
+        return ncls
