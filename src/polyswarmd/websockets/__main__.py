@@ -40,9 +40,8 @@ def run_doctests():
 
     class TestChain:
 
-        @property
-        def blockNumber(self):
-            return 117
+        def __init__(self, block_number=117):
+            self.blockNumber = block_number
 
     # Override _substitute_metadata so we can test `fetch_metadata' without network IO.
     # doctest.testmod does accept globals-setting parameters (`globs` & `extraglobs'),
@@ -95,7 +94,8 @@ def run_doctests():
             'mkevent': TestEvent,
             'addr1': "0x00000000000000000000000000000001",
             'addr2': "0x00000000000000000000000000000002",
-            'chain1': TestChain()
+            'chain1': TestChain(117),
+            'chain2': TestChain(220)
         }
     )
     failures += fails
