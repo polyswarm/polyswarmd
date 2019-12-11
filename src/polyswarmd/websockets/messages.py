@@ -733,6 +733,8 @@ class LatestEvent(WebsocketFilterMessage[LatestEventMessageData]):
     {'data': {'number': 117}, 'event': 'block'}
     >>> decoded_msg(LA.serialize_message(event))
     {'data': {'number': 220}, 'event': 'block'}
+    >>> decoded_msg(LE.serialize_message(event))
+    {'data': {'number': 117}, 'event': 'block'}
     """
     event: ClassVar[str] = 'block'
     contract_event_name: ClassVar[str] = 'latest'

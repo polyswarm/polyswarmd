@@ -93,7 +93,7 @@ def post_artifacts():
     except (AttributeError, IOError):
         logger.error('Error checking file size')
         return failure('Unable to read file sizes', 400)
-    except ArtifactTooLargeException as e:
+    except ArtifactTooLargeException:
         return failure('Artifact too large', 413)
     except ArtifactEmptyException:
         return failure('Artifact empty', 400)

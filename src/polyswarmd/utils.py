@@ -257,13 +257,32 @@ def cache_contract_view(
     >>> from collections import namedtuple
     >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', None)
     (False, '12')
-    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'exists'))(lambda k: '13', lambda k: True))
+    >>> cache_contract_view(
+    ... namedtuple('ContractCall', 'call')(lambda : '12'),
+    ... '',
+    ... redis=namedtuple('Redis', ('get', 'exists'))(lambda k: '13', lambda k: True))
     (True, '13')
-    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, ex: None, lambda k: False))
+    >>> cache_contract_view(
+    ... namedtuple('ContractCall', 'call')(lambda : '12'),
+    ... '', redis=namedtuple(
+    ...     'Redis',
+    ...     ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, ex: None, lambda k: False))
     (False, '12')
-    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, ex: None, lambda k: True), invalidate=True)
+    >>> cache_contract_view(
+    ... namedtuple('ContractCall', 'call')(lambda : '12'),
+    ... '',
+    ... redis=namedtuple(
+    ...     'Redis',
+    ...     ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, ex: None, lambda k: True),
+    ...     invalidate=True)
     (False, '12')
-    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, ex: None, lambda k: True), invalidate=False)
+    >>> cache_contract_view(
+    ... namedtuple('ContractCall', 'call')(lambda : '12'),
+    ... '',
+    ... redis=namedtuple(
+    ...     'Redis',
+    ...     ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, ex: None, lambda k: True),
+    ...     invalidate=False)
     (True, '13')
     """
     if redis is None:

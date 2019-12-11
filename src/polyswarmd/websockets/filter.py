@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 import logging
 from random import gauss
 from typing import Any, Callable, Iterable, List, NoReturn, Set, Type
@@ -107,6 +106,8 @@ class FilterWrapper:
 
 class FilterManager:
     """Manages access to filtered Ethereum events."""
+    wrappers: Set[FilterWrapper]
+    pool: Group
 
     def __init__(self):
         self.wrappers = set()
