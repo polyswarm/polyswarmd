@@ -52,7 +52,6 @@ class EthereumRpc:
                         self.broadcast(msg)
         except WebsocketConnectionAbortedError:
             logger.exception("Shutting down poll()")
-            self.filter_manager.flush()
             self.websockets = None
         except gevent.GreenletExit:
             logger.exception('Greenlet killed, not restarting')

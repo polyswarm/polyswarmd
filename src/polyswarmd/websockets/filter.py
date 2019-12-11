@@ -139,7 +139,7 @@ class FilterManager:
         """Setup the most common event filters"""
         if len(self.wrappers) != 0:
             logger.exception("Attempting to initialize already initialized filter manager")
-            return
+            self.flush()
 
         bounty_contract = chain.bounty_registry.contract
 
