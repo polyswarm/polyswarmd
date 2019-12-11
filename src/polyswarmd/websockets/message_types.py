@@ -14,7 +14,7 @@ E = TypeVar('E')
 
 
 class EventData(Mapping):
-    "Event data returned from web3 filter requests"
+    """Event data returned from web3 filter requests"""
     args: Dict[str, Any]
     event: str
     logIndex: int
@@ -26,7 +26,7 @@ class EventData(Mapping):
 
 
 class WebsocketEventMessage(Generic[D], Mapping):
-    "An Polyswarm WebSocket message"
+    """An Polyswarm WebSocket message"""
     event: str
     data: D
     block_number: Optional[int]

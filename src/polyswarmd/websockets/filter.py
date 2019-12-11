@@ -1,19 +1,19 @@
 from contextlib import contextmanager
-import logging
+from gevent.pool import Group
+from gevent.queue import Queue
 from random import gauss
+from requests.exceptions import ConnectionError
 from typing import Any, Callable, Iterable, List, NoReturn, Set, Type
 
 import gevent
-from gevent.pool import Group
-from gevent.queue import Queue
-from requests.exceptions import ConnectionError
+import logging
 
 from . import messages
 
 logger = logging.getLogger(__name__)
 
 
-class ContractFilter():
+class ContractFilter:
     callbacks: List[Callable[..., Any]]
     stopped: bool
     poll_interval: float
@@ -32,13 +32,15 @@ Message = bytes
 
 
 class FilterWrapper:
-    "A utility class which wraps a contract filter with websocket-messaging features"
+    """A utility class which wraps a contract filter with websocket-messaging features"""
     filter: ContractFilter
+    filter_installer = Callable[[], ContractFilter]
     formatter: FormatClass
     backoff: bool
 
-    def __init__(self, fltr: ContractFilter, formatter: FormatClass, backoff: bool):
-        self.filter = fltr
+    def __init__(self, filter_installer: Callable[[], ContractFilter], formatter: FormatClass, backoff: bool):
+        self.filter = filter_installer()
+        self.filter_installer = filter_installer
         self.formatter = formatter
         self.backoff = backoff
 
@@ -56,22 +58,20 @@ class FilterWrapper:
     def compute_wait(self, ctr: int) -> float:
         """Compute the amount of wait time from a counter of (sequential) empty replies"""
         min_wait = 0.5
-        max_wait = 8.0
+        max_wait = 4.0
 
-        result: float = 1.0
         if self.backoff:
             # backoff 'exponentially'
             exp = (1 << max(0, ctr - 2)) - 1
             result = min(max_wait, max(min_wait, exp))
+            return abs(gauss(result, 0.1))
         else:
-            result = min_wait
+            return min_wait
 
-        return abs(gauss(result, 0.1))
-
-    def get_new_entries(self) -> Iterable[Message]:
+    def get_new_entries(self) -> List[Message]:
         return [self.formatter.serialize_message(e) for e in self.filter.get_new_entries()]
 
-    def spawn_poll_loop(self, callback: Callable[[Iterable[FormatClass]], NoReturn]):
+    def spawn_poll_loop(self, callback: Callable[[Iterable[Message]], NoReturn]):
         """Spawn a greenlet which polls the filter's contract events, passing results to `callback'"""
         ctr: int = 0  # number of loops since the last non-empty response
         wait: float = 0.0  # The amount of time this loop will wait.
@@ -80,27 +80,30 @@ class FilterWrapper:
             ctr += 1
             # XXX spawn_later prevents easily killing the pool. Use `wait` here.
             gevent.sleep(wait)
-            # Spawn the next version of this instance
-            greenlet = gevent.spawn(self.get_new_entries)
             try:
-                result = greenlet.get(block=True)
+                result = self.get_new_entries()
             # LookupError generally occurs when our schema doesn't match the message
             except LookupError:
                 logger.exception("LookupError inside spawn_poll_loop")
                 wait = 1
                 continue
             # ConnectionError generally occurs when we cannot fetch events
-            except (ConnectionError, gevent.Timeout):
+            except (ConnectionError, TimeoutError):
                 logger.exception("ConnectionError/timeout in spawn_poll_loop")
-                wait = self.compute_wait(ctr + 2)
+                wait = self.compute_wait(ctr)
+                continue
+            # ValueError generally occurs when Geth removed the filter
+            except ValueError:
+                logger.exception("Filter removed by Ethereum client")
+                self.filter = self.filter_installer()
+                wait = 1
                 continue
 
-            # Reset the ctr if we recieved a non-empty response or we shouldn't backoff
+            # Reset the ctr if we received a non-empty response or we shouldn't backoff
             if len(result) != 0:
                 ctr = 0
                 callback(result)
 
-            # We add gaussian randomness so that requests are queued all-at-once.
             wait = self.compute_wait(ctr)
             logger.debug("%s wait=%f", self.filter, wait)
 
@@ -115,9 +118,9 @@ class FilterManager:
         self.wrappers = set()
         self.pool = Group()
 
-    def register(self, fltr: ContractFilter, fmt_cls: FormatClass, backoff: bool = True):
+    def register(self, filter_installer: Callable[[], ContractFilter], fmt_cls: FormatClass, backoff: bool = True):
         """Add a new filter, with an optional associated WebsocketMessage-serializer class"""
-        wrapper = FilterWrapper(fltr, fmt_cls, backoff)
+        wrapper = FilterWrapper(filter_installer, fmt_cls, backoff)
         self.wrappers.add(wrapper)
         logger.debug('Registered new filter: %s', wrapper)
 
@@ -149,12 +152,14 @@ class FilterManager:
 
         # Setup Latest
         self.register(
-            chain.w3.eth.filter('latest'), messages.LatestEvent.make(chain.w3.eth), backoff=False
+            lambda: chain.w3.eth.filter('latest'),
+            messages.LatestEvent.make(chain.w3.eth),
+            backoff=False
         )
 
         bounty_contract = chain.bounty_registry.contract
         self.register(
-            bounty_contract.eventFilter(messages.NewBounty.contract_event_name),
+            lambda: bounty_contract.eventFilter(messages.NewBounty.contract_event_name),
             messages.NewBounty,
             # messages.NewBounty shouldn't wait or back-off from new bounties.
             backoff=False
@@ -169,14 +174,15 @@ class FilterManager:
             messages.SettledBounty,
             messages.RevealedAssertion,
             messages.Deprecated,
+            messages.Undeprecated,
         ]
 
         for cls in filter_events:
-            self.register(bounty_contract.eventFilter(cls.contract_event_name), cls)
+            self.register(lambda: bounty_contract.eventFilter(cls.contract_event_name), cls)
 
         offer_registry = chain.offer_registry
         if offer_registry and offer_registry.contract:
             self.register(
-                offer_registry.contract.eventFilter(messages.InitializedChannel.contract_event_name),
+                lambda: offer_registry.contract.eventFilter(messages.InitializedChannel.contract_event_name),
                 messages.InitializedChannel
             )
