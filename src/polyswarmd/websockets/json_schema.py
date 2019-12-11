@@ -12,12 +12,8 @@ from typing import (
     Union,
     cast,
 )
+from typing_extensions import TypedDict
 import uuid
-
-try:
-    from typing import TypedDict
-except ImportError:
-    from mypy_extensions import TypedDict
 
 SchemaType = str
 SchemaFormat = str
