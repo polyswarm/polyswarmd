@@ -7,24 +7,22 @@ from gevent.lock import BoundedSemaphore
 from polyswarmd.event_message import WebSocket
 from polyswarmd.utils import logging
 from polyswarmd.websockets.filter import FilterManager
+from polyswarmd.exceptions import WebsocketConnectionAbortedError
 
 logger = logging.getLogger(__name__)
-
-
-class WebsocketConnectionAbortedError(Exception):
-    """Exception thrown when no clients exist to broadcast to"""
-    pass
-
 
 class EthereumRpc:
     """
     This class periodically polls several geth filters, and multicasts the results across any open WebSockets
     """
-    filter_manager = FilterManager()
-    websockets: Optional[List[WebSocket]] = None
-    websockets_lock: BoundedSemaphore = BoundedSemaphore(1)
+    filter_manager: FilterManager()
+    websockets: Optional[List[WebSocket]]
+    websockets_lock: BoundedSemaphore
 
     def __init__(self, chain):
+        self.filter_manager = FilterManager()
+        self.websockets = None
+        self.websockets_lock = BoundedSemaphore(1)
         self.chain = chain
 
     def broadcast(self, message: Union[AnyStr, SupportsBytes]):
@@ -53,16 +51,11 @@ class EthereumRpc:
             logger.exception("Shutting down poll()")
             self.websockets = None
         except gevent.GreenletExit:
-            logger.exception(
-                'Greenlet killed, not restarting. Outstanding websockets: %d', len(self.websockets)
-            )
+            logger.exception('Exiting poll() Greenlet with %d connected clients websockets', len(self.websockets))
             # if the greenlet is killed, we need to destroy the websocket connections (if any exist)
             self.websockets = None
         except Exception:
-            logger.exception(
-                'Exception in filter checks, restarting greenlet. Outstanding websockets: %d',
-                len(self.websockets)
-            )
+            logger.exception('Exception in filter checks with %d connected websockets', len(self.websockets))
             # Creates a new greenlet with all new filters and let's this one die.
             greenlet = gevent.spawn(self.poll)
             gevent.signal(SIGQUIT, greenlet.kill)
