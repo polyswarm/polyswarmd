@@ -13,12 +13,15 @@ class EthereumRpc:
     """
     This class periodically polls several geth filters, and multicasts the results across any open WebSockets
     """
-    filter_manager = FilterManager()
 
     def __init__(self, chain):
         self.chain = chain
+        self.filter_manager = FilterManager()
         self.websockets_lock = BoundedSemaphore(1)
         self.websockets = None
+
+    def __repr__(self):
+        return f"<EthereumRPC Chain={self.chain}>"
 
     def broadcast(self, message):
         """
@@ -27,8 +30,13 @@ class EthereumRpc:
         """
         # XXX This can be replaced with a broadcast inside the WebsocketHandlerApplication
         with self.websockets_lock:
+            logger.critical("I have %s websockets on %s", len(self.websockets), repr(self))
             for ws in self.websockets:
-                ws.send(message)
+                try:
+                    ws.send(message)
+                except Exception:
+                    logger.exception('Error adding message to the queue')
+                    continue
 
     # noinspection PyBroadException
     def poll(self):

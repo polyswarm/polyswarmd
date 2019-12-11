@@ -55,18 +55,18 @@ class FilterWrapper:
         else:
             logger.warning("Could not uninstall filter<filter_id=%s>", self.filter_id)
 
-    def compute_wait(self, ctr: int) -> float:
-        """Compute the amount of wait time from a counter of (sequential) empty replies"""
-        min_wait = 0.5
-        max_wait = 4.0
-
-        if self.backoff:
-            # backoff 'exponentially'
-            exp = (1 << max(0, ctr - 2)) - 1
-            result = min(max_wait, max(min_wait, exp))
-            return abs(gauss(result, 0.1))
-        else:
-            return min_wait
+    # def compute_wait(self, ctr: int) -> float:
+    #     """Compute the amount of wait time from a counter of (sequential) empty replies"""
+    #     min_wait = 0.5
+    #     max_wait = 4.0
+    #
+    #     if self.backoff:
+    #         # backoff 'exponentially'
+    #         exp = (1 << max(0, ctr - 2)) - 1
+    #         result = min(max_wait, max(min_wait, exp))
+    #         return abs(gauss(result, 0.1))
+    #     else:
+    #         return min_wait
 
     def get_new_entries(self) -> List[Message]:
         return [self.formatter.serialize_message(e) for e in self.filter.get_new_entries()]
@@ -88,9 +88,9 @@ class FilterWrapper:
                 wait = 1
                 continue
             # ConnectionError generally occurs when we cannot fetch events
-            except ConnectionError:
+            except (ConnectionError, TimeoutError):
                 logger.exception("ConnectionError/timeout in spawn_poll_loop")
-                wait = self.compute_wait(ctr + 2)
+                wait = .5
                 continue
             # ValueError generally occurs when Geth removed the filter
             except ValueError:
@@ -104,8 +104,7 @@ class FilterWrapper:
                 ctr = 0
                 callback(result)
 
-            # We add gaussian randomness so that requests are queued all-at-once.
-            wait = self.compute_wait(ctr)
+            wait = .5
             logger.debug("%s wait=%f", self.filter, wait)
 
 
