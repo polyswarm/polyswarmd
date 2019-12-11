@@ -34,7 +34,7 @@ FilterInstaller = Callable[[str], ContractFilter]
 class FilterWrapper:
     """A utility class which wraps a contract filter with websocket-messaging features"""
     filter: ContractFilter
-    filter_installer = Callable[[], ContractFilter]
+    filter_installer: FilterInstaller
     formatter: FormatClass
     backoff: bool
 
