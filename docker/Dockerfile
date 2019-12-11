@@ -16,4 +16,5 @@ COPY . .
 RUN set -x && pip install .
 
 # You can set log format and level in command line by e.g. `polyswarmd.wsgi:app(log_format='text', log_level='WARNING')`
-CMD ["gunicorn", "--bind", "0.0.0.0:31337", "-k", "flask_sockets.worker", "-t", "600", "-w", "1", "polyswarmd.wsgi:app()"]
+ENV GUNICORN_CMD_ARGS="--bind 0.0.0.0:31337 -k flask_sockets.worker -t 600 -w 4"
+CMD ["gunicorn", "polyswarmd.wsgi:app()"]
