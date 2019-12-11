@@ -7,6 +7,7 @@ from typing import (
     Iterable,
     List,
     NoReturn,
+    Optional,
     Set,
     Type,
 )
@@ -23,12 +24,13 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing_extensions import Protocol
 
-    class ContractFilter:
-        callbacks: List[Callable[..., Any]]
-        stopped: bool
-        poll_interval: float
+    class ContractFilter(Protocol):
+        """Interface of a Web3 filter object"""
+        callbacks: Optional[List[Callable[..., Any]]]
+        stopped: Optional[bool]
+        poll_interval: Optional[float]
+        web3: Optional[Any]
         filter_id: int
-        web3: Any
 
         def get_new_entries(self) -> List[messages.EventData]:
             ...
@@ -37,8 +39,11 @@ if TYPE_CHECKING:
             ...
 
     class FilterInstaller(Protocol):
+        """Return a new filter object that tracks events emitted by the supplied contract
 
-        def __call__(self, event_name: str) -> ContractFilter:
+        This is typically called once: to build `filter` in ``FilterWrapper.__init__``"""
+
+        def __call__(self, contract_name: str) -> ContractFilter:
             ...
 else:
     ContractFilter = object
@@ -62,8 +67,9 @@ class FilterWrapper:
         self.filter = self.create_filter()
 
     def create_filter(self) -> ContractFilter:
-        """Return a new filter
+        """Return a new web3 log filter
 
+        Create filter object that tracks events emitted by this contract.
         NOTE: this function is here instead of directly assigned in __init__ to appease mypy"""
         installer: FilterInstaller = self._filter_installer
         return installer(self.formatter.contract_event_name)
