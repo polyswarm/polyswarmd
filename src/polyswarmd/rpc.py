@@ -5,17 +5,18 @@ import gevent
 from gevent.lock import BoundedSemaphore
 
 from polyswarmd.event_message import WebSocket
+from polyswarmd.exceptions import WebsocketConnectionAbortedError
 from polyswarmd.utils import logging
 from polyswarmd.websockets.filter import FilterManager
-from polyswarmd.exceptions import WebsocketConnectionAbortedError
 
 logger = logging.getLogger(__name__)
+
 
 class EthereumRpc:
     """
     This class periodically polls several geth filters, and multicasts the results across any open WebSockets
     """
-    filter_manager: FilterManager()
+    filter_manager: FilterManager
     websockets: Optional[List[WebSocket]]
     websockets_lock: BoundedSemaphore
 
@@ -26,7 +27,6 @@ class EthereumRpc:
         self.websockets_lock = BoundedSemaphore(1)
         self.chain = chain
 
-    def broadcast(self, message: Union[AnyStr, SupportsBytes]):
     def __repr__(self):
         return f"<EthereumRPC Chain={self.chain}>"
 
@@ -61,11 +61,15 @@ class EthereumRpc:
             logger.exception("Shutting down poll()")
             self.websockets = None
         except gevent.GreenletExit:
-            logger.exception('Exiting poll() Greenlet with %d connected clients websockets', len(self.websockets))
+            logger.exception(
+                'Exiting poll() Greenlet with %d connected clients websockets', len(self.websockets)
+            )
             # if the greenlet is killed, we need to destroy the websocket connections (if any exist)
             self.websockets = None
         except Exception:
-            logger.exception('Exception in filter checks with %d connected websockets', len(self.websockets))
+            logger.exception(
+                'Exception in filter checks with %d connected websockets', len(self.websockets)
+            )
             # Creates a new greenlet with all new filters and let's this one die.
             greenlet = gevent.spawn(self.poll)
             gevent.signal(SIGQUIT, greenlet.kill)

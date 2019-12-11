@@ -1,12 +1,12 @@
 from contextlib import contextmanager
-from gevent.pool import Group
-from gevent.queue import Queue
+import logging
 from random import gauss
-from requests.exceptions import ConnectionError
 from typing import Any, Callable, Iterable, List, NoReturn, Set, Type
 
 import gevent
-import logging
+from gevent.pool import Group
+from gevent.queue import Queue
+from requests.exceptions import ConnectionError
 
 from . import messages
 
@@ -92,12 +92,6 @@ class FilterWrapper:
             # ValueError generally occurs when Geth removed the filter
             except ValueError:
                 logger.exception("Filter removed by Ethereum client")
-                self.filter = self.filter_installer()
-                wait = 1
-                continue
-            # ValueError generally occurs when Geth removed the filter
-            except ValueError:
-                logger.exception("Filter removed by Ethereum client")
                 self.filter = self.create_filter()
                 wait = 1
                 continue
@@ -114,8 +108,9 @@ class FilterWrapper:
 class FilterManager:
     """Manages access to filtered Ethereum events."""
 
-    wrappers: Set[FilterWrapper] = set()
-    pool: Group = Group()
+    def __init__(self):
+        self.wrappers = set()
+        self.pool = Group()
 
     def register(
         self, filter_installer: FilterInstaller, fmt_cls: FormatClass, backoff: bool = True
@@ -145,7 +140,7 @@ class FilterManager:
 
         bounty_contract = chain.bounty_registry.contract
 
-        # Setup Latest
+        # Setup Latest (although this could pass `w3.eth.filter` directly)
         self.register(chain.w3.eth.filter, messages.LatestEvent.make(chain.w3.eth), backoff=False)
         # messages.NewBounty shouldn't wait or back-off from new bounties.
         self.register(bounty_contract.eventFilter, messages.NewBounty, backoff=False)
