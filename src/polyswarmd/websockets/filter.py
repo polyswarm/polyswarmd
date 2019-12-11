@@ -129,7 +129,7 @@ class FilterManager:
         queue = Queue()
         for wrapper in self.wrappers:
             self.pool.spawn(wrapper.spawn_poll_loop, queue.put_nowait)
-        yield queue
+        yield from queue
 
     def setup_event_filters(self, chain: Any):
         """Setup the most common event filters"""
