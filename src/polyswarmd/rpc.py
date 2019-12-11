@@ -46,10 +46,9 @@ class EthereumRpc:
         """
         # Start the pool
         try:
-            with self.filter_manager.fetch() as results:
-                for messages in results:
-                    for msg in messages:
-                        self.broadcast(msg)
+            for filter_events in self.filter_manager.fetch():
+                for msg in filter_events:
+                    self.broadcast(msg)
         except WebsocketConnectionAbortedError:
             logger.exception("Shutting down poll()")
             self.websockets = None

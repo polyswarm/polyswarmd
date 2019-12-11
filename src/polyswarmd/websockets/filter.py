@@ -124,16 +124,12 @@ class FilterManager:
         self.pool.kill()
         self.wrappers.clear()
 
-    @contextmanager
     def fetch(self):
         """Return a queue of currently managed contract events"""
-        try:
-            queue = Queue()
-            for wrapper in self.wrappers:
-                self.pool.spawn(wrapper.spawn_poll_loop, queue.put_nowait)
-            yield queue
-        finally:
-            self.flush()
+        queue = Queue()
+        for wrapper in self.wrappers:
+            self.pool.spawn(wrapper.spawn_poll_loop, queue.put_nowait)
+        yield queue
 
     def setup_event_filters(self, chain: Any):
         """Setup the most common event filters"""
