@@ -1,17 +1,18 @@
+from io import SEEK_END
 import logging
 
-from io import SEEK_END
 from flask import Blueprint
 from flask import current_app as app
 from flask import g, request
 from requests import HTTPError
 
 from polyswarmd.artifacts.exceptions import (
+    ArtifactEmptyException,
     ArtifactException,
     ArtifactNotFoundException,
-    InvalidUriException,
     ArtifactTooLargeException,
-    ArtifactEmptyException)
+    InvalidUriException,
+)
 from polyswarmd.response import failure, success
 
 logger = logging.getLogger(__name__)
@@ -86,7 +87,9 @@ def post_artifacts():
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
     try:
-        files = [(f'{i:06d}', f) for (i, f) in enumerate(request.files.getlist(key='file')) if check_size(f, g.user.max_artifact_size)]
+        files = [(f'{i:06d}', f)
+                 for (i, f) in enumerate(request.files.getlist(key='file'))
+                 if check_size(f, g.user.max_artifact_size)]
     except (AttributeError, IOError):
         logger.error('Error checking file size')
         return failure('Unable to read file sizes', 400)
