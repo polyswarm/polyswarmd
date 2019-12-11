@@ -1,6 +1,15 @@
 import logging
 from random import gauss
-from typing import Any, Callable, Iterable, List, NoReturn, Set, Type
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Iterable,
+    List,
+    NoReturn,
+    Set,
+    Type,
+)
 
 import gevent
 from gevent.pool import Group
@@ -11,32 +20,40 @@ from . import messages
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from typing_extensions import Protocol
 
-class ContractFilter:
-    callbacks: List[Callable[..., Any]]
-    stopped: bool
-    poll_interval: float
-    filter_id: int
-    web3: Any
+    class ContractFilter:
+        callbacks: List[Callable[..., Any]]
+        stopped: bool
+        poll_interval: float
+        filter_id: int
+        web3: Any
 
-    def get_new_entries(self) -> List[messages.EventData]:
-        ...
+        def get_new_entries(self) -> List[messages.EventData]:
+            ...
 
-    def get_all_entries(self) -> List[messages.EventData]:
-        ...
+        def get_all_entries(self) -> List[messages.EventData]:
+            ...
 
+    class FilterInstaller(Protocol):
+
+        def __call__(self, event_name: str) -> ContractFilter:
+            ...
+else:
+    ContractFilter = object
+    FilterInstaller = Callable[[str], ContractFilter]
 
 FormatClass = Type[messages.WebsocketFilterMessage]
 Message = bytes
-FilterInstaller = Callable[[str], ContractFilter]
 
 
 class FilterWrapper:
     """A utility class which wraps a contract filter with websocket-messaging features"""
     filter: ContractFilter
-    filter_installer: FilterInstaller
     formatter: FormatClass
     backoff: bool
+    _filter_installer: FilterInstaller
 
     def __init__(self, filter_installer: FilterInstaller, formatter: FormatClass, backoff: bool):
         self.formatter = formatter
