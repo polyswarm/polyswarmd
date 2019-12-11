@@ -9,6 +9,11 @@ from polyswarmd.websockets.filter import FilterManager
 logger = logging.getLogger(__name__)
 
 
+class WebsocketConnectionAbortedError(Exception):
+    """Exception thrown when broadcast cannot send to can clients"""
+    pass
+
+
 class EthereumRpc:
     """
     This class periodically polls several geth filters, and multicasts the results across any open WebSockets
@@ -27,6 +32,8 @@ class EthereumRpc:
         """
         # XXX This can be replaced with a broadcast inside the WebsocketHandlerApplication
         with self.websockets_lock:
+            if len(self.websockets) == 0:
+                raise WebsocketConnectionAbortedError
             for ws in self.websockets:
                 ws.send(message)
 
@@ -39,12 +46,12 @@ class EthereumRpc:
         try:
             with self.filter_manager.fetch() as results:
                 for messages in results:
-                    with self.websockets_lock:
-                        if self.websockets is None:
-                            return
                     for msg in messages:
                         self.broadcast(msg)
-
+        except WebsocketConnectionAbortedError:
+            logger.exception("Shutting down poll()")
+            self.filter_manager.flush()
+            self.websockets = None
         except Exception:
             logger.exception('Exception in filter checks, restarting greenlet')
             # Creates a new greenlet with all new filters and let's this one die.
@@ -76,6 +83,3 @@ class EthereumRpc:
             if ws in self.websockets:
                 logger.debug('Removing WebSocket %s', ws)
                 self.websockets.remove(ws)
-                if len(self.websockets) == 0:
-                    self.websockets = None
-                    self.filter_manager.flush()

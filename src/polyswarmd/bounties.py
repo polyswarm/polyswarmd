@@ -1,4 +1,3 @@
-import functools
 import json
 import logging
 import os
@@ -153,7 +152,7 @@ def get_bounties():
     if count % page_size != 0 or page_size_multiplier > MAX_PAGES_PER_REQUEST:
         return failure(f'Count must be a multiple of page size {page_size}', 400)
 
-    guids = []
+    guids: List[str] = []
     start_page = page * page_size_multiplier
     for i in range(page_size_multiplier):
         page_guids = get_bounty_guids_page(start_page + i, page_size, config.redis)

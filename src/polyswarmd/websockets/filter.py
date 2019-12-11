@@ -1,12 +1,12 @@
 from contextlib import contextmanager
-from gevent.pool import Group
-from gevent.queue import Queue
+import logging
 from random import gauss
-from requests.exceptions import ConnectionError
-from typing import Any, Callable, Iterable, List, NoReturn, Set, Type
+from typing import Any, Callable, ClassVar, Iterable, List, NoReturn, Set, Type
 
 import gevent
-import logging
+from gevent.pool import Group
+from gevent.queue import Queue
+from requests.exceptions import ConnectionError
 
 from . import messages
 
@@ -29,31 +29,26 @@ class ContractFilter:
 
 FormatClass = Type[messages.WebsocketFilterMessage]
 Message = bytes
+FilterInstaller = Callable[[str], ContractFilter]
 
 
 class FilterWrapper:
     """A utility class which wraps a contract filter with websocket-messaging features"""
     filter: ContractFilter
-    filter_installer = Callable[[], ContractFilter]
     formatter: FormatClass
     backoff: bool
+    _installer_key: ClassVar[str] = '_installer_key'
 
-    def __init__(self, filter_installer: Callable[[], ContractFilter], formatter: FormatClass, backoff: bool):
-        self.filter = filter_installer()
-        self.filter_installer = filter_installer
+    def __init__(self, filter_installer: FilterInstaller, formatter: FormatClass, backoff: bool):
         self.formatter = formatter
         self.backoff = backoff
+        self.__dict__[self._installer_key] = filter_installer
+        self.filter = self.filter_installer()
 
-    @property
-    def filter_id(self) -> int:
-        """Return the associated contract event filter's numeric web3 id"""
-        return self.filter.filter_id
-
-    def uninstall(self):
-        if self.filter.web3.eth.uninstallFilter(self.filter_id):
-            logger.debug("Uninstalled filter_id=%s", self.filter_id)
-        else:
-            logger.warning("Could not uninstall filter<filter_id=%s>", self.filter_id)
+    def filter_installer(self) -> ContractFilter:
+        """Install the filter from the filter creation fn passed at obj creation"""
+        installer = self.__dict__[self._installer_key]
+        return installer(self.formatter.contract_event_name)
 
     def compute_wait(self, ctr: int) -> float:
         """Compute the amount of wait time from a counter of (sequential) empty replies"""
@@ -112,14 +107,12 @@ class FilterWrapper:
 class FilterManager:
     """Manages access to filtered Ethereum events."""
 
-    wrappers: Set[FilterWrapper]
-    pool: Group
+    wrappers: Set[FilterWrapper] = set()
+    pool: Group = Group()
 
-    def __init__(self):
-        self.wrappers = set()
-        self.pool = Group()
-
-    def register(self, filter_installer: Callable[[], ContractFilter], fmt_cls: FormatClass, backoff: bool = True):
+    def register(
+        self, filter_installer: FilterInstaller, fmt_cls: FormatClass, backoff: bool = True
+    ):
         """Add a new filter, with an optional associated WebsocketMessage-serializer class"""
         wrapper = FilterWrapper(filter_installer, fmt_cls, backoff)
         self.wrappers.add(wrapper)
@@ -128,9 +121,6 @@ class FilterManager:
     def flush(self):
         """End all event polling, uninstall all filters and remove their corresponding wrappers"""
         self.pool.kill()
-        logger.debug('Flushing %d filters', len(self.wrappers))
-        for filt in self.wrappers:
-            filt.uninstall()
         self.wrappers.clear()
 
     @contextmanager
@@ -140,7 +130,6 @@ class FilterManager:
             queue = Queue()
             for wrapper in self.wrappers:
                 self.pool.spawn(wrapper.spawn_poll_loop, queue.put_nowait)
-
             yield queue
         finally:
             self.flush()
@@ -151,20 +140,12 @@ class FilterManager:
             logger.exception("Attempting to initialize already initialized filter manager")
             return
 
-        # Setup Latest
-        self.register(
-            lambda: chain.w3.eth.filter('latest'),
-            messages.LatestEvent.make(chain.w3.eth),
-            backoff=False
-        )
-
         bounty_contract = chain.bounty_registry.contract
-        self.register(
-            lambda: bounty_contract.eventFilter(messages.NewBounty.contract_event_name),
-            messages.NewBounty,
-            # messages.NewBounty shouldn't wait or back-off from new bounties.
-            backoff=False
-        )
+
+        # Setup Latest
+        self.register(chain.w3.eth.filter, messages.LatestEvent.make(chain.w3.eth), backoff=False)
+        # messages.NewBounty shouldn't wait or back-off from new bounties.
+        self.register(bounty_contract.eventFilter, messages.NewBounty, backoff=False)
 
         filter_events: List[FormatClass] = [
             messages.FeesUpdated,
@@ -179,11 +160,8 @@ class FilterManager:
         ]
 
         for cls in filter_events:
-            self.register(lambda: bounty_contract.eventFilter(cls.contract_event_name), cls)
+            self.register(bounty_contract.eventFilter, cls)
 
         offer_registry = chain.offer_registry
         if offer_registry and offer_registry.contract:
-            self.register(
-                lambda: offer_registry.contract.eventFilter(messages.InitializedChannel.contract_event_name),
-                messages.InitializedChannel
-            )
+            self.register(offer_registry.contract.eventFilter, messages.InitializedChannel)
