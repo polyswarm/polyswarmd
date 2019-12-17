@@ -4,7 +4,7 @@ import logging
 import numbers
 import operator
 
-from .utils import sha3
+from polyswarmd.utils import sha3
 
 logger = logging.getLogger(__name__)
 

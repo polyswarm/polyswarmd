@@ -5,7 +5,7 @@ import click
 from gevent import pywsgi
 from geventwebsocket.handler import WebSocketHandler
 
-from polyswarmd.logger import init_logging
+from polyswarmd.utils.logger import init_logging
 
 logger = logging.getLogger(__name__)
 

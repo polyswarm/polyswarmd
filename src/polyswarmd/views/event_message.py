@@ -9,7 +9,7 @@ import gevent
 from gevent.queue import Empty, Queue
 from geventwebsocket import WebSocketApplication, WebSocketError
 
-from polyswarmd.chains import chain
+from polyswarmd.utils.decorators.chains import chain
 from polyswarmd.utils import channel_to_dict, g, logging, state_to_dict, uuid
 from polyswarmd.websockets.filter import FilterManager
 from polyswarmd.websockets.messages import (

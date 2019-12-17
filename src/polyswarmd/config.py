@@ -14,8 +14,8 @@ from web3.exceptions import MismatchedABI
 from web3.middleware import geth_poa_middleware
 import yaml
 
-from polyswarmd.artifacts.ipfs import IpfsServiceClient
-from polyswarmd.rpc import EthereumRpc
+from polyswarmd.services.artifact_storage.ipfs import IpfsServiceClient
+from polyswarmd.services.rpc import EthereumRpc
 from polyswarmd.utils import camel_case_to_snake_case
 
 logger = logging.getLogger(__name__)
@@ -100,7 +100,7 @@ class ContractConfig(object):
             self.bind(persistent=True)
 
     def bind(self, address=None, persistent=False):
-        from polyswarmd.eth import ZERO_ADDRESS
+        from polyswarmd.views.eth import ZERO_ADDRESS
         if self.contract:
             return self.contract
 

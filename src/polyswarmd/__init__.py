@@ -18,10 +18,10 @@ from flask_caching import Cache
 
 from polyswarmd.config import Config, is_service_reachable, DEFAULT_FALLBACK_SIZE
 
-from polyswarmd.logger import init_logging  # noqa
+from polyswarmd.utils.logger import init_logging  # noqa
 
-from polyswarmd.profiler import setup_profiler
-from polyswarmd.response import success, failure, install_error_handlers
+from polyswarmd.utils.profiler import setup_profiler
+from polyswarmd.utils.response import success, failure, install_error_handlers
 
 logger = logging.getLogger(__name__)
 cache: Cache = Cache(config={"CACHE_TYPE": "simple", "CACHE_DEFAULT_TIMEOUT": 30})
@@ -43,14 +43,14 @@ app.config['THREADPOOL'] = ThreadPoolExecutor()
 
 install_error_handlers(app)
 
-from polyswarmd.eth import misc
-from polyswarmd.artifacts.artifacts import artifacts
-from polyswarmd.balances import balances
-from polyswarmd.bounties import bounties
-from polyswarmd.relay import relay
-from polyswarmd.offers import offers
-from polyswarmd.staking import staking
-from polyswarmd.event_message import init_websockets
+from polyswarmd.views.eth import misc
+from polyswarmd.views.artifacts import artifacts
+from polyswarmd.views.balances import balances
+from polyswarmd.views.bounties import bounties
+from polyswarmd.views.relay import relay
+from polyswarmd.views.offers import offers
+from polyswarmd.views.staking import staking
+from polyswarmd.views.event_message import init_websockets
 
 app.register_blueprint(misc, url_prefix='/')
 app.register_blueprint(artifacts, url_prefix='/artifacts')

@@ -4,7 +4,7 @@ from typing import AnyStr, List, Optional, SupportsBytes, Union
 import gevent
 from gevent.lock import BoundedSemaphore
 
-from polyswarmd.event_message import WebSocket
+from polyswarmd.views.event_message import WebSocket
 from polyswarmd.exceptions import WebsocketConnectionAbortedError
 from polyswarmd.utils import logging
 from polyswarmd.websockets.filter import FilterManager

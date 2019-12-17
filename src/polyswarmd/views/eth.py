@@ -17,8 +17,8 @@ from web3.module import Module
 from web3.utils.events import get_event_data
 
 from polyswarmd import cache
-from polyswarmd.chains import chain
-from polyswarmd.response import failure, success
+from polyswarmd.utils.decorators.chains import chain
+from polyswarmd.utils.response import failure, success
 from polyswarmd.websockets import messages
 
 logger = logging.getLogger(__name__)

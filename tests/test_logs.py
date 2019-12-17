@@ -2,7 +2,7 @@ import logging
 import os
 import signal
 
-from polyswarmd.logger import init_logging, LoggerConfig, PolyswarmdJsonFormatter
+from polyswarmd.utils.logger import init_logging, LoggerConfig, PolyswarmdJsonFormatter
 
 
 def test_init_logging():

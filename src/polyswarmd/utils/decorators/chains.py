@@ -4,7 +4,7 @@ import logging
 from flask import current_app as app
 from flask import g, request
 
-from polyswarmd.response import failure
+from polyswarmd.utils.response import failure
 
 logger = logging.getLogger(__name__)
 

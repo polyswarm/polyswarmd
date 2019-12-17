@@ -2,8 +2,8 @@ import logging
 
 from flask import Blueprint, g
 
-from polyswarmd.chains import chain
-from polyswarmd.response import failure, success
+from polyswarmd.utils.decorators.chains import chain
+from polyswarmd.utils.response import failure, success
 
 logger = logging.getLogger(__name__)
 balances = Blueprint('balances', __name__)

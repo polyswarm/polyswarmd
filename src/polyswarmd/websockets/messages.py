@@ -135,7 +135,7 @@ class MetadataHandler:
     def initialize(cls):
         """Create & assign a new implementation of _substitute_metadata"""
         from polyswarmd import app
-        from polyswarmd.bounties import substitute_metadata
+        from polyswarmd.views.bounties import substitute_metadata
         config: Optional[Dict[str, Any]] = app.config
         ai = config['POLYSWARMD'].artifact_client
         session = FuturesSession(adapter_kwargs={'max_retries': 3})

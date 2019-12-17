@@ -6,14 +6,14 @@ from flask import current_app as app
 from flask import g, request
 from requests import HTTPError
 
-from polyswarmd.artifacts.exceptions import (
+from polyswarmd.services.artifact_storage.exceptions import (
     ArtifactEmptyException,
     ArtifactException,
     ArtifactNotFoundException,
     ArtifactTooLargeException,
     InvalidUriException,
 )
-from polyswarmd.response import failure, success
+from polyswarmd.utils.response import failure, success
 
 logger = logging.getLogger(__name__)
 artifacts = Blueprint('artifacts', __name__)
