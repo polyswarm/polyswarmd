@@ -16,7 +16,7 @@ import logging
 from flask import Flask, g, request
 from flask_caching import Cache
 
-from polyswarmd.config import Config, is_service_reachable, DEFAULT_FALLBACK_SIZE
+from polyswarmd.config import Config, DEFAULT_FALLBACK_SIZE
 
 from polyswarmd.utils.logger import init_logging  # noqa
 
@@ -148,32 +148,7 @@ class User(object):
 def status():
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
-
-    ret = {}
-
-    ret['community'] = config.community
-
-    ret['artifact_services'] = {
-        config.artifact_client.name.lower(): {
-            'reachable': is_service_reachable(session, config.artifact_client.reachable_endpoint),
-        }
-    }
-
-    if config.auth_uri:
-        ret['auth'] = {
-            'reachable': is_service_reachable(session, f"{config.auth_uri}/communities/public"),
-        }
-
-    for name, chain in config.chains.items():
-        ret[name] = {
-            'reachable': is_service_reachable(session, f"{chain.eth_uri}", is_ethereum=True),
-        }
-
-        if ret[name]['reachable']:
-            ret[name]['syncing'] = chain.w3.eth.syncing is not False
-            ret[name]['block'] = chain.w3.eth.blockNumber
-
-    return success(ret)
+    return success(config.status.get_status(session))
 
 
 @app.before_request

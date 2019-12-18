@@ -13,7 +13,7 @@ from polyswarmartifact.schema import Assertion as AssertionMetadata
 from polyswarmartifact.schema import Bounty as BountyMetadata
 from polyswarmd import app, cache
 from polyswarmd.views import eth
-from polyswarmd.services.artifact_storage.exceptions import ArtifactException
+from polyswarmd.services.artifact.exceptions import ArtifactException
 from polyswarmd.models.bloom import FILTER_BITS, BloomFilter
 from polyswarmd.utils.decorators.chains import chain
 from polyswarmd.views.eth import ZERO_ADDRESS, build_transaction

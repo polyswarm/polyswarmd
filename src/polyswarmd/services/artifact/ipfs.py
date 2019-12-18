@@ -6,8 +6,8 @@ import base58
 import ipfshttpclient
 from urllib3.util import parse_url
 
-from polyswarmd.services.artifact_storage.client import AbstractArtifactServiceClient
-from polyswarmd.services.artifact_storage.exceptions import (
+from polyswarmd.services.artifact.client import AbstractArtifactServiceClient
+from polyswarmd.services.artifact.exceptions import (
     ArtifactException,
     ArtifactNotFoundException,
     ArtifactTooLargeException,

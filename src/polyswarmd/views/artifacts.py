@@ -6,7 +6,7 @@ from flask import current_app as app
 from flask import g, request
 from requests import HTTPError
 
-from polyswarmd.services.artifact_storage.exceptions import (
+from polyswarmd.services.artifact.exceptions import (
     ArtifactEmptyException,
     ArtifactException,
     ArtifactNotFoundException,

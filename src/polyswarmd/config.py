@@ -1,21 +1,28 @@
 import json
 import logging
 import os
+import redis
+import requests
 import threading
 import time
-from urllib.parse import urlparse
+import yaml
 
 from consul import Consul
 from consul.base import Timeout
-import redis
-import requests
+from requests import HTTPError
+from requests_futures.sessions import FuturesSession
+from urllib.parse import urlparse
 from web3 import HTTPProvider, Web3
 from web3.exceptions import MismatchedABI
 from web3.middleware import geth_poa_middleware
-import yaml
 
-from polyswarmd.services.artifact_storage.ipfs import IpfsServiceClient
-from polyswarmd.services.rpc import EthereumRpc
+from polyswarmd.services.artifact.ipfs import IpfsServiceClient
+from polyswarmd.services.artifact.service import ArtifactServices
+from polyswarmd.services.auth.service import AuthService
+from polyswarmd.services.consul.service import ConsulService
+from polyswarmd.services.ethereum.rpc import EthereumRpc
+from polyswarmd.services.ethereum.service import EthereumService
+from polyswarmd.status import Status
 from polyswarmd.utils import camel_case_to_snake_case
 
 logger = logging.getLogger(__name__)
@@ -31,34 +38,6 @@ SUPPORTED_CONTRACT_VERSIONS = {
 }
 
 DEFAULT_FALLBACK_SIZE = 10 * 1024 * 1024
-
-
-def is_service_reachable(session, uri, is_ethereum=False):
-    if is_ethereum:
-        # parity does not support GET, so use POST.
-        # Using application/json is to cover geth as well.
-        session.headers.update({'Content-Type': 'application/json'})
-        r = session.post(uri)
-    else:
-        r = session.get(uri)
-
-    # check if futures session or normal
-    if hasattr(r, "result"):
-        r = r.result()
-
-    return r is not None and r.status_code == 200
-
-
-def wait_for_service(session, uri):
-    logger.info('Waiting for service at %s', uri)
-
-    while True:
-        if is_service_reachable(session, uri):
-            logger.info('%s available, continuing', uri)
-            return
-        else:
-            logger.info('%s not available, sleeping', uri)
-            time.sleep(1)
 
 
 def fetch_from_consul_or_wait(client, key, recurse=False, index=0):
@@ -153,7 +132,7 @@ class ContractConfig(object):
 
 
 class ChainConfig(object):
-    session = requests.Session()
+    session = FuturesSession()
 
     def __init__(
         self, name, eth_uri, chain_id, w3, nectar_token, bounty_registry, arbiter_staking,
@@ -265,9 +244,6 @@ class ChainConfig(object):
         return cls.from_contract_configs(name, eth_uri, chain_id, w3, contract_configs, free)
 
     def __validate(self):
-        if not is_service_reachable(self.session, self.eth_uri, is_ethereum=True):
-            raise ValueError('Ethereum not reachable, is correct URI specified?')
-
         if self.chain_id != int(self.w3.version.network):
             raise ValueError(
                 'Chain ID mismatch, expected %s got %s', self.chain_id, int(self.w3.version.network)
@@ -301,7 +277,7 @@ class ChainConfig(object):
 
 
 class Config(object):
-    session = requests.Session()
+    session = FuturesSession()
 
     def __init__(
         self, community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config,
@@ -324,6 +300,8 @@ class Config(object):
         self.redis = redis_client
         self.fallback_max_artifact_size = fallback_max_artifact_size
         self.max_artifact_size = int(max_artifact_size)
+        self.status = Status(community)
+        self.status.register_services(self.__create_services())
 
         self.__validate()
 
@@ -369,7 +347,8 @@ class Config(object):
         consul_uri = os.environ.get('CONSUL')
         consul_token = os.environ.get('CONSUL_TOKEN', None)
 
-        wait_for_service(cls.session, consul_uri)
+        service = ConsulService(consul_uri, cls.session)
+        service.wait_until_live()
 
         u = urlparse(consul_uri)
         consul_client = Consul(host=u.hostname, port=u.port, scheme=u.scheme, token=consul_token)
@@ -428,20 +407,32 @@ class Config(object):
         else:
             return cls.from_config_file_search()
 
+    def __create_services(self):
+        services = [*self.__create_ethereum_services(), self.__create_artifact_service()]
+        if self.auth_uri:
+            services.append(self.__create_auth_services())
+        return services
+
+    def __create_artifact_service(self):
+        return ArtifactServices(self.artifact_client, self.session)
+
+    def __create_ethereum_services(self):
+        return [EthereumService(chain, self.session) for chain in self.chains.items()]
+
+    def __create_auth_services(self):
+        return AuthService(self.auth_uri, self.session)
+
     def __validate(self):
-        # We expect IPFS and API key service to be up already
-        if not is_service_reachable(self.session, self.artifact_client.reachable_endpoint):
-            raise ValueError(f'{self.artifact_client.name} not reachable, is correct URI specified?')
+        for service in self.status.services:
+            try:
+                service.test_reachable()
+            except HTTPError:
+                raise ValueError(f'{service.name} not reachable, is correct URI specified?')
 
         if self.artifact_limit < 1 or self.artifact_limit > 256:
             raise ValueError(
                 'Artifact limit must be greater than 0 and cannot exceed contract limit of 256'
             )
-
-        if self.auth_uri and not is_service_reachable(
-            self.session, f"{self.auth_uri}/communities/public"
-        ):
-            raise ValueError('API key service not reachable, is correct URI specified?')
 
         if self.require_api_key and not self.auth_uri:
             raise ValueError('API keys required but no API key service URI specified')
