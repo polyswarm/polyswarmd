@@ -147,8 +147,7 @@ class User(object):
 @app.route('/status')
 def status():
     config = app.config['POLYSWARMD']
-    session = app.config['REQUESTS_SESSION']
-    return success(config.status.get_status(session))
+    return success(config.status.get_status())
 
 
 @app.before_request

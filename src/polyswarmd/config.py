@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import redis
-import requests
 import threading
 import time
 import yaml
@@ -132,8 +131,6 @@ class ContractConfig(object):
 
 
 class ChainConfig(object):
-    session = FuturesSession()
-
     def __init__(
         self, name, eth_uri, chain_id, w3, nectar_token, bounty_registry, arbiter_staking,
         erc20_relay, offer_registry, offer_multisig, free
@@ -417,7 +414,7 @@ class Config(object):
         return ArtifactServices(self.artifact_client, self.session)
 
     def __create_ethereum_services(self):
-        return [EthereumService(chain, self.session) for chain in self.chains.items()]
+        return [EthereumService(name, chain, self.session) for name, chain in self.chains.items()]
 
     def __create_auth_services(self):
         return AuthService(self.auth_uri, self.session)

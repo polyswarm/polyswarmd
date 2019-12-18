@@ -1,18 +1,14 @@
-from requests import HTTPError
-from requests_futures.sessions import FuturesSession
 from typing import Any, Dict
 
-from polyswarmd.config import ChainConfig
 from polyswarmd.services.service import Service
 
 
 class EthereumService(Service):
     """Service for Ethereum"""
-    chain: ChainConfig
 
-    def __init__(self, session, chain):
+    def __init__(self, name, chain, session):
         self.chain = chain
-        super().__init__(chain.name, chain.eth_uri, session)
+        super().__init__(name, chain.eth_uri, session)
 
     def build_output(self, reachable) -> Dict[str, Any]:
         if reachable:
