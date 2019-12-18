@@ -4,38 +4,38 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict
 
 from requests import HTTPError
-
-DEFAULT_FAILED_STATE: Dict[str, Any] = {'reachable': False}
-DEFAULT_SUCCESS_STATE: Dict[str, Any] = {'reachable': True}
+from requests_futures.sessions import FuturesSession
 
 
-class Service(ABC):
+class Service:
     """Service that polyswarmd connects to """
+    session: FuturesSession
     name: str
+    uri: str
 
-    def __init__(self, name):
+    def __init__(self, name, uri, session):
         self.name = name
+        self.uri = uri
+        self.session = session
 
     def wait_until_live(self):
-        while True:
-            try:
-                return self.test_reachable()
-            except HTTPError:
-                gevent.sleep(1)
-                continue
+        while not self.test_reachable():
+            gevent.sleep(1)
+
+    def test_reachable(self) -> bool:
+        try:
+            self.connect_to_service()
+            return True
+        except HTTPError:
+            return False
+
+    def connect_to_service(self):
+        future = self.session.post(self.uri)
+        response = future.result()
+        response.raise_for_status()
 
     def get_service_state(self) -> Dict[str, Any]:
-        try:
-            self.test_reachable()
-            return DEFAULT_SUCCESS_STATE
-        except HTTPError:
-            return DEFAULT_FAILED_STATE
+        return self.build_output(self.test_reachable())
 
-    @abstractmethod
-    def test_reachable(self):
-        """
-        Test if service can be reached
-
-        raises HTTPError when not live
-        """
-        raise NotImplementedError()
+    def build_output(self, reachable) -> Dict[str, Any]:
+        return {'reachable': reachable}

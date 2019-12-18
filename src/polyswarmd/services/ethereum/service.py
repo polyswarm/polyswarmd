@@ -3,25 +3,25 @@ from requests_futures.sessions import FuturesSession
 from typing import Any, Dict
 
 from polyswarmd.config import ChainConfig
-from polyswarmd.services.service import Service, DEFAULT_FAILED_STATE
+from polyswarmd.services.service import Service
 
 
 class EthereumService(Service):
-    """Service declaration for Ethereum"""
+    """Service for Ethereum"""
     chain: ChainConfig
-    session: FuturesSession
-    uri: str
 
     def __init__(self, session, chain):
-        super().__init__(chain.name)
         self.chain = chain
-        self.session = session
+        super().__init__(chain.name, chain.eth_uri, session)
 
-    def get_reachable_and_chain_state(self) -> Dict[str, Any]:
-        return {'reachable': True, 'syncing': self.is_syncing(), 'block': self.get_block()}
+    def build_output(self, reachable) -> Dict[str, Any]:
+        if reachable:
+            return {'reachable': True, 'syncing': self.is_syncing(), 'block': self.get_block()}
+        else:
+            super().build_output(False)
 
-    def test_reachable(self):
-        future = self.session.post(self.chain.eth_uri, headers={'Content-Type': 'application/json'})
+    def connect_to_service(self):
+        future = self.session.post(self.uri, headers={'Content-Type': 'application/json'})
         response = future.result()
         response.raise_for_status()
 
@@ -30,10 +30,3 @@ class EthereumService(Service):
 
     def get_block(self) -> int:
         return self.chain.w3.eth.blockNumber
-
-    def get_service_state(self) -> Dict[str, Any]:
-        try:
-            self.test_reachable()
-            return self.get_reachable_and_chain_state()
-        except HTTPError:
-            return DEFAULT_FAILED_STATE
