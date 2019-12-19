@@ -2,7 +2,7 @@ import logging
 
 from requests_futures.sessions import FuturesSession
 
-from polyswarmd.services.service import Service
+from polyswarmd.config.service import Service
 
 logger = logging.getLogger(__name__)
 

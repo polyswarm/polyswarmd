@@ -2,7 +2,7 @@ from requests_futures.sessions import FuturesSession
 from typing import Any, Dict
 
 from polyswarmd.services.artifact.client import AbstractArtifactServiceClient
-from polyswarmd.services.service import Service
+from polyswarmd.config.service import Service
 
 
 class ArtifactServices(Service):

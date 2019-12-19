@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from polyswarmd.services.service import Service
+from polyswarmd.config.service import Service
 
 
 class EthereumService(Service):
