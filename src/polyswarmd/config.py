@@ -2,15 +2,12 @@ import json
 import logging
 import os
 import redis
-import threading
 import time
 import yaml
 
-from consul import Consul
 from consul.base import Timeout
 from requests import HTTPError
 from requests_futures.sessions import FuturesSession
-from urllib.parse import urlparse
 from web3 import HTTPProvider, Web3
 from web3.exceptions import MismatchedABI
 from web3.middleware import geth_poa_middleware
@@ -18,7 +15,6 @@ from web3.middleware import geth_poa_middleware
 from polyswarmd.services.artifact.ipfs import IpfsServiceClient
 from polyswarmd.services.artifact.service import ArtifactServices
 from polyswarmd.services.auth.service import AuthService
-from polyswarmd.services.consul.service import ConsulService
 from polyswarmd.services.ethereum.rpc import EthereumRpc
 from polyswarmd.services.ethereum.service import EthereumService
 from polyswarmd.status import Status
@@ -335,74 +331,13 @@ class Config(object):
             location = os.path.abspath(os.path.expanduser(location))
             filename = os.path.join(location, 'polyswarmd.yml')
             if os.path.isfile(filename):
-                return Config.from_config_file(filename)
+                return cls.from_config_file(filename)
 
         raise OSError('Config file not found')
 
     @classmethod
-    def from_consul(cls):
-        consul_uri = os.environ.get('CONSUL')
-        consul_token = os.environ.get('CONSUL_TOKEN', None)
-
-        service = ConsulService(consul_uri, cls.session)
-        service.wait_until_live()
-
-        u = urlparse(consul_uri)
-        consul_client = Consul(host=u.hostname, port=u.port, scheme=u.scheme, token=consul_token)
-
-        community = os.environ['POLY_COMMUNITY_NAME']
-        homechain_config = ChainConfig.from_consul(
-            consul_client, 'home', f'chain/{community}/homechain'
-        )
-        sidechain_config = ChainConfig.from_consul(
-            consul_client, 'side', f'chain/{community}/sidechain'
-        )
-
-        base_key = f'chain/{community}'
-        config = fetch_from_consul_or_wait(consul_client, base_key + '/config').get('Value')
-        if config is None:
-            raise ValueError('Invalid global config')
-
-        config = json.loads(config.decode('utf-8'))
-
-        ipfs_uri = config.get('ipfs_uri')
-        artifact_limit = config.get('artifact_limit', 256)
-        auth_uri = config.get('auth_uri', os.environ.get('AUTH_URI'))
-        require_api_key = auth_uri is not None
-        trace_transactions = config.get('trace_transactions', True)
-        profiler_enabled = config.get('profiler_enabled', False)
-        redis_uri = config.get('redis_uri', os.environ.get('REDIS_URI', None))
-        redis_client = redis.Redis.from_url(redis_uri) if redis_uri else None
-        fallback_max_artifact_size = config.get('fallback_max_artifact_size', DEFAULT_FALLBACK_SIZE)
-        max_artifact_size = config.get(
-            'max_artifact_size', os.environ.get('MAX_ARTIFACT_SIZE', DEFAULT_FALLBACK_SIZE)
-        )
-
-        ret = cls(
-            community, ipfs_uri, artifact_limit, auth_uri, require_api_key, homechain_config,
-            sidechain_config, trace_transactions, profiler_enabled, redis_client,
-            fallback_max_artifact_size, max_artifact_size
-        )
-
-        # Watch for key deletion, if config is deleted die and restart with new config
-        def watch_for_config_deletion(consul_client, key):
-            wait_for_consul_key_deletion(consul_client, key, recurse=True)
-            logger.fatal('Config change detected, exiting')
-
-            # sys.exit is caught by flask, we want to tear down immediately though
-            os._exit(0)
-
-        t = threading.Thread(target=watch_for_config_deletion, args=(consul_client, base_key))
-        t.start()
-
-        return ret
-
-    @classmethod
     def auto(cls):
-        if os.environ.get('CONSUL'):
-            return cls.from_consul()
-        else:
-            return cls.from_config_file_search()
+        return cls.from_config_file_search()
 
     def __create_services(self):
         services = [*self.__create_ethereum_services(), self.__create_artifact_service()]
@@ -420,22 +355,35 @@ class Config(object):
         return AuthService(self.auth_uri, self.session)
 
     def __validate(self):
+        self.__validate_community()
+        self.__validate_auth()
+        self.__validate_services()
+        self.__validate_artifacts()
+
+    def __validate_community(self):
+        if not self.community:
+            raise ValueError('No community specified')
+
+    def __validate_auth(self):
+        if self.require_api_key and not self.auth_uri:
+            raise ValueError('API keys required but no API key service URI specified')
+
+    def __validate_services(self):
         for service in self.status.services:
             try:
                 service.test_reachable()
             except HTTPError:
                 raise ValueError(f'{service.name} not reachable, is correct URI specified?')
 
+    def __validate_artifacts(self):
+        self.__validate_artifact_limit()
+
+    def __validate_artifact_limit(self):
         if self.artifact_limit < 1 or self.artifact_limit > 256:
             raise ValueError(
                 'Artifact limit must be greater than 0 and cannot exceed contract limit of 256'
             )
 
-        if self.require_api_key and not self.auth_uri:
-            raise ValueError('API keys required but no API key service URI specified')
-
+    def __validate_artifact_fallback_size(self):
         if self.fallback_max_artifact_size < 1:
             raise ValueError('Fall back max artifact size must be greater than 0')
-
-        if not self.community:
-            raise ValueError('No community specified')
