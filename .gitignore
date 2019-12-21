@@ -7,7 +7,7 @@ __pycache__/
 .pytest_cache
 .tox
 build/
-config/
+/config/
 !config/polyswarmd.yml
 !config/polyswarmd.docker.yml
 dist/
