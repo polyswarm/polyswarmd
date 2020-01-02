@@ -72,8 +72,8 @@ class Contract(object):
 
         return ret
 
-    @classmethod
-    def from_json(cls, w3: Web3, name: str, contract: Dict[str: Any], config: Dict[str: Any]):
+    @staticmethod
+    def from_json(w3: Web3, name: str, contract: Dict[str, Any], config: Dict[str, Any]):
         if 'abi' not in contract:
             return None
 
@@ -82,4 +82,4 @@ class Contract(object):
         # XXX: OfferMultiSig doesn't follow this convention, but we don't bind that now anyway
         address = config.get(camel_case_to_snake_case(name) + '_address')
 
-        return cls(w3, name, abi, address)
+        return Contract(w3, name, abi, address)

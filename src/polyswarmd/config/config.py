@@ -1,3 +1,4 @@
+import importlib
 import json
 import logging
 import os
@@ -8,7 +9,7 @@ import redis
 import time
 import yaml
 
-from consul.base import Timeout, Consul
+from consul import Timeout, Consul
 from redis import Redis
 from requests import HTTPError
 from requests_futures.sessions import FuturesSession
@@ -46,14 +47,46 @@ class DictConfig:
         return loaded.get(key, {})
 
 
-class ArtifactConfig(DictConfig):
+class ClassModuleLoader:
+    module_name: str
+    class_name: str
+
+    def __init__(self, module_name: str, class_name: str):
+        self.module_name = module_name
+        self.class_name = class_name
+
+    def load(self):
+        client_module = importlib.import_module(self.module_name)
+        return getattr(client_module, self.class_name)
+
+
+class ArtifactClientSpecConfig(DictConfig):
+    module: str
+    class_name: str
+    settings: Dict[str, Any]
     client: AbstractArtifactServiceClient
+
+    def __init__(self, client_spec: Dict[str, Any]):
+        self.populate(client_spec)
+        self.build_client()
+
+    def populate(self, client_spec: Dict[str, Any]):
+        self.module = self.retrieve_value('module', client_spec)
+        self.class_name = self.retrieve_value('class_name', client_spec)
+        self.settings = self.retrieve_sub_config('settings', client_spec)
+
+    def build_client(self):
+        self.client = ClassModuleLoader(self.module, self.class_name).load()(**self.settings)
+
+
+class ArtifactConfig(DictConfig):
+    client_spec: ArtifactClientSpecConfig
     limit: int
     fallback_max_size: int
     max_size: int
 
     def __init__(self, configuration: Dict[str, Any]):
-        self.populate_client(configuration)
+        self.populate_client_spec(configuration)
         self.populate_fallback_artifact_size(configuration)
         self.populate_limit(configuration)
         self.populate_max__size(configuration)
@@ -76,18 +109,13 @@ class ArtifactConfig(DictConfig):
         except MissingConfigValueError:
             self.fallback_max_size = DEFAULT_FALLBACK_SIZE
 
-    def populate_client(self, artifact: Dict[str, Any]):
-        client_specification = self.retrieve_value('client', artifact)
-        self.client = self.load_client_from_spec(client_specification)
+    def populate_client_spec(self, artifact: Dict[str, Any]):
+        client_spec = self.retrieve_sub_config('client_spec', artifact)
+        self.client_spec = ArtifactClientSpecConfig(client_spec)
 
-    def load_client_from_spec(self, client_specification: Dict[str, Any]) -> AbstractArtifactServiceClient:
-        module_name = self.retrieve_value('module', client_specification)
-        class_name = self.retrieve_value('class', client_specification)
-        settings = self.retrieve_value('settings', client_specification)
-        return self.load_client_with_settings(module_name, class_name, settings)
-
-    def load_client_with_settings(self, module_name: str, class_name: str, settings: Dict[str, Any]) -> AbstractArtifactServiceClient:
-        pass
+    @property
+    def client(self):
+        return self.client_spec.client
 
 
 class AuthConfig(DictConfig):
@@ -100,7 +128,7 @@ class AuthConfig(DictConfig):
         try:
             self.uri = self.retrieve_value("uri", auth)
         except MissingConfigValueError:
-            pass
+            self.uri = None
 
     @property
     def require_api_key(self):
@@ -121,7 +149,8 @@ class ChainConfig(DictConfig):
     offer_multisig: Contract
     rpc: EthereumRpc
 
-    def __init__(self, chain: Dict[str, Any]):
+    def __init__(self, name: str, chain: Dict[str, Any]):
+        self.name = name
         self.populate(chain)
         self.load_web3(self.eth_uri)
         self.load_contracts(chain)
@@ -129,13 +158,9 @@ class ChainConfig(DictConfig):
         self.__validate()
 
     def populate(self, chain: Dict[str, Any]):
-        self.populate_name(chain)
         self.populate_eth_uri(chain)
         self.populate_chain_id(chain)
         self.populate_free(chain)
-
-    def populate_name(self, chain: Dict[str, Any]):
-        self.name = self.retrieve_value('name', chain)
 
     def populate_free(self, chain: Dict[str, Any]):
         try:
@@ -168,19 +193,17 @@ class ChainConfig(DictConfig):
 
     def create_contracts(self, chain: Dict[str, Any]) -> Dict[str, Contract]:
         return {name: Contract.from_json(self.w3, name, abi, chain)
-                for name, abi in self.retrieve_sub_config('contracts', chain)}
+                for name, abi in self.retrieve_value('contracts', chain).items()}
 
     def __bind_child_contracts(self):
-        self.arbiter_staking.bind(
-            address=self.bounty_registry.contract.functions.staking().call(), persistent=True
-        )
+        self.arbiter_staking.bind(address=self.bounty_registry.contract.functions.staking().call(), persistent=True)
 
     @classmethod
     def from_config_file(cls, name, filename):
         chain = cls.get_chain_details_from_file(filename)
         chain['name'] = name
         chain['contracts'] = cls.get_contracts_from_path(filename)
-        return cls(chain)
+        return cls(name, chain)
 
     @classmethod
     def get_chain_details_from_file(cls, filename: str) -> Dict[str, Any]:
@@ -195,7 +218,7 @@ class ChainConfig(DictConfig):
     @classmethod
     def find_contracts_in_directory(cls, directory) -> Dict[str, Any]:
         for root, dirs, files in os.walk(directory):
-            return {name: abi for name, abi in  cls.get_contracts_from_files(root, files)}
+            return {name: abi for name, abi in cls.get_contracts_from_files(root, files)}
 
     @classmethod
     def get_contracts_from_files(cls, root, files) -> List[Tuple[str, Dict[str, Any]]]:
@@ -215,13 +238,13 @@ class ChainConfig(DictConfig):
             return json.load(f)
 
     @classmethod
-    def from_consul(cls, consul_client: Consul, name: str, community_key: str):
+    def from_consul(cls, consul_client, name: str, community_key: str):
         chain = cls.fetch_config_from_consul(consul_client, name, community_key)
         chain['contracts'] = cls.fetch_contracts_from_consul(consul_client, community_key)
-        return cls(chain)
+        return cls(name, chain)
 
     @classmethod
-    def fetch_config_from_consul(cls, consul_client: Consul, name: str, key: str) -> Dict[str, Any]:
+    def fetch_config_from_consul(cls, consul_client, name: str, key: str) -> Dict[str, Any]:
         config = ChainConfig.fetch_from_consul_or_wait(consul_client, f'{key}/{name}chain').get('Value')
         if config is None:
             raise ValueError(f'Invalid chain config for chain {name}')
@@ -229,7 +252,7 @@ class ChainConfig(DictConfig):
         return json.loads(config.decode('utf-8'))
 
     @classmethod
-    def fetch_contracts_from_consul(cls, consul_client: Consul, key: str) -> Dict[str, Any]:
+    def fetch_contracts_from_consul(cls, consul_client, key: str) -> Dict[str, Any]:
         contracts: Dict[str, Any] = {}
         while True:
             contracts.update(cls.find_contracts_in_consul(consul_client, key))
@@ -241,18 +264,15 @@ class ChainConfig(DictConfig):
         return contracts
 
     @classmethod
-    def find_contracts_in_consul(cls, consul_client: Consul, key: str) -> Dict[str, Any]:
-        contracts: Dict[str, Any] = {}
-        for name, abi in cls.fetch_contract_parts_from_consul(consul_client, key):
-            contracts[name] = abi
-        return contracts
+    def find_contracts_in_consul(cls, consul_client, key: str) -> Dict[str, Any]:
+        return {name: abi for name, abi in cls.fetch_contract_parts_from_consul(consul_client, key)}
 
     @classmethod
-    def fetch_contract_parts_from_consul(cls, consul_client: Consul, key: str):
+    def fetch_contract_parts_from_consul(cls, consul_client, key: str) -> List[Tuple[str, Dict[str, Any]]]:
         return [cls.parse_kv_pair(kv_pair) for kv_pair in cls.fetch_filtered_contract_kv_pairs(consul_client, key)]
 
     @classmethod
-    def fetch_filtered_contract_kv_pairs(cls, consul_client: Consul, key: str):
+    def fetch_filtered_contract_kv_pairs(cls, consul_client, key: str) -> List[Any]:
         filter_k = cls.build_consul_key_filter(key)
         return [x for x in ChainConfig.fetch_from_consul_or_wait(consul_client, key, recurse=True)
                 if x.get('Key') not in filter_k]
@@ -262,7 +282,7 @@ class ChainConfig(DictConfig):
         return {key + x for x in ('homechain', 'sidechain', 'config')}
 
     @staticmethod
-    def fetch_from_consul_or_wait(client, key, recurse=False, index=0):
+    def fetch_from_consul_or_wait(client, key, recurse=False, index=0) -> Any:
         logger.info('Fetching key: %s', key)
         while True:
             try:
@@ -374,24 +394,38 @@ class ConsulConfig(DictConfig):
             self.token = None
 
 
-class DebugConfig(DictConfig):
-    profiler_enabled: bool
+class ProfilerConfig(DictConfig):
+    enabled: bool
+    db_uri: Optional[str]
 
     def __init__(self, profiler: Dict[str, Any]):
-        self.populate_profile_enabled(profiler)
+        self.populate(profiler)
 
-    def populate_profile_enabled(self, profiler: Dict[str, Any]):
-        return self.retrieve_value('profiler_enabled', profiler)
+    def populate(self, profiler: Dict[str, Any]):
+        self.populate_enabled(profiler)
+        self.populate_db_uri(profiler)
+
+    def populate_db_uri(self, profiler: Dict[str, Any]):
+        try:
+            self.db_uri = self.retrieve_value('db_uri', profiler)
+        except MissingConfigValueError:
+            self.db_uri = None
+
+    def populate_enabled(self, profiler: Dict[str, Any]):
+        try:
+            self.enabled = self.retrieve_value('enabled', profiler)
+        except MissingConfigValueError:
+            self.enabled = False
 
 
 class EthConfig(DictConfig):
-    trace_transaction: bool
+    trace_transactions: bool
 
     def __init__(self, eth: Dict[str, Any]):
-        self.populate_trace_transaction(eth)
+        self.populate_trace_transactions(eth)
 
-    def populate_trace_transaction(self, eth: Dict[str, Any]):
-        return self.retrieve_value('trace_transaction', eth)
+    def populate_trace_transactions(self, eth: Dict[str, Any]):
+        self.trace_transactions = self.retrieve_value('trace_transactions', eth)
 
 
 class WebsocketConfig(DictConfig):
@@ -416,36 +450,35 @@ class Config(DictConfig):
     redis: Optional[Redis]
     chains: Dict[str, ChainConfig]
     websocket: WebsocketConfig
-    debug: DebugConfig
+    profiler: ProfilerConfig
     eth: EthConfig
-
-    # Intentional class variable
-    session = FuturesSession()
+    session: FuturesSession
 
     def __init__(self, config: Dict[str, Any]):
+        self.session = FuturesSession()
         self.populate(config)
         self.status = Status(self.community)
         self.status.register_services(self.__create_services())
         self.__validate()
 
-    @classmethod
-    def auto(cls):
-        return cls.from_config_file_search()
+    @staticmethod
+    def auto():
+        return Config.from_config_file_search()
 
-    @classmethod
-    def from_config_file_search(cls):
+    @staticmethod
+    def from_config_file_search():
         for location in CONFIG_LOCATIONS:
             location = os.path.abspath(os.path.expanduser(location))
             filename = os.path.join(location, 'polyswarmd.yml')
             if os.path.isfile(filename):
-                return cls.create_from_file(filename)
+                return Config.create_from_file(filename)
 
         raise OSError('Config file not found')
 
-    @classmethod
-    def create_from_file(cls, path):
+    @staticmethod
+    def create_from_file(path):
         with open(path, 'r') as f:
-            return cls(yaml.safe_load(f))
+            return Config(yaml.safe_load(f))
 
     def populate(self, loaded: Dict[str, Any]):
         self.populate_community(loaded)
@@ -468,7 +501,7 @@ class Config(DictConfig):
             redis_uri = self.retrieve_value('redis_uri', loaded)
             self.redis = redis.Redis.from_url(redis_uri)
         except MissingConfigValueError:
-            pass
+            self.redis = None
 
     def load_artifact(self, loaded: Dict[str, Any]):
         artifact = self.retrieve_value('artifact', loaded)
@@ -481,7 +514,7 @@ class Config(DictConfig):
         self.auth = AuthConfig(self.retrieve_sub_config('auth', loaded))
 
     def load_debug(self, loaded: Dict[str, Any]):
-        self.debug = DebugConfig(self.retrieve_sub_config('debug', loaded))
+        self.profiler = ProfilerConfig(self.retrieve_sub_config('profiler', loaded))
 
     def load_websocket(self, loaded: Dict[str, Any]):
         self.websocket = WebsocketConfig(self.retrieve_sub_config('websocket', loaded))
@@ -493,7 +526,7 @@ class Config(DictConfig):
             'side': ChainConfig.from_consul(consul_client, 'side', f'chain/{self.community}')
         }
 
-    def build_consul_client(self, loaded: Dict[str, Any]) -> Consul:
+    def build_consul_client(self, loaded: Dict[str, Any]):
         self.load_consul(loaded)
         u = urlparse(self.consul.uri)
         return Consul(host=u.hostname, port=u.port, scheme=u.scheme, token=self.consul.token)
