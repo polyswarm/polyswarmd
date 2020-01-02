@@ -1,0 +1,21 @@
+community: gamma
+consul:
+  uri: http://consul:8500
+
+artifact:
+  limit: 256
+  client_spec:
+    module: polyswarmd.services.artifact.ipfs
+    class_name: IpfsServiceClient
+    settings:
+      base_uri: http://ipfs:5001
+websocket:
+  enabled: true
+
+redis_uri: redis://redis:6379
+
+profiler:
+  enabled: false
+
+eth:
+  trace_transactions: true
