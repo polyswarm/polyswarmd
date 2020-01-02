@@ -78,7 +78,7 @@ def get_assertion(guid, index, num_artifacts):
     ]
     assertion['bid'] = bid
     assertion['metadata'] = substitute_metadata(
-        assertion.get('metadata', ''), config.artifact.client, session, redis=config.redis
+        assertion.get('metadata', ''), config.artifact.client, session, redis=config.redis.client
     )
     return assertion
 
@@ -159,7 +159,7 @@ def substitute_metadata(
 @chain
 def get_bounties():
     config = app.config['POLYSWARMD']
-    page_size = get_page_size(config.redis)
+    page_size = get_page_size(config.redis.client)
     page = int(request.args.get('page', 0))
     count = int(request.args.get('count', page_size))
 
@@ -170,7 +170,7 @@ def get_bounties():
     guids: List[str] = []
     start_page = page * page_size_multiplier
     for i in range(page_size_multiplier):
-        page_guids = get_bounty_guids_page(start_page + i, page_size, config.redis)
+        page_guids = get_bounty_guids_page(start_page + i, page_size, config.redis.client)
         if not page_guids:
             break
 
@@ -314,7 +314,7 @@ def get_bounties_guid(guid):
             config.artifact.client,
             session,
             validate=BountyMetadata.validate,
-            redis=config.redis
+            redis=config.redis.client
         )
     else:
         metadata = None
@@ -401,7 +401,7 @@ def post_assertion_metadata():
         return failure('Invalid Assertion metadata', 400)
 
     try:
-        uri = config.artifact.client.add_artifact(body, session, redis=config.redis)
+        uri = config.artifact.client.add_artifact(body, session, redis=config.redis.client)
         response = success(uri)
     except HTTPError as e:
         response = failure(e.response.content, e.response.status_code)

@@ -2,8 +2,8 @@ import io
 
 import requests_mock
 
-from polyswarmd.config.config import Config
+from polyswarmd.config.polyswarmd import PolySwarmd
 
 def test_from_consul_configs():
-    Config.from_consul()
+    PolySwarmd.from_consul()
     pass

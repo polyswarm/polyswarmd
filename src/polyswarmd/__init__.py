@@ -16,7 +16,7 @@ import logging
 from flask import Flask, g, request
 from flask_caching import Cache
 
-from polyswarmd.config.config import Config, DEFAULT_FALLBACK_SIZE
+from polyswarmd.config.polyswarmd import PolySwarmd, DEFAULT_FALLBACK_SIZE
 
 from polyswarmd.utils.logger import init_logging  # noqa
 
@@ -28,7 +28,7 @@ cache: Cache = Cache(config={"CACHE_TYPE": "simple", "CACHE_DEFAULT_TIMEOUT": 30
 
 # Set up our app object
 app = Flask(__name__)
-_config = Config.auto()
+_config = PolySwarmd.auto()
 app.config['POLYSWARMD'] = _config
 # Setting this value works even when Content-Length is omitted, we must have it
 app.config['MAX_CONTENT_LENGTH'] = _config.artifact.max_size * _config.artifact.limit
