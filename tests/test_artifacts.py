@@ -4,7 +4,7 @@ import requests_mock
 from polyswarmd import app
 from tests import client, test_account
 
-ipfs_uri = app.config['POLYSWARMD'].ipfs_uri
+ipfs_uri = app.config['POLYSWARMD'].artifact.client.reachable_endpoint
 
 def setup_mocks(mock):
     mock.post(

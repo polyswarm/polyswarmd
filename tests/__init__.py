@@ -1,7 +1,7 @@
 import pytest
 import polyswarmd
 
-from polyswarmd.config import Config
+from polyswarmd.config.config import Config
 
 test_account='0x4B1867c484871926109E3C47668d5C0938CA3527'
 
