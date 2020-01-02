@@ -137,7 +137,7 @@ class MetadataHandler:
         from polyswarmd import app
         from polyswarmd.views.bounties import substitute_metadata
         config: Optional[Dict[str, Any]] = app.config
-        ai = config['POLYSWARMD'].artifact_client
+        ai = config['POLYSWARMD'].artifact.client
         session = FuturesSession(adapter_kwargs={'max_retries': 3})
         redis = config['POLYSWARMD'].redis
 

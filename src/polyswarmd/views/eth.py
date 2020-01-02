@@ -181,7 +181,7 @@ def post_transactions():
     except fastjsonschema.JsonSchemaException as e:
         return failure('Invalid JSON: ' + e.message, 400)
 
-    withdrawal_only = not g.user and app.config['POLYSWARMD'].require_api_key
+    withdrawal_only = not g.user and app.config['POLYSWARMD'].auth.require_api_key
     # If we don't have a user key, and they are required, start checking the transaction
     if withdrawal_only and len(body['transactions']) != 1:
         return failure('Posting multiple transactions requires an API key', 403)
@@ -329,7 +329,7 @@ def is_withdrawal(tx):
 
 def events_from_transaction(txhash, chain):
     config = app.config['POLYSWARMD']
-    trace_transactions = config.trace_transactions
+    trace_transactions = config.eth.trace_transactions
     if trace_transactions:
         try:
             Debug.attach(g.chain.w3, 'debug')

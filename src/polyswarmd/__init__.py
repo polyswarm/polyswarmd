@@ -16,7 +16,7 @@ import logging
 from flask import Flask, g, request
 from flask_caching import Cache
 
-from polyswarmd.config import Config, DEFAULT_FALLBACK_SIZE
+from polyswarmd.config.config import Config, DEFAULT_FALLBACK_SIZE
 
 from polyswarmd.utils.logger import init_logging  # noqa
 
@@ -31,7 +31,7 @@ app = Flask(__name__)
 _config = Config.auto()
 app.config['POLYSWARMD'] = _config
 # Setting this value works even when Content-Length is omitted, we must have it
-app.config['MAX_CONTENT_LENGTH'] = _config.max_artifact_size * _config.artifact_limit
+app.config['MAX_CONTENT_LENGTH'] = _config.artifact.max_size * _config.artifact.limit
 
 session = FuturesSession(executor=ThreadPoolExecutor(4), adapter_kwargs={'max_retries': 2})
 
@@ -60,7 +60,7 @@ app.register_blueprint(relay, url_prefix='/relay')
 app.register_blueprint(offers, url_prefix='/offers')
 app.register_blueprint(staking, url_prefix='/staking')
 
-if not os.getenv('DISABLE_WEBSOCKETS', False):
+if app.config['POLYSWARMD'].websocket.enabled:
     init_websockets(app)
 
 setup_profiler(app)
@@ -104,35 +104,34 @@ class User(object):
     def from_api_key(cls, api_key):
         config = app.config['POLYSWARMD']
 
-        auth_uri = f'{config.auth_uri}/communities/{config.community}/auth'
+        auth_uri = f'{config.auth.uri}/communities/{config.community}/auth'
 
         r = get_auth(api_key, auth_uri)
         j = check_auth_response(r)
         if j is None:
             return cls(
-                authorized=False, user_id=None, max_artifact_size=config.fallback_max_artifact_size
+                authorized=False, user_id=None, max_artifact_size=config.artifact.fallback_max_size
             )
 
         anonymous = j.get('anonymous', True)
         user_id = j.get('user_id') if not anonymous else None
 
         # Get account features
-        account_uri = f'{config.auth_uri}/accounts'
+        account_uri = f'{config.auth.uri}/accounts'
         r = get_account(api_key, account_uri)
         j = check_auth_response(r)
         if j is None:
             return cls(
                 authorized=True,
                 user_id=user_id,
-                max_artifact_size=config.fallback_max_artifact_size
+                max_artifact_size=config.artifact.fallback_max_size
             )
 
         max_artifact_size = next((
             f['base_uses']
             for f in j.get('account', {}).get('features', [])
             if f['tag'] == 'max_artifact_size'
-        ), config.fallback_max_artifact_size)
-
+        ), config.artifact.fallback_max_size)
         return cls(authorized=True, user_id=user_id, max_artifact_size=max_artifact_size)
 
     @property
@@ -141,7 +140,7 @@ class User(object):
 
     def __bool__(self):
         config = app.config['POLYSWARMD']
-        return config.require_api_key and self.authorized
+        return config.auth.require_api_key and self.authorized
 
 
 @app.route('/status')
@@ -156,7 +155,7 @@ def before_request():
 
     config = app.config['POLYSWARMD']
 
-    if not config.require_api_key:
+    if not config.auth.require_api_key:
         return
 
     # Ignore prefix if present

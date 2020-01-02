@@ -78,7 +78,7 @@ def get_assertion(guid, index, num_artifacts):
     ]
     assertion['bid'] = bid
     assertion['metadata'] = substitute_metadata(
-        assertion.get('metadata', ''), config.artifact_client, session, redis=config.redis
+        assertion.get('metadata', ''), config.artifact.client, session, redis=config.redis
     )
     return assertion
 
@@ -233,7 +233,7 @@ def post_bounties():
     metadata = body.get('metadata', '')
 
     try:
-        arts = config.artifact_client.ls(artifact_uri, session)
+        arts = config.artifact.client.ls(artifact_uri, session)
     except HTTPError as e:
         return failure(e.response.content, e.response.status_code)
     except ArtifactException:
@@ -243,7 +243,7 @@ def post_bounties():
     if amount < eth.bounty_amount_min(g.chain.bounty_registry.contract) * len(arts):
         return failure('Invalid bounty amount', 400)
 
-    if metadata and not config.artifact_client.check_uri(metadata):
+    if metadata and not config.artifact.client.check_uri(metadata):
         return failure('Invalid bounty metadata URI (should be IPFS hash)', 400)
 
     num_artifacts = len(arts)
@@ -311,7 +311,7 @@ def get_bounties_guid(guid):
     if metadata:
         metadata = substitute_metadata(
             metadata,
-            config.artifact_client,
+            config.artifact.client,
             session,
             validate=BountyMetadata.validate,
             redis=config.redis
@@ -319,7 +319,7 @@ def get_bounties_guid(guid):
     else:
         metadata = None
     bounty['metadata'] = metadata
-    if not config.artifact_client.check_uri(bounty['uri']):
+    if not config.artifact.client.check_uri(bounty['uri']):
         return failure(f'Invalid {config.artifact_client.name} URI', 400)
     if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
@@ -401,7 +401,7 @@ def post_assertion_metadata():
         return failure('Invalid Assertion metadata', 400)
 
     try:
-        uri = config.artifact_client.add_artifact(body, session, redis=config.redis)
+        uri = config.artifact.client.add_artifact(body, session, redis=config.redis)
         response = success(uri)
     except HTTPError as e:
         response = failure(e.response.content, e.response.status_code)

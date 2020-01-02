@@ -1,17 +1,15 @@
-import logging
-import os
-
 import flask_profiler
+import logging
 
 logger = logging.getLogger(__name__)
 
 
 def setup_profiler(app):
-    if not app.config['POLYSWARMD'].profiler_enabled:
+    profiler = app.config['POLYSWARMD'].profiler
+    if not profiler.enabled:
         return
 
-    db_uri = os.environ.get('PROFILER_DB_URI')
-    if db_uri is None:
+    if profiler.db_uri is None:
         logger.error('Profiler enabled but no db configured')
         return
 
@@ -21,7 +19,7 @@ def setup_profiler(app):
         'gui': False,
         'storage': {
             'engine': 'sqlalchemy',
-            'db_url': db_uri,
+            'db_url': profiler.db_uri,
         },
     }
 

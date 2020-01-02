@@ -74,7 +74,7 @@ def get_artifacts_status():
     session = app.config['REQUESTS_SESSION']
 
     try:
-        return success(config.artifact_client.status(session))
+        return success(config.artifact.client.status(session))
 
     except HTTPError as e:
         return failure(e.response.content, e.response.status_code)
@@ -100,11 +100,11 @@ def post_artifacts():
 
     if not files:
         return failure('No artifacts', 400)
-    if len(files) > config.artifact_limit:
+    if len(files) > config.artifact.limit:
         return failure('Too many artifacts', 400)
 
     try:
-        response = success(config.artifact_client.add_artifacts(files, session))
+        response = success(config.artifact.client.add_artifacts(files, session))
     except HTTPError as e:
         response = failure(e.response.content, e.response.status_code)
     except ArtifactException as e:
@@ -118,9 +118,9 @@ def get_artifacts_identifier(identifier):
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
     try:
-        arts = config.artifact_client.ls(identifier, session)
+        arts = config.artifact.client.ls(identifier, session)
         if len(arts) > 256:
-            return failure(f'Invalid {config.artifact_client.name} resource, too many links', 400)
+            return failure(f'Invalid {config.artifact.client.name} resource, too many links', 400)
 
         response = success([{'name': a[0], 'hash': a[1]} for a in arts])
 
@@ -141,7 +141,7 @@ def get_artifacts_identifier_id(identifier, id_):
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
     try:
-        response = config.artifact_client.get_artifact(
+        response = config.artifact.client.get_artifact(
             identifier, session, index=id_, max_size=g.user.max_artifact_size
         )
     except HTTPError as e:
@@ -163,7 +163,7 @@ def get_artifacts_identifier_id_stat(identifier, id_):
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
     try:
-        response = success(config.artifact_client.details(identifier, id_, session))
+        response = success(config.artifact.client.details(identifier, id_, session))
     except HTTPError as e:
         response = failure(e.response.content, e.response.status_code)
     except InvalidUriException:
