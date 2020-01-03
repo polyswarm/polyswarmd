@@ -8,8 +8,8 @@ __pycache__/
 .tox
 build/
 /config/
-!config/polyswarmd.yml
-!config/polyswarmd.docker.yml
+!/config/polyswarmd.yml
+!/config/polyswarmd.docker.yml
 dist/
 deb_dist/
 polyswarmd.spec

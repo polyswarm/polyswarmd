@@ -1,0 +1,20 @@
+artifact:
+  max_size: 34603008
+  fallback_max_size: 10485760
+  limit: 256
+  library:
+    module: polyswarmd.services.artifact.ipfs
+    class_name: IpfsServiceClient
+    args:
+      - http://ipfs:5001
+community: gamma
+eth:
+  trace_transactions: true
+  consul:
+    uri: http://consul:8500
+profiler:
+  enabled: false
+redis:
+  uri: redis://redis:6379
+websocket:
+  enabled: true
