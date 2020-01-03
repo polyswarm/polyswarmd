@@ -2,7 +2,7 @@ import importlib
 import logging
 import os
 import sys
-from typing import Dict, Any, Optional, ClassVar
+from typing import Dict, Any, Optional, ClassVar, List
 from urllib.parse import urlparse
 
 import yaml
@@ -12,7 +12,7 @@ from redis import Redis as RedisClient
 from requests import HTTPError
 from requests_futures.sessions import FuturesSession
 
-from polyswarmd.config.contract import Chain
+from polyswarmd.config.contract import Chain, ConsulChain, FileChain
 from polyswarmd.exceptions import MissingConfigValueError
 from polyswarmd.services.artifact import AbstractArtifactServiceClient, ArtifactServices
 from polyswarmd.services.auth import AuthService
@@ -43,7 +43,7 @@ class ClassModuleLoader:
 class Library(Config):
     module: str
     class_name: str
-    kwargs: Dict[str, Any]
+    args: List[Any]
     client: AbstractArtifactServiceClient
 
     def finish(self):
@@ -53,10 +53,10 @@ class Library(Config):
         if not hasattr(self, 'class_name'):
             MissingConfigValueError('No class name specified for artifact service client')
 
-        if not hasattr(self, 'kwargs'):
-            self.kwargs = {}
+        if not hasattr(self, 'args'):
+            self.args = []
 
-        self.client = ClassModuleLoader(self.module, self.class_name).load()(**self.kwargs)
+        self.client = ClassModuleLoader(self.module, self.class_name).load()(*self.args)
 
 
 class Artifact(Config):
@@ -120,6 +120,35 @@ class Consul(Config):
         self.client = ConsulClient(host=u.hostname, port=u.port, scheme=u.scheme, token=self.token)
 
 
+class Eth(Config):
+    trace_transactions: bool
+    consul: Optional[Consul]
+    filename: Optional[str]
+
+    def finish(self):
+        if not hasattr(self, 'trace_transactions') or self.trace_transactions is None:
+            self.trace_transactions = False
+
+        if not hasattr(self, 'consul'):
+            self.consul = None
+
+        if not hasattr(self, 'filename'):
+            self.filename = None
+
+        if self.consul is not None and self.filename is not None:
+            raise ValueError('Cannot have both filename and consul values')
+        elif self.consul is None and self.filename is None:
+            raise MissingConfigValueError('Must specify either consul or filename')
+
+    def get_chains(self, community: str) -> Dict[str, Chain]:
+        if self.consul is not None:
+            return {network: ConsulChain.from_consul(self.consul.client, network, f'chain/{community}')
+                    for network in ['home', 'side']}
+        else:
+            return {network: FileChain.from_config_file(network, self.filename)
+                    for network in ['home', 'side']}
+
+
 class Profiler(Config):
     enabled: bool
     db_uri: Optional[str]
@@ -134,14 +163,6 @@ class Profiler(Config):
 
         if self.enabled and self.db_uri is None:
             raise ValueError('Profiler enabled, but no db uri set')
-
-
-class Eth(Config):
-    trace_transactions: bool
-
-    def finish(self):
-        if not hasattr(self, 'trace_transactions') or self.trace_transactions is None:
-            self.trace_transactions = False
 
 
 class Websocket(Config):
@@ -172,7 +193,6 @@ class PolySwarmd(Config):
     auth: Auth
     chains: Dict[str, Chain]
     community: str
-    consul: Consul
     eth: Eth
     profiler: Profiler
     redis: Redis
@@ -180,7 +200,7 @@ class PolySwarmd(Config):
 
     def __init__(self, config: Dict[str, Any]):
         self.session = FuturesSession()
-        super().__init__(config, sys.modules[__name__])
+        super().__init__(config, module=sys.modules[__name__])
 
     @staticmethod
     def auto():
@@ -204,7 +224,7 @@ class PolySwarmd(Config):
     def finish(self):
         self.check_community()
         self.fill_default_sub_configs()
-        self.load_chains_from_consul()
+        self.load_chains()
         self.setup_status()
 
     def check_community(self):
@@ -212,8 +232,8 @@ class PolySwarmd(Config):
             raise MissingConfigValueError('Missing community')
 
     def fill_default_sub_configs(self):
-        sub_configs = [('artifact', Artifact), ('auth', Auth), ('consul', Consul), ('eth', Eth), ('profiler', Profiler),
-                       ('redis', Redis), ('websocket', Websocket)]
+        sub_configs = [('artifact', Artifact), ('auth', Auth), ('eth', Eth), ('profiler', Profiler), ('redis', Redis),
+                       ('websocket', Websocket)]
         for attribute, sub_config in sub_configs:
             self.create_default_sub_config_if_missing(attribute, sub_config)
 
@@ -221,12 +241,8 @@ class PolySwarmd(Config):
         if not hasattr(self, attribute):
             setattr(self, attribute, sub_config({}))
 
-    def load_chains_from_consul(self):
-        consul_client = self.consul.client
-        self.chains = {
-            'home': Chain.from_consul(consul_client, 'home', f'chain/{self.community}'),
-            'side': Chain.from_consul(consul_client, 'side', f'chain/{self.community}')
-        }
+    def load_chains(self):
+        self.chains = self.eth.get_chains(self.community)
 
     def setup_status(self):
         self.status = Status(self.community)

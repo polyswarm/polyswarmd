@@ -1,7 +1,6 @@
 """
    isort:skip_file
 """
-import os
 from concurrent.futures import ThreadPoolExecutor
 from requests_futures.sessions import FuturesSession
 from polyswarmd.monkey import patch_all

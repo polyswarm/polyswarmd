@@ -167,7 +167,7 @@ def post_transactions():
     threadpool_executor = app.config['THREADPOOL']
     account = g.chain.w3.toChecksumAddress(g.eth_address)
 
-    # Does not include offer_multisig contracts, need to loosen validation for those
+    # Does not include offer_multi_sig contracts, need to loosen validation for those
     contract_addresses = {
         g.chain.w3.toChecksumAddress(c.address) for c in (
             g.chain.nectar_token, g.chain.bounty_registry, g.chain.arbiter_staking,
@@ -412,7 +412,7 @@ def events_from_transaction(txhash, chain):
     ]
 
     if g.chain.offer_registry.contract:
-        offer_msig = g.chain.offer_multisig.bind(ZERO_ADDRESS)
+        offer_msig = g.chain.offer_multi_sig.bind(ZERO_ADDRESS)
         contracts.append((
             g.chain.offer_registry.contract.events,
             [('offers_initialized', messages.InitializedChannel)]

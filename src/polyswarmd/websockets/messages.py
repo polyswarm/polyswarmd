@@ -139,7 +139,7 @@ class MetadataHandler:
         config: Optional[Dict[str, Any]] = app.config
         ai = config['POLYSWARMD'].artifact.client
         session = FuturesSession(adapter_kwargs={'max_retries': 3})
-        redis = config['POLYSWARMD'].redis
+        redis = config['POLYSWARMD'].redis.client
 
         def _substitute_metadata_impl(uri: str, validate=None):
             return substitute_metadata(uri, ai, session, validate=validate, redis=redis)

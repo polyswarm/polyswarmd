@@ -88,7 +88,7 @@ def post_uri(guid):
         g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
     )
     msig_address = offer_channel['msig_address']
-    offer_msig = g.chain.offer_multisig.bind(msig_address)
+    offer_msig = g.chain.offer_multi_sig.bind(msig_address)
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
 
@@ -142,7 +142,7 @@ def post_open(guid):
         g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
     )
     msig_address = offer_channel['msig_address']
-    offer_msig = g.chain.offer_multisig.bind(msig_address)
+    offer_msig = g.chain.offer_multi_sig.bind(msig_address)
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
 
@@ -182,7 +182,7 @@ def post_cancel(guid):
         g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
     )
     msig_address = offer_channel['msig_address']
-    offer_msig = g.chain.offer_multisig.bind(msig_address)
+    offer_msig = g.chain.offer_multi_sig.bind(msig_address)
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
 
@@ -224,7 +224,7 @@ def post_join(guid):
         g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
     )
     msig_address = offer_channel['msig_address']
-    offer_msig = g.chain.offer_multisig.bind(msig_address)
+    offer_msig = g.chain.offer_multi_sig.bind(msig_address)
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
 
@@ -284,7 +284,7 @@ def post_close(guid):
         g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
     )
     msig_address = offer_channel['msig_address']
-    offer_msig = g.chain.offer_multisig.bind(msig_address)
+    offer_msig = g.chain.offer_multi_sig.bind(msig_address)
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
 
@@ -342,7 +342,7 @@ def post_close_challenged(guid):
         g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
     )
     msig_address = offer_channel['msig_address']
-    offer_msig = g.chain.offer_multisig.bind(msig_address)
+    offer_msig = g.chain.offer_multi_sig.bind(msig_address)
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
 
@@ -401,7 +401,7 @@ def post_settle(guid):
         g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
     )
     msig_address = offer_channel['msig_address']
-    offer_msig = g.chain.offer_multisig.bind(msig_address)
+    offer_msig = g.chain.offer_multi_sig.bind(msig_address)
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
 
@@ -565,7 +565,7 @@ def post_challange(guid):
         g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
     )
     msig_address = offer_channel['msig_address']
-    offer_msig = g.chain.offer_multisig.bind(msig_address)
+    offer_msig = g.chain.offer_multi_sig.bind(msig_address)
     account = g.chain.w3.toChecksumAddress(g.eth_address)
     base_nonce = int(request.args.get('base_nonce', g.chain.w3.eth.getTransactionCount(account)))
 
@@ -601,7 +601,7 @@ def get_settlement_period(guid):
     offer_channel = g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
     channel_data = channel_to_dict(offer_channel)
     msig_address = channel_data['msig_address']
-    offer_msig = g.chain.offer_multisig.bind(msig_address)
+    offer_msig = g.chain.offer_multi_sig.bind(msig_address)
 
     settlement_period_end = offer_msig.functions.settlementPeriodEnd().call()
 
@@ -614,7 +614,7 @@ def get_websocket(guid):
     offer_channel = g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
     channel_data = channel_to_dict(offer_channel)
     msig_address = channel_data['msig_address']
-    offer_msig = g.chain.offer_multisig.bind(msig_address)
+    offer_msig = g.chain.offer_multi_sig.bind(msig_address)
     socket_uri = offer_msig.functions.websocketUri().call()
 
     # TODO find a better way than replace
@@ -637,7 +637,7 @@ def get_pending():
         offer_channel = g.chain.offer_registry.contract.functions.guidToChannel(guid).call()
         channel_data = channel_to_dict(offer_channel)
         msig_address = channel_data['msig_address']
-        offer_msig = g.chain.offer_multisig.bind(msig_address)
+        offer_msig = g.chain.offer_multi_sig.bind(msig_address)
         pending_channel = offer_msig.functions.isPending().call()
         if pending_channel:
             offers_pending.append({'guid': guid, 'address': msig_address})
@@ -656,7 +656,7 @@ def get_opened():
         offer_channel = g.chain.offer_registry.contract.functions.guidToChannel(guid).call()
         channel_data = channel_to_dict(offer_channel)
         msig_address = channel_data['msig_address']
-        offer_msig = g.chain.offer_multisig.bind(msig_address)
+        offer_msig = g.chain.offer_multi_sig.bind(msig_address)
         opened_channel = offer_msig.functions.isOpen().call()
         if opened_channel:
             offers_opened.append({'guid': guid, 'address': msig_address})
@@ -675,7 +675,7 @@ def get_closed():
         offer_channel = g.chain.offer_registry.contract.functions.guidToChannel(guid).call()
         channel_data = channel_to_dict(offer_channel)
         msig_address = channel_data['msig_address']
-        offer_msig = g.chain.offer_multisig.bind(msig_address)
+        offer_msig = g.chain.offer_multi_sig.bind(msig_address)
         closed_channel = offer_msig.functions.isClosed().call()
         if closed_channel:
             offers_closed.append({'guid': guid, 'address': msig_address})
@@ -696,7 +696,7 @@ def get_myoffers():
         offer_channel = g.chain.offer_registry.contract.functions.guidToChannel(guid).call()
         channel_data = channel_to_dict(offer_channel)
         msig_address = channel_data['msig_address']
-        offer_msig = g.chain.offer_multisig.bind(msig_address)
+        offer_msig = g.chain.offer_multi_sig.bind(msig_address)
         expert = offer_msig.functions.expert().call()
         ambassador = offer_msig.functions.ambassador().call()
         if account == expert or account == ambassador:

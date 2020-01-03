@@ -1,21 +1,20 @@
-community: gamma
-consul:
-  uri: http://consul:8500
-
 artifact:
+  max_size: 34603008
+  fallback_max_size: 10485760
   limit: 256
-  client_spec:
+  library:
     module: polyswarmd.services.artifact.ipfs
     class_name: IpfsServiceClient
-    settings:
-      base_uri: http://ipfs:5001
-websocket:
-  enabled: true
-
-redis_uri: redis://redis:6379
-
-profiler:
-  enabled: false
-
+    args:
+      - http://ipfs:5001
+community: gamma
 eth:
   trace_transactions: true
+  consul:
+    uri: http://consul:8500
+profiler:
+  enabled: false
+redis:
+  uri: redis://redis:6379
+websocket:
+  enabled: true

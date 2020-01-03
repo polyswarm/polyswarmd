@@ -14,7 +14,7 @@ from polyswarmartifact.schema import Bounty as BountyMetadata
 from polyswarmd import app, cache
 from polyswarmd.views import eth
 from polyswarmd.services.artifact.exceptions import ArtifactException
-from polyswarmd.models.bloom import FILTER_BITS, BloomFilter
+from polyswarmd.utils.bloom import FILTER_BITS, BloomFilter
 from polyswarmd.utils.decorators.chains import chain
 from polyswarmd.views.eth import ZERO_ADDRESS, build_transaction
 from polyswarmd.utils.response import failure, success

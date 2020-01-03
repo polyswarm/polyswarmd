@@ -127,7 +127,7 @@ def init_websockets(app):
             g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
         )
         msig_address = offer_channel['msig_address']
-        offer_msig = g.chain.offer_multisig.bind(msig_address)
+        offer_msig = g.chain.offer_multi_sig.bind(msig_address)
         filter_manager = FilterManager()
         filter_events: Any[Type[WebsocketFilterMessage]] = [
             ClosedAgreement,
