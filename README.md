@@ -26,3 +26,30 @@ The configuration files for each are an approximation of my own reading of _"Pol
 ### Generating stubs
 `./scripts/lint.sh` can be run with `--stubs` flag to print dynamically generated type-stubs for the polyswarm Websocket messages. The script which is ultimately responsible for generating these stubs is located in `src/polyswarmd/websockets/scripts/gen_stubs.py`
 
+## Example Config
+
+```yaml
+artifact:
+  max_size: 34603008
+  fallback_max_size: 10485760
+  limit: 256
+  library:
+    module: polyswarmd.services.artifact.ipfs
+    class_name: IpfsServiceClient
+    args:
+      - http://localhost:5001
+community: gamma
+eth:
+  trace_transactions: true
+  consul:
+    uri: http://localhost:8500
+  # directory: /path/to/config 
+profiler:
+  enabled: false
+  # db_uri: http://db:1234
+redis:
+  uri: redis://localhost:6379
+websocket:
+  enabled: true
+```
+
