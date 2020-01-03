@@ -2,7 +2,7 @@ import importlib
 import logging
 import os
 import sys
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, ClassVar
 from urllib.parse import urlparse
 
 import yaml
@@ -182,13 +182,6 @@ class PolySwarmd(Config):
         self.session = FuturesSession()
         super().__init__(config, sys.modules[__name__])
 
-    def finish(self):
-        self.check_sub_configs()
-        self.load_chains_from_consul()
-        self.status = Status(self.community)
-        self.status.register_services(self.__create_services())
-        self.validate()
-
     @staticmethod
     def auto():
         return PolySwarmd.from_config_file_search()
@@ -208,6 +201,26 @@ class PolySwarmd(Config):
         with open(path, 'r') as f:
             return PolySwarmd(yaml.safe_load(f))
 
+    def finish(self):
+        self.check_community()
+        self.fill_default_sub_configs()
+        self.load_chains_from_consul()
+        self.setup_status()
+
+    def check_community(self):
+        if not hasattr(self, 'community'):
+            raise MissingConfigValueError('Missing community')
+
+    def fill_default_sub_configs(self):
+        sub_configs = [('artifact', Artifact), ('auth', Auth), ('consul', Consul), ('eth', Eth), ('profiler', Profiler),
+                       ('redis', Redis), ('websocket', Websocket)]
+        for attribute, sub_config in sub_configs:
+            self.create_default_sub_config_if_missing(attribute, sub_config)
+
+    def create_default_sub_config_if_missing(self, attribute: str, sub_config: ClassVar[Config]):
+        if not hasattr(self, attribute):
+            setattr(self, attribute, sub_config({}))
+
     def load_chains_from_consul(self):
         consul_client = self.consul.client
         self.chains = {
@@ -215,45 +228,10 @@ class PolySwarmd(Config):
             'side': Chain.from_consul(consul_client, 'side', f'chain/{self.community}')
         }
 
-    def check_sub_configs(self):
-        self.check_artifact()
-        self.check_auth()
-        self.check_consul()
-        self.check_eth()
-        self.check_profiler()
-        self.check_redis()
-        self.check_websocket()
-
-    def check_artifact(self):
-        if not self.check_attribute('artifact'):
-            self.artifact = Artifact({})
-
-    def check_auth(self):
-        if not self.check_attribute('auth'):
-            self.auth = Auth({})
-
-    def check_consul(self):
-        if not self.check_attribute('consul'):
-            self.consul = Consul({})
-
-    def check_eth(self):
-        if not self.check_attribute('eth'):
-            self.eth = Eth({})
-
-    def check_profiler(self):
-        if not self.check_attribute('profiler'):
-            self.profiler = Profiler({})
-
-    def check_redis(self):
-        if not self.check_attribute('redis'):
-            self.redis = Redis({})
-
-    def check_websocket(self):
-        if not self.check_attribute('websocket'):
-            self.websocket = Websocket({})
-
-    def check_attribute(self, attribute) -> bool:
-        return hasattr(self, attribute)
+    def setup_status(self):
+        self.status = Status(self.community)
+        self.status.register_services(self.__create_services())
+        self.validate_services()
 
     def __create_services(self):
         services = [*self.create_ethereum_services(), self.create_artifact_service()]
@@ -269,14 +247,6 @@ class PolySwarmd(Config):
 
     def create_auth_services(self):
         return AuthService(self.auth.uri, self.session)
-
-    def validate(self):
-        self.validate_community()
-        self.validate_services()
-
-    def validate_community(self):
-        if not self.community:
-            raise ValueError('No community specified')
 
     def validate_services(self):
         for service in self.status.services:
