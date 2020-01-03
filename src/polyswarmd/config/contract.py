@@ -117,14 +117,12 @@ class Chain(Config):
         self.name = name
         try:
             jsonschema.validate(config, CHAIN_CONFIG_SCHEMA)
-            logger.critical(config.keys())
         except ValidationError:
             raise MissingConfigValueError('Invalid config')
 
         super().__init__(config)
 
     def populate(self, config: Dict[str, Any], module):
-        # TODO validate schema
         self.eth_uri = config.get('eth_uri', None)
         if self.eth_uri is None:
             raise MissingConfigValueError('Missing eth_uri')
@@ -311,7 +309,7 @@ class FileChain(Chain):
 
     @classmethod
     def load_contracts(cls, path) -> Dict[str, Any]:
-        contracts_dir = os.path.join(os.path.dirname(path), 'contracts')
+        contracts_dir = os.path.dirname(path)
         return cls.load_contracts_from_dir(contracts_dir)
 
     @classmethod
@@ -321,7 +319,12 @@ class FileChain(Chain):
 
     @classmethod
     def load_contract_files(cls, root: str, files: List[str]) -> List[Tuple[str, Dict[str, Any]]]:
-        return [cls.load_contract(os.path.join(root, f)) for f in files]
+        filter_ = cls.contract_filter()
+        return [cls.load_contract(os.path.join(root, f)) for f in files if f not in filter_]
+
+    @classmethod
+    def contract_filter(cls) -> Set[str]:
+        return {f'{x}.json' for x in ('homechain', 'sidechain', 'config')}
 
     @classmethod
     def load_contract(cls, filename: str) -> Tuple[str, Dict[str, Any]]:

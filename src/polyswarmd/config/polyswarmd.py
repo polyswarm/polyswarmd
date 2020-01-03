@@ -126,7 +126,7 @@ class Consul(Config):
 class Eth(Config):
     trace_transactions: bool
     consul: Optional[Consul]
-    filename: Optional[str]
+    directory: Optional[str]
 
     def finish(self):
         if not hasattr(self, 'trace_transactions') or self.trace_transactions is None:
@@ -135,12 +135,12 @@ class Eth(Config):
         if not hasattr(self, 'consul'):
             self.consul = None
 
-        if not hasattr(self, 'filename'):
-            self.filename = None
+        if not hasattr(self, 'directory'):
+            self.directory = None
 
-        if self.consul is not None and self.filename is not None:
+        if self.consul is not None and self.directory is not None:
             raise ValueError('Cannot have both filename and consul values')
-        elif self.consul is None and self.filename is None:
+        elif self.consul is None and self.directory is None:
             raise MissingConfigValueError('Must specify either consul or filename')
 
     def get_chains(self, community: str) -> Dict[str, Chain]:
@@ -148,8 +148,8 @@ class Eth(Config):
             return {network: ConsulChain.from_consul(self.consul.client, network, f'chain/{community}')
                     for network in ['home', 'side']}
         else:
-            return {network: FileChain.from_config_file(network, self.filename)
-                    for network in ['home', 'side']}
+            return {chain: FileChain.from_config_file(chain, os.path.join(self.directory, f'{chain}chain.json'))
+                    for chain in ['home', 'side']}
 
 
 class Profiler(Config):

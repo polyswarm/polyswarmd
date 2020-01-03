@@ -25,7 +25,7 @@ POLYSWARMD_CONFIG_SCHEMA = {
             "type": "object",
             "properties": {
                 "trace_transactions": {"type": "boolean"},
-                "filename": {"type": "string"},
+                "directory": {"type": "string"},
                 "consul": {
                     "type": "object",
                     "properties": {
