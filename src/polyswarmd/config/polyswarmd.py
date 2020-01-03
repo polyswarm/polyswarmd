@@ -14,11 +14,10 @@ from requests_futures.sessions import FuturesSession
 
 from polyswarmd.config.contract import Chain
 from polyswarmd.exceptions import MissingConfigValueError
-from polyswarmd.services.artifact.client import AbstractArtifactServiceClient
-from polyswarmd.services.artifact.service import ArtifactServices
-from polyswarmd.services.auth.service import AuthService
-from polyswarmd.services.consul.service import ConsulService
-from polyswarmd.services.ethereum.service import EthereumService
+from polyswarmd.services.artifact import AbstractArtifactServiceClient, ArtifactServices
+from polyswarmd.services.auth import AuthService
+from polyswarmd.services.consul import ConsulService
+from polyswarmd.services.ethereum import EthereumService
 from polyswarmd.config.status import Status
 from polyswarmd.config.config import Config
 
@@ -26,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 CONFIG_LOCATIONS = ['/etc/polyswarmd', '~/.config/polyswarmd']
 DEFAULT_FALLBACK_SIZE = 10 * 1024 * 1024
-EXPECTED_CONTRACTS = ['NectarToken', 'BountyRegistry', 'ArbiterStaking', 'ERC20Relay', 'OfferRegistry', 'OfferMultiSig']
 
 
 class ClassModuleLoader:
@@ -151,8 +149,9 @@ class Websocket(Config):
 
     def finish(self):
         if not hasattr(self, 'enabled') or self.enabled is None:
-            # This environment var is confusing, but until we move all over the the new config it remains
-            self.enabled = not os.environ.get('DISABLE_WEBSOCKETS', False)
+            if os.environ.get('DISABLE_WEBSOCKETS') is not None:
+                self.enabled = False
+                logger.warning('"DISABLE_WEBSOCKETS" environment variable is deprecated, please use configuration')
 
 
 class Redis(Config):
