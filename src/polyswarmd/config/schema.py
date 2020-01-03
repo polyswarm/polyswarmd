@@ -58,3 +58,25 @@ POLYSWARMD_CONFIG_SCHEMA = {
     "additionalItems": True,
     "required": ["community", "eth", "artifact"]
 }
+
+CHAIN_CONFIG_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "chain.json",
+    "type": "object",
+    "properties": {
+        "nectar_token_address": {"type": "string"},
+        "arbiter_staking_address": {"type": "string"},
+        "erc20_relay_address": {"type": "string"},
+        "offer_registry_address": {"type": "string"},
+        "bounty_registry_address": {"type": "string"},
+        "eth_uri": {"type": "string"},
+        "chain_id": {"type": "integer"},
+        "free": {"type": "boolean"},
+        "contracts": {
+            "type": "object",
+            "additionalItems": True
+        }
+    },
+    "required": ["nectar_token_address", "arbiter_staking_address", "erc20_relay_address", "offer_registry_address",
+                 "bounty_registry_address", "eth_uri", "chain_id", "free", "contracts"],
+}

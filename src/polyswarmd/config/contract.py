@@ -5,14 +5,17 @@ import os
 import time
 from typing import Any, Dict, List, Tuple, Set
 
+import jsonschema
 import yaml
 from consul import Timeout
+from jsonschema import ValidationError
 
 from polyswarmd.config.config import Config
 from web3 import Web3, HTTPProvider
 from web3.exceptions import MismatchedABI
 from web3.middleware import geth_poa_middleware
 
+from polyswarmd.config.schema import CHAIN_CONFIG_SCHEMA
 from polyswarmd.exceptions import MissingConfigValueError
 from polyswarmd.services.ethereum.rpc import EthereumRpc
 from polyswarmd.utils import camel_case_to_snake_case
@@ -112,6 +115,12 @@ class Chain(Config):
 
     def __init__(self, name: str, config: Dict[str, Any]):
         self.name = name
+        try:
+            jsonschema.validate(config, CHAIN_CONFIG_SCHEMA)
+            logger.critical(config.keys())
+        except ValidationError:
+            raise MissingConfigValueError('Invalid config')
+
         super().__init__(config)
 
     def populate(self, config: Dict[str, Any], module):
