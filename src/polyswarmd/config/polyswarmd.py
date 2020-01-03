@@ -5,14 +5,17 @@ import sys
 from typing import Dict, Any, Optional, ClassVar, List
 from urllib.parse import urlparse
 
+import jsonschema
 import yaml
 
 from consul import Consul as ConsulClient
+from jsonschema import ValidationError
 from redis import Redis as RedisClient
 from requests import HTTPError
 from requests_futures.sessions import FuturesSession
 
 from polyswarmd.config.contract import Chain, ConsulChain, FileChain
+from polyswarmd.config.schema import POLYSWARMD_CONFIG_SCHEMA
 from polyswarmd.exceptions import MissingConfigValueError
 from polyswarmd.services.artifact import AbstractArtifactServiceClient, ArtifactServices
 from polyswarmd.services.auth import AuthService
@@ -200,6 +203,10 @@ class PolySwarmd(Config):
 
     def __init__(self, config: Dict[str, Any]):
         self.session = FuturesSession()
+        try:
+            jsonschema.validate(config, POLYSWARMD_CONFIG_SCHEMA)
+        except ValidationError:
+            raise MissingConfigValueError('Invalid Config')
         super().__init__(config, module=sys.modules[__name__])
 
     @staticmethod
