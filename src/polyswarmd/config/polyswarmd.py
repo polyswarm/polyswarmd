@@ -99,7 +99,7 @@ class Auth(Config):
 
     def finish(self):
         if not hasattr(self, 'uri'):
-            self.uri = None
+            self.uri = os.environ.get('AUTH_URI')
 
     @property
     def require_api_key(self):
@@ -113,10 +113,10 @@ class Consul(Config):
 
     def finish(self):
         if not hasattr(self, 'uri'):
-            raise MissingConfigValueError('Missing consul URI')
+            self.uri = os.environ.get('CONSUL')
 
         if not hasattr(self, 'token'):
-            self.token = None
+            self.token = os.environ.get('CONSUL_TOKEN')
 
         ConsulService(self.uri, FuturesSession()).wait_until_live()
         u = urlparse(self.uri)
@@ -130,7 +130,7 @@ class Eth(Config):
 
     def finish(self):
         if not hasattr(self, 'trace_transactions') or self.trace_transactions is None:
-            self.trace_transactions = False
+            self.trace_transactions = True
 
         if not hasattr(self, 'consul'):
             self.consul = None
@@ -173,20 +173,25 @@ class Websocket(Config):
 
     def finish(self):
         if not hasattr(self, 'enabled') or self.enabled is None:
-            if os.environ.get('DISABLE_WEBSOCKETS') is not None:
+            if os.environ.get('DISABLE_WEBSOCKETS'):
                 self.enabled = False
                 logger.warning('"DISABLE_WEBSOCKETS" environment variable is deprecated, please use configuration')
+            else:
+                self.enabled = True
 
 
 class Redis(Config):
     client: Optional[RedisClient]
-    uri: str
+    uri: Optional[str]
 
     def finish(self):
-        if hasattr(self, 'uri'):
+        self.client = None
+
+        if not hasattr(self, 'uri'):
+            self.uri = os.environ.get('REDIS_URI')
+
+        if self.uri:
             self.client = RedisClient.from_url(self.uri)
-        else:
-            self.client = None
 
 
 class PolySwarmd(Config):

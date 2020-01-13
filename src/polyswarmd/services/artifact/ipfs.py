@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 import uuid
 
@@ -24,8 +25,8 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
     Uses MFS for adding to directories, since limits on IPFS API requests prevent 256 file requests.
     """
 
-    def __init__(self, base_uri):
-        self.base_uri = base_uri
+    def __init__(self, base_uri=None):
+        self.base_uri = base_uri or os.environ.get('IPFS_URI')
         reachable_endpoint = f"{self.base_uri}{'/api/v0/bootstrap'}"
         super().__init__('IPFS', reachable_endpoint)
         # Create IPFS client
