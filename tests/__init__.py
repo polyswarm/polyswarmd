@@ -3,7 +3,8 @@ import polyswarmd
 
 from polyswarmd.config.polyswarmd import PolySwarmd
 
-test_account='0x4B1867c484871926109E3C47668d5C0938CA3527'
+test_account = '0x4B1867c484871926109E3C47668d5C0938CA3527'
+
 
 @pytest.fixture
 def client():
