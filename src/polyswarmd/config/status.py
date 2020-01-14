@@ -13,8 +13,7 @@ class Status:
 
     def get_status(self):
         status: Dict = {'community': self.community}
-        for k, v in self.test_services().items():
-            status[k] = v
+        status.update(self.test_services())
         return status
 
     def register_services(self, services: List[Service]):
