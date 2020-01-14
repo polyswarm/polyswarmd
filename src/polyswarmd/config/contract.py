@@ -126,10 +126,6 @@ class Chain(Config):
         self.config.update(contracts)
         super().populate()
 
-    @property
-    def type_hints(self) -> Dict[str, Callable]:
-        return {'chain_id': int, 'free': bool}
-
     def finish(self):
         if not hasattr(self, 'free'):
             self.free = False
