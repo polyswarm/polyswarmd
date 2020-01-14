@@ -14,9 +14,10 @@ from typing import (
 )
 import uuid
 
-# in python 3.8+:
-# from typing import TypedDict
-from mypy_extensions import TypedDict
+try:
+    from typing import TypedDict  # noqa
+except ImportError:
+    from mypy_extensions import TypedDict  # noqa
 
 SchemaType = str
 SchemaFormat = str
