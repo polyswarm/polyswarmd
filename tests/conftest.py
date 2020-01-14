@@ -44,7 +44,7 @@ def community():
     return 'gamma'
 
 @pytest.fixture
-def taddr():
+def token_address():
     return '0x4B1867c484871926109E3C47668d5C0938CA3527'
 
 

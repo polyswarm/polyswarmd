@@ -32,7 +32,7 @@ format: format-requirements  ## format code in Polyswarm style
 	yapf -p -r -i $(SRCROOT)
 	isort --recursive $(SRCROOT)
 
-format-requirements:
+format-requirements:  ## sort requirements.txt
 	sort -u requirements.txt -o requirements.txt
 	sort -u requirements.dev.txt -o requirements.dev.txt
 
