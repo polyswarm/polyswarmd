@@ -30,5 +30,5 @@ class EthereumService(Service):
         return self.chain.w3.eth.blockNumber
 
     def check_chain_id(self):
-        if not self.chain.chain_id == self.chain.w3.version.network:
-            raise ValueError('Chain ID does not match network ID')
+        if self.chain.chain_id != self.chain.w3.version.network:
+            raise ValueError(f'Chain id mismatch: {self.chain.chain_id} != {self.chain.w3.version.network}')
