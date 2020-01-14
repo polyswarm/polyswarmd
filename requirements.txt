@@ -21,6 +21,6 @@ requests==2.22.0
 requests-futures==1.0.0
 rlp==1.1.0
 ujson==1.35
-web3==4.9.2
+web3==5.4.0
 websocket-client==0.48.0
 Werkzeug==0.15.3

@@ -14,7 +14,7 @@ from hexbytes import HexBytes
 import rlp
 from web3.exceptions import MismatchedABI
 from web3.module import Module
-from web3.utils.events import get_event_data
+from web3._utils.events import get_event_data
 
 from polyswarmd.app import cache
 from polyswarmd.utils.decorators.chains import chain

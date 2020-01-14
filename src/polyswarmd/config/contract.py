@@ -137,7 +137,7 @@ class Chain(Config):
 
     def setup_web3(self, eth_uri: str):
         self.w3 = Web3(HTTPProvider(eth_uri))
-        self.w3.middleware_stack.inject(geth_poa_middleware, layer=0)
+        self.w3.middleware_onion.inject(geth_poa_middleware, layer=0)
 
     def setup_rpc(self):
         self.rpc = EthereumRpc(self)
