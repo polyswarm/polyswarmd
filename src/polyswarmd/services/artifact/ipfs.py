@@ -29,11 +29,17 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
         self.base_uri = base_uri or os.environ.get('IPFS_URI')
         reachable_endpoint = f"{self.base_uri}{'/api/v0/bootstrap'}"
         super().__init__('IPFS', reachable_endpoint)
-        # Create IPFS client
-        url = parse_url(self.base_uri)
-        self.client = ipfshttpclient.connect(
-            f'/dns/{url.host}/tcp/{url.port}/{url.scheme}', session=True
-        )
+        self._client = None
+
+    @property
+    def client(self):
+        if self._client is None:
+            url = parse_url(self.base_uri)
+            self._client = ipfshttpclient.connect(
+                f'/dns/{url.host}/tcp/{url.port}/{url.scheme}', session=True
+            )
+
+        return self.client
 
     @staticmethod
     def check_ls(artifacts, index, max_size=None):
