@@ -128,7 +128,6 @@ class Chain(Config):
         return {'chain_id': int, 'free': bool}
 
     def finish(self):
-        # XXX: is it possible to get this far without `free`? - zv
         if not hasattr(self, 'free'):
             self.free = False
 
