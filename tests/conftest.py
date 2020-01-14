@@ -29,15 +29,18 @@ PRE_INIT_PATCHES = (
     patch('os.getenv', lambda *args, **kwargs: 'testing' if args[0] == 'POLY_WORK' else os.getenv)
 )
 
-for patch in PRE_INIT_PATCHES: patch.start()
+for pa in PRE_INIT_PATCHES:
+    pa.start()
 
 # NOTE polyswarmd is structured such that merely importing a package in the `polyswarmd` namespace will
 # raise an exception. Fixing this (e.g moving stuff outta src/polyswarmd/__init__.py) has been on the
 # todo list for some time, but for now, we just patch up methods which have unsafe side effects to
 # run unit tests without side-effects.
-import polyswarmd   # noqa
+import polyswarmd.app   # noqa
 
-for patch in PRE_INIT_PATCHES: patch.stop()
+for pa in PRE_INIT_PATCHES:
+    pa.stop()
+
 
 @pytest.fixture
 def community():
