@@ -87,7 +87,7 @@ def test_type_hints_fix_bool_true():
     os.environ['PROFILER_DB_URI'] = 'asdf'
     config = {}
     profiler = Profiler(config)
-    profiler.load()
+    profiler.overlay_and_load()
     assert isinstance(profiler.enabled, bool)
     assert profiler.enabled
 
@@ -96,7 +96,7 @@ def test_type_hints_fix_bool_false():
     os.environ['PROFILER_ENABLED'] = ''
     config = {}
     profiler = Profiler(config)
-    profiler.load()
+    profiler.overlay_and_load()
     assert isinstance(profiler.enabled, bool)
     assert not profiler.enabled
 
@@ -105,7 +105,7 @@ def test_type_hints_fix_int():
     os.environ['ARTIFACT_MAX_SIZE'] = "10"
     config = {}
     artifact = Artifact(config)
-    artifact.load()
+    artifact.overlay_and_load()
     assert isinstance(artifact.max_size, int)
     assert artifact.max_size == 10
 
@@ -113,5 +113,5 @@ def test_type_hints_fix_int():
 def test_type_hints_fix_no_int():
     config = {}
     artifact = Artifact(config)
-    artifact.load()
+    artifact.overlay_and_load()
     assert isinstance(artifact.max_size, int)

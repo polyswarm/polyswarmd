@@ -10,3 +10,8 @@ class AuthService(Service):
     @staticmethod
     def build_uri(base_uri) -> str:
         return f'{base_uri}/communities/public'
+
+    def connect_to_service(self):
+        future = self.session.get(self.uri)
+        response = future.result()
+        response.raise_for_status()
