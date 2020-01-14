@@ -16,9 +16,14 @@ help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
 lint: doctest mypy ## check style
+# static checks
 	-flake8 $(SRCROOT)
+# style checks
 	-yapf -p -r -d $(SRCROOT)
+# order import
 	-isort --recursive --diff $(SRCROOT)
+# verify that requirements.txt is ordered
+	sort -u -c requirements.txt && sort -u -c requirements.dev.txt
 
 mypy:  ## check types
 	mypy

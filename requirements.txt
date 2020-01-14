@@ -6,6 +6,7 @@ Flask-Caching==1.7.2
 Flask-Sockets==0.2.1
 gevent==1.4.0
 gevent-websocket==0.10.1
+git+https://github.com/polyswarm/flask-profiler.git@profile-stats#egg=flask_profiler
 gunicorn==19.9.0
 ipfshttpclient==0.4.12
 mypy==0.761
@@ -25,4 +26,3 @@ ujson==1.35
 web3==4.9.2
 websocket-client==0.48.0
 Werkzeug==0.15.3
-git+https://github.com/polyswarm/flask-profiler.git@profile-stats#egg=flask_profiler
