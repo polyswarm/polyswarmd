@@ -1,6 +1,6 @@
 import os
 from abc import abstractmethod, ABC
-from typing import Dict, Any, ClassVar, Optional, Tuple
+from typing import Dict, Any, ClassVar, Optional, Tuple, Callable, List
 
 
 class Config(ABC):
@@ -27,10 +27,18 @@ class Config(ABC):
         """
         raise NotImplementedError
 
+    @property
+    def type_hints(self) -> Dict[str, Callable]:
+        return {}
+
+    def correct_type(self, key, value) -> Any:
+        cast = self.type_hints.get(key)
+        return cast(value) if cast else value
+
     def populate(self):
         for k, v in self.config.items():
             if not isinstance(v, dict):
-                setattr(self, k, v)
+                setattr(self, k, self.correct_type(k, v))
             elif self.module and hasattr(self.module, k.capitalize()):
                 sub_config_class: ClassVar[Config] = getattr(self.module, k.capitalize())
                 if issubclass(sub_config_class, Config):

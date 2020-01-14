@@ -2,8 +2,7 @@ import os
 
 import pytest
 
-from polyswarmd.config.polyswarmd import PolySwarmd
-from polyswarmd.config.config import Config
+from polyswarmd.config.polyswarmd import PolySwarmd, Profiler, Artifact
 
 
 @pytest.fixture(autouse=True)
@@ -81,3 +80,38 @@ def test_set_multi_word_value():
     polyswarmd = PolySwarmd(config)
     polyswarmd.overlay_environment()
     assert config == {'artifact': {"max_size": '10', 'library': {'module': 'ipfs', 'class_name': 'IpfsServiceClient'}}}
+
+
+def test_type_hints_fix_bool_true():
+    os.environ['PROFILER_ENABLED'] = '1'
+    os.environ['PROFILER_DB_URI'] = 'asdf'
+    config = {}
+    profiler = Profiler(config)
+    profiler.load()
+    assert isinstance(profiler.enabled, bool)
+    assert profiler.enabled
+
+
+def test_type_hints_fix_bool_false():
+    os.environ['PROFILER_ENABLED'] = ''
+    config = {}
+    profiler = Profiler(config)
+    profiler.load()
+    assert isinstance(profiler.enabled, bool)
+    assert not profiler.enabled
+
+
+def test_type_hints_fix_int():
+    os.environ['ARTIFACT_MAX_SIZE'] = "10"
+    config = {}
+    artifact = Artifact(config)
+    artifact.load()
+    assert isinstance(artifact.max_size, int)
+    assert artifact.max_size == 10
+
+
+def test_type_hints_fix_no_int():
+    config = {}
+    artifact = Artifact(config)
+    artifact.load()
+    assert isinstance(artifact.max_size, int)

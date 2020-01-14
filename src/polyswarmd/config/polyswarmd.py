@@ -8,7 +8,7 @@ from consul import Consul as ConsulClient
 from redis import Redis as RedisClient
 from requests_futures.sessions import FuturesSession
 from urllib.parse import urlparse
-from typing import Dict, Any, Optional, ClassVar, List
+from typing import Dict, Any, Optional, ClassVar, List, Tuple, Callable
 
 from polyswarmd.config.contract import Chain, ConsulChain, FileChain
 from polyswarmd.exceptions import MissingConfigValueError
@@ -67,8 +67,6 @@ class Artifact(Config):
         if not hasattr(self, 'limit'):
             self.limit = 256
 
-        self.limit = int(self.limit)
-
         if self.limit < 1 or self.limit > 256:
             raise ValueError(
                 'Artifact limit must be greater than 0 and cannot exceed contract limit of 256'
@@ -77,18 +75,18 @@ class Artifact(Config):
         if not hasattr(self, 'max_size'):
             self.max_size = DEFAULT_FALLBACK_SIZE
 
-        self.max_size = int(self.max_size)
-
         if not hasattr(self, 'fallback_max_size'):
             self.fallback_max_size = DEFAULT_FALLBACK_SIZE
-
-        self.fallback_max_size = int(self.fallback_max_size)
 
         if self.fallback_max_size < 1:
             raise ValueError('Fall back max artifact size must be above 0')
 
         if not hasattr(self, 'library'):
             MissingConfigValueError('Failed to load artifact services client')
+
+    @property
+    def type_hints(self) -> Dict[str, Callable]:
+        return {'limit': int, 'max_size': int, 'fallback_max_size': int}
 
     @property
     def client(self):
@@ -170,7 +168,9 @@ class Profiler(Config):
         if self.enabled and self.db_uri is None:
             raise ValueError('Profiler enabled, but no db uri set')
 
-        self.enabled = bool(self.enabled)
+    @property
+    def type_hints(self) -> Dict[str, Callable]:
+        return {'enabled': bool}
 
 
 class Websocket(Config):
@@ -184,7 +184,9 @@ class Websocket(Config):
             else:
                 self.enabled = True
 
-        self.enabled = bool(self.enabled)
+    @property
+    def type_hints(self) -> Dict[str, Callable]:
+        return {'enabled': bool}
 
 
 class Redis(Config):
