@@ -2,19 +2,14 @@ import json
 import logging
 import os
 import time
-from typing import Any, Dict, List, Set, Tuple
-
-import jsonschema
 import yaml
 from consul import Timeout
-from jsonschema import ValidationError
-
-from polyswarmd.config.config import Config
+from typing import Any, Dict, List, Tuple, Set, Callable
 from web3 import Web3, HTTPProvider
 from web3.exceptions import MismatchedABI
 from web3.middleware import geth_poa_middleware
 
-from polyswarmd.config.schema import CHAIN_CONFIG_SCHEMA
+from polyswarmd.config.config import Config
 from polyswarmd.exceptions import MissingConfigValueError
 from polyswarmd.services.ethereum.rpc import EthereumRpc
 from polyswarmd.utils import camel_case_to_snake_case, IN_TESTENV
@@ -38,21 +33,11 @@ class Contract(object):
         self.w3 = w3
         self.abi = abi
         self.address = address
-
-        self.contract = None
-
-        # Eager bind if address provided
-        if address:
-            self.bind(persistent=True)
+        self._contract = None
 
     def bind(self, address=None, persistent=False):
         from polyswarmd.views.eth import ZERO_ADDRESS
-        if self.contract:
-            return self.contract
-
-        if not address:
-            address = self.address
-
+        address = address or self.address
         if not address:
             raise ValueError('No address provided to bind to')
 
@@ -83,9 +68,16 @@ class Contract(object):
                 raise ValueError('Unsupported contract version')
 
         if persistent:
-            self.contract = ret
+            self._contract = ret
 
         return ret
+
+    @property
+    def contract(self):
+        if self._contract is None:
+            return self.bind(self.address, persistent=True)
+
+        return self._contract
 
     @staticmethod
     def from_json(w3: Web3, name: str, contract: Dict[str, Any], config: Dict[str, Any]):
@@ -116,26 +108,30 @@ class Chain(Config):
 
     def __init__(self, name: str, config: Dict[str, Any]):
         self.name = name
-        try:
-            jsonschema.validate(config, CHAIN_CONFIG_SCHEMA)
-        except ValidationError:
-            raise MissingConfigValueError('Invalid config')
-
         super().__init__(config)
+        self.load()
 
-    def populate(self, config: Dict[str, Any], module):
-        self.eth_uri = config.get('eth_uri', None)
+    def populate(self):
+        self.eth_uri = self.config.get('eth_uri')
         if self.eth_uri is None:
             raise MissingConfigValueError('Missing eth_uri')
 
         self.setup_web3(self.eth_uri)
-        contract_abis = config.get('contracts')
-        del config['contracts']
-        contracts = self.create_bound_contract_dicts(contract_abis, config)
-        config.update(contracts)
-        super().populate(config, module)
+        contract_abis = self.config.get('contracts')
+        del self.config['contracts']
+        contracts = self.create_contract_dicts(contract_abis, self.config)
+        self.config.update(contracts)
+        super().populate()
+
+    @property
+    def type_hints(self) -> Dict[str, Callable]:
+        return {'chain_id': int, 'free': bool}
 
     def finish(self):
+        # XXX: is it possible to get this far without `free`? - zv
+        if not hasattr(self, 'free'):
+            self.free = False
+
         if not IN_TESTENV:
             self.__bind_child_contracts()
             self.__validate()
@@ -148,69 +144,15 @@ class Chain(Config):
     def setup_rpc(self):
         self.rpc = EthereumRpc(self)
 
-    def create_bound_contract_dicts(self, contracts: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Contract]:
+    def create_contract_dicts(self, contracts: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Contract]:
         return {camel_case_to_snake_case(name): self.create_contract(name, abi, config) for name, abi in contracts.items()}
 
     def create_contract(self, name, abi, config: Dict[str, Any]) -> Contract:
         return Contract.from_json(self.w3, name, abi, config)
 
-    def __bind_child_contracts(self):
-        self.arbiter_staking.bind(address=self.bounty_registry.contract.functions.staking().call(), persistent=True)
-
     @staticmethod
     def does_include_all_contracts(contracts: Dict[str, Any]) -> bool:
         return all([c in contracts for c in EXPECTED_CONTRACTS])
-
-    def __validate(self):
-        self.__validate_chain_id()
-        self.__validate_contracts()
-
-    def __validate_chain_id(self):
-        if self.chain_id != int(self.w3.version.network):
-            raise ValueError(
-                'Chain ID mismatch, expected %s got %s', self.chain_id, int(self.w3.version.network)
-            )
-
-    def __validate_contracts(self):
-        self.__validate_nectar_token()
-        self.__validate_bounty_contracts()
-        self.__validate_erc20_relay()
-        self.__validate_offer_contracts()
-
-    def __validate_nectar_token(self):
-        if not self.nectar_token or not self.nectar_token.contract:
-            raise ValueError('Invalid NectarToken contract or address')
-
-    def __validate_bounty_contracts(self):
-        self.__validate_bounty_registry()
-        self.__validate_arbiter_staking()
-
-    def __validate_bounty_registry(self):
-        if not self.bounty_registry or not self.bounty_registry.contract:
-            raise ValueError('Invalid BountyRegistry contract or address')
-
-    def __validate_erc20_relay(self):
-        if not self.erc20_relay or not self.erc20_relay.contract:
-            raise ValueError('Invalid ERC20Relay contract or address')
-
-    def __validate_arbiter_staking(self):
-        # Child contracts not bound yet, but should be defined
-        if not self.arbiter_staking:
-            raise ValueError('Invalid ArbiterStaking contract')
-
-    def __validate_offer_contracts(self):
-        # Offer contracts only live on homechain
-        if self.name == 'home':
-            self.__validate_offer_registry()
-            self.__validate_offer_multi_sig()
-
-    def __validate_offer_registry(self):
-        if not self.offer_registry or not self.offer_registry.contract:
-            raise ValueError('Invalid OfferRegistry contract or address')
-
-    def __validate_offer_multi_sig(self):
-        if not self.offer_multi_sig:
-            raise ValueError('Invalid OfferMultiSig contract')
 
 
 class ConsulChain(Chain):

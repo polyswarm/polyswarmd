@@ -2,20 +2,16 @@ import importlib
 import logging
 import os
 import sys
-from typing import Any, Dict, List, Optional, Tuple, Type
-from urllib.parse import urlparse
+import yaml
 
 from consul import Consul as ConsulClient
-import jsonschema
-from jsonschema import ValidationError
 from redis import Redis as RedisClient
-from requests import HTTPError
 from requests_futures.sessions import FuturesSession
-import yaml
+from urllib.parse import urlparse
+from typing import Dict, Any, Optional, Type, List, Tuple, Callable
 
 from polyswarmd.config.config import Config
 from polyswarmd.config.contract import Chain, ConsulChain, FileChain
-from polyswarmd.config.schema import POLYSWARMD_CONFIG_SCHEMA
 from polyswarmd.config.status import Status
 from polyswarmd.exceptions import MissingConfigValueError
 from polyswarmd.services.artifact import (
@@ -87,7 +83,7 @@ class Artifact(Config):
             )
 
         if not hasattr(self, 'max_size'):
-            self.max_size = int(os.environ.get('MAX_ARTIFACT_SIZE', DEFAULT_FALLBACK_SIZE))
+            self.max_size = DEFAULT_FALLBACK_SIZE
 
         if not hasattr(self, 'fallback_max_size'):
             self.fallback_max_size = DEFAULT_FALLBACK_SIZE
@@ -99,6 +95,10 @@ class Artifact(Config):
             MissingConfigValueError('Failed to load artifact services client')
 
     @property
+    def type_hints(self) -> Dict[str, Callable]:
+        return {'limit': int, 'max_size': int, 'fallback_max_size': int}
+
+    @property
     def client(self):
         return self.library.client
 
@@ -108,7 +108,7 @@ class Auth(Config):
 
     def finish(self):
         if not hasattr(self, 'uri'):
-            self.uri = os.environ.get('AUTH_URI')
+            self.uri = None
 
     @property
     def require_api_key(self):
@@ -122,10 +122,10 @@ class Consul(Config):
 
     def finish(self):
         if not hasattr(self, 'uri'):
-            self.uri = os.environ.get('CONSUL')
+            raise MissingConfigValueError('Missing consul uri')
 
         if not hasattr(self, 'token'):
-            self.token = os.environ.get('CONSUL_TOKEN')
+            self.token = None
 
         ConsulService(self.uri, FuturesSession()).wait_until_live()
         u = urlparse(self.uri)
@@ -140,6 +140,8 @@ class Eth(Config):
     def finish(self):
         if not hasattr(self, 'trace_transactions') or self.trace_transactions is None:
             self.trace_transactions = True
+
+        self.trace_transactions = bool(self.trace_transactions)
 
         if not hasattr(self, 'consul'):
             self.consul = None
@@ -181,6 +183,10 @@ class Profiler(Config):
         if self.enabled and self.db_uri is None:
             raise ValueError('Profiler enabled, but no db uri set')
 
+    @property
+    def type_hints(self) -> Dict[str, Callable]:
+        return {'enabled': bool}
+
 
 class Websocket(Config):
     enabled: bool
@@ -189,11 +195,13 @@ class Websocket(Config):
         if not hasattr(self, 'enabled') or self.enabled is None:
             if os.environ.get('DISABLE_WEBSOCKETS'):
                 self.enabled = False
-                logger.warning(
-                    '"DISABLE_WEBSOCKETS" environment variable is deprecated, please use configuration'
-                )
+                logger.warning('"DISABLE_WEBSOCKETS" environment variable is deprecated, please use WEBSOCKER_ENABLED')
             else:
                 self.enabled = True
+
+    @property
+    def type_hints(self) -> Dict[str, Callable]:
+        return {'enabled': bool}
 
 
 class Redis(Config):
@@ -204,7 +212,7 @@ class Redis(Config):
         self.client = None
 
         if not hasattr(self, 'uri'):
-            self.uri = os.environ.get('REDIS_URI')
+            self.uri = None
 
         if self.uri:
             self.client = RedisClient.from_url(self.uri)
@@ -224,10 +232,6 @@ class PolySwarmd(Config):
 
     def __init__(self, config: Dict[str, Any]):
         self.session = FuturesSession()
-        try:
-            jsonschema.validate(config, POLYSWARMD_CONFIG_SCHEMA)
-        except ValidationError:
-            raise MissingConfigValueError('Invalid Config')
         super().__init__(config, module=sys.modules[__name__])
 
     @staticmethod
@@ -236,13 +240,16 @@ class PolySwarmd(Config):
 
     @staticmethod
     def from_config_file_search():
+        # Expect config in the environment
+        polyswarmd = PolySwarmd({})
         for location in CONFIG_LOCATIONS:
             location = os.path.abspath(os.path.expanduser(location))
             filename = os.path.join(location, 'polyswarmd.yml')
             if os.path.isfile(filename):
-                return PolySwarmd.create_from_file(filename)
+                polyswarmd = PolySwarmd.create_from_file(filename)
 
-        raise OSError('Config file not found')
+        polyswarmd.overlay_and_load()
+        return polyswarmd
 
     @staticmethod
     def create_from_file(path):
@@ -268,7 +275,9 @@ class PolySwarmd(Config):
 
     def create_default_sub_config_if_missing(self, attribute: str, sub_config: Type[Config]):
         if not hasattr(self, attribute):
-            setattr(self, attribute, sub_config({}))
+            sub_config = sub_config({})
+            setattr(self, attribute, sub_config)
+            sub_config.load()
 
     def load_chains(self):
         self.chains = self.eth.get_chains(self.community)
@@ -276,7 +285,6 @@ class PolySwarmd(Config):
     def setup_status(self):
         self.status = Status(self.community)
         self.status.register_services(self.__create_services())
-        self.validate_services()
 
     def __create_services(self):
         services = [*self.create_ethereum_services(), self.create_artifact_service()]
@@ -292,14 +300,3 @@ class PolySwarmd(Config):
 
     def create_auth_services(self):
         return AuthService(self.auth.uri, self.session)
-
-    def validate_services(self):
-        for service in self.status.services:
-            self.validate_service(service)
-
-    @staticmethod
-    def validate_service(service):
-        try:
-            service.test_reachable()
-        except HTTPError:
-            raise ValueError(f'{service.name} not reachable, is correct URI specified?')
