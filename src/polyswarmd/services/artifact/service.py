@@ -1,8 +1,9 @@
-from requests_futures.sessions import FuturesSession
 from typing import Any, Dict
 
-from polyswarmd.services.artifact.client import AbstractArtifactServiceClient
+from requests_futures.sessions import FuturesSession
+
 from polyswarmd.config.service import Service
+from polyswarmd.services.artifact.client import AbstractArtifactServiceClient
 
 
 class ArtifactServices(Service):

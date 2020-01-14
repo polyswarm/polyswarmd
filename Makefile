@@ -15,10 +15,12 @@ export PRINT_HELP_PYSCRIPT
 help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
-lint: doctest ## check style
+lint: doctest mypy ## check style
 	-flake8 $(SRCROOT)
 	-yapf -p -r -d $(SRCROOT)
 	-isort --recursive --diff $(SRCROOT)
+
+mypy:  ## check types
 	mypy
 
 format:  ## format code in Polyswarm style

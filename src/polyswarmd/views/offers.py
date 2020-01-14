@@ -4,9 +4,6 @@ import uuid
 import fastjsonschema
 from flask import Blueprint, g, request
 
-from polyswarmd.utils.decorators.chains import chain
-from polyswarmd.views.eth import build_transaction
-from polyswarmd.utils.response import failure, success
 from polyswarmd.utils import (
     bool_list_to_int,
     channel_to_dict,
@@ -15,6 +12,9 @@ from polyswarmd.utils import (
     to_padded_hex,
     validate_ws_url,
 )
+from polyswarmd.utils.decorators.chains import chain
+from polyswarmd.utils.response import failure, success
+from polyswarmd.views.eth import build_transaction
 
 logger = logging.getLogger(__name__)
 offers = Blueprint('offers', __name__)

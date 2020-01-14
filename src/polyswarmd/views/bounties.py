@@ -12,12 +12,7 @@ from polyswarmartifact import ArtifactType
 from polyswarmartifact.schema import Assertion as AssertionMetadata
 from polyswarmartifact.schema import Bounty as BountyMetadata
 from polyswarmd import app, cache
-from polyswarmd.views import eth
 from polyswarmd.services.artifact.exceptions import ArtifactException
-from polyswarmd.utils.bloom import FILTER_BITS, BloomFilter
-from polyswarmd.utils.decorators.chains import chain
-from polyswarmd.views.eth import ZERO_ADDRESS, build_transaction
-from polyswarmd.utils.response import failure, success
 from polyswarmd.utils import (
     assertion_to_dict,
     bloom_to_dict,
@@ -27,6 +22,11 @@ from polyswarmd.utils import (
     sha3,
     vote_to_dict,
 )
+from polyswarmd.utils.bloom import FILTER_BITS, BloomFilter
+from polyswarmd.utils.decorators.chains import chain
+from polyswarmd.utils.response import failure, success
+from polyswarmd.views import eth
+from polyswarmd.views.eth import ZERO_ADDRESS, build_transaction
 
 MAX_PAGES_PER_REQUEST = 3
 

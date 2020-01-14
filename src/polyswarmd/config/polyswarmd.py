@@ -2,27 +2,29 @@ import importlib
 import logging
 import os
 import sys
-from typing import Dict, Any, Optional, ClassVar, List
+from typing import Any, Dict, List, Optional, Tuple, Type
 from urllib.parse import urlparse
 
-import jsonschema
-import yaml
-
 from consul import Consul as ConsulClient
+import jsonschema
 from jsonschema import ValidationError
 from redis import Redis as RedisClient
 from requests import HTTPError
 from requests_futures.sessions import FuturesSession
+import yaml
 
+from polyswarmd.config.config import Config
 from polyswarmd.config.contract import Chain, ConsulChain, FileChain
 from polyswarmd.config.schema import POLYSWARMD_CONFIG_SCHEMA
+from polyswarmd.config.status import Status
 from polyswarmd.exceptions import MissingConfigValueError
-from polyswarmd.services.artifact import AbstractArtifactServiceClient, ArtifactServices
+from polyswarmd.services.artifact import (
+    AbstractArtifactServiceClient,
+    ArtifactServices,
+)
 from polyswarmd.services.auth import AuthService
 from polyswarmd.services.consul import ConsulService
 from polyswarmd.services.ethereum import EthereumService
-from polyswarmd.config.status import Status
-from polyswarmd.config.config import Config
 from polyswarmd.utils.utils import IN_TESTENV
 
 logger = logging.getLogger(__name__)
@@ -152,11 +154,16 @@ class Eth(Config):
 
     def get_chains(self, community: str) -> Dict[str, Chain]:
         if self.consul is not None:
-            return {network: ConsulChain.from_consul(self.consul.client, network, f'chain/{community}')
-                    for network in ['home', 'side']}
+            return {
+                network: ConsulChain.from_consul(self.consul.client, network, f'chain/{community}')
+                for network in ['home', 'side']
+            }
         else:
-            return {chain: FileChain.from_config_file(chain, os.path.join(self.directory, f'{chain}chain.json'))
-                    for chain in ['home', 'side']}
+            return {
+                chain: FileChain.from_config_file(
+                    chain, os.path.join(self.directory, f'{chain}chain.json')
+                ) for chain in ['home', 'side']
+            }
 
 
 class Profiler(Config):
@@ -182,7 +189,9 @@ class Websocket(Config):
         if not hasattr(self, 'enabled') or self.enabled is None:
             if os.environ.get('DISABLE_WEBSOCKETS'):
                 self.enabled = False
-                logger.warning('"DISABLE_WEBSOCKETS" environment variable is deprecated, please use configuration')
+                logger.warning(
+                    '"DISABLE_WEBSOCKETS" environment variable is deprecated, please use configuration'
+                )
             else:
                 self.enabled = True
 
@@ -251,12 +260,13 @@ class PolySwarmd(Config):
             raise MissingConfigValueError('Missing community')
 
     def fill_default_sub_configs(self):
-        sub_configs = [('artifact', Artifact), ('auth', Auth), ('eth', Eth), ('profiler', Profiler), ('redis', Redis),
-                       ('websocket', Websocket)]
+        sub_configs: List[Tuple[str, Type[Config]]] = [('artifact', Artifact), ('auth', Auth),
+                                                       ('eth', Eth), ('profiler', Profiler),
+                                                       ('redis', Redis), ('websocket', Websocket)]
         for attribute, sub_config in sub_configs:
             self.create_default_sub_config_if_missing(attribute, sub_config)
 
-    def create_default_sub_config_if_missing(self, attribute: str, sub_config: ClassVar[Config]):
+    def create_default_sub_config_if_missing(self, attribute: str, sub_config: Type[Config]):
         if not hasattr(self, attribute):
             setattr(self, attribute, sub_config({}))
 

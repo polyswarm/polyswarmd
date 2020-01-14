@@ -1,8 +1,7 @@
-import gevent
 import logging
-
 from typing import Any, Dict
 
+import gevent
 from requests import HTTPError
 from requests_futures.sessions import FuturesSession
 

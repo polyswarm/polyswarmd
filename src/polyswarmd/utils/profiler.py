@@ -1,5 +1,6 @@
-import flask_profiler
 import logging
+
+import flask_profiler
 
 logger = logging.getLogger(__name__)
 

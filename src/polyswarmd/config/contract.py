@@ -1,9 +1,8 @@
 import json
 import logging
 import os
-
 import time
-from typing import Any, Dict, List, Tuple, Set
+from typing import Any, Dict, List, Set, Tuple
 
 import jsonschema
 import yaml
@@ -314,8 +313,11 @@ class FileChain(Chain):
 
     @classmethod
     def load_contracts_from_dir(cls, directory) -> Dict[str, Any]:
-        for root, dirs, files in os.walk(directory):
-            return {name: abi for name, abi in cls.load_contract_files(root, files)}
+        return {
+            name: abi
+            for root, dirs, files in os.walk(directory)
+            for name, abi in cls.load_contract_files(root, files)
+        }
 
     @classmethod
     def load_contract_files(cls, root: str, files: List[str]) -> List[Tuple[str, Dict[str, Any]]]:
