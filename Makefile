@@ -28,9 +28,13 @@ lint: doctest mypy ## check style
 mypy:  ## check types
 	mypy
 
-format:  ## format code in Polyswarm style
+format: format-requirements  ## format code in Polyswarm style
 	yapf -p -r -i $(SRCROOT)
 	isort --recursive $(SRCROOT)
+
+format-requirements:
+	sort -u requirements.txt -o requirements.txt
+	sort -u requirements.dev.txt -o requirements.dev.txt
 
 msgstubs: # generate websocket event definition type stubs
 	(cd $(SRCROOT) && python -m websockets.scripts.gen_stubs | yapf)
