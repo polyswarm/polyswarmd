@@ -16,7 +16,7 @@ class EthereumService(Service):
             self.check_chain_id()
             return {'reachable': True, 'syncing': self.is_syncing(), 'block': self.get_block()}
         else:
-            super().build_output(False)
+            return super().build_output(False)
 
     def connect_to_service(self):
         future = self.session.post(self.uri, headers={'Content-Type': 'application/json'})
