@@ -4,7 +4,7 @@ import os
 import time
 import yaml
 from consul import Timeout
-from typing import Any, Dict, List, Tuple, Set
+from typing import Any, Dict, List, Tuple, Set, Callable
 from web3 import Web3, HTTPProvider
 from web3.exceptions import MismatchedABI
 from web3.middleware import geth_poa_middleware
@@ -120,6 +120,10 @@ class Chain(Config):
         contracts = self.create_contract_dicts(contract_abis, self.config)
         self.config.update(contracts)
         super().populate()
+
+    @property
+    def type_hints(self) -> Dict[str, Callable]:
+        return {'chain_id': int, 'free': bool}
 
     def finish(self):
         if not hasattr(self, 'free'):
