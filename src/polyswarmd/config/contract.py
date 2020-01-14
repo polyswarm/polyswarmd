@@ -107,6 +107,7 @@ class Chain(Config):
     def __init__(self, name: str, config: Dict[str, Any]):
         self.name = name
         super().__init__(config)
+        self.load()
 
     def populate(self):
         self.eth_uri = self.config.get('eth_uri')

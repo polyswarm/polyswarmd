@@ -233,7 +233,7 @@ class PolySwarmd(Config):
             if os.path.isfile(filename):
                 polyswarmd = PolySwarmd.create_from_file(filename)
 
-        polyswarmd.load()
+        polyswarmd.overlay_and_load()
         return polyswarmd
 
     @staticmethod
@@ -257,9 +257,11 @@ class PolySwarmd(Config):
         for attribute, sub_config in sub_configs:
             self.create_default_sub_config_if_missing(attribute, sub_config)
 
-    def create_default_sub_config_if_missing(self, attribute: str, sub_config: ClassVar[Config]):
+    def create_default_sub_config_if_missing(self, attribute: str, sub_config_class: ClassVar[Config]):
         if not hasattr(self, attribute):
-            setattr(self, attribute, sub_config({}))
+            sub_config = sub_config_class({})
+            setattr(self, attribute, sub_config)
+            sub_config.load()
 
     def load_chains(self):
         self.chains = self.eth.get_chains(self.community)

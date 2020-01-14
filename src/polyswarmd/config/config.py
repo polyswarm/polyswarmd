@@ -11,11 +11,6 @@ class Config(ABC):
         self.module = module
         self.config = config
 
-    def load(self):
-        self.overlay_environment()
-        self.populate()
-        self.finish()
-
     @abstractmethod
     def finish(self):
         """
@@ -35,6 +30,10 @@ class Config(ABC):
         cast = self.type_hints.get(key)
         return cast(value) if cast else value
 
+    def load(self):
+        self.populate()
+        self.finish()
+
     def populate(self):
         for k, v in self.config.items():
             if not isinstance(v, dict):
@@ -45,6 +44,10 @@ class Config(ABC):
                     sub_config = sub_config_class(v, self.module)
                     setattr(self, k, sub_config)
                     sub_config.load()
+
+    def overlay_and_load(self):
+        self.overlay_environment()
+        self.load()
 
     def overlay_environment(self):
         name = self.__class__.__name__.upper()
