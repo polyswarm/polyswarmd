@@ -8,15 +8,16 @@ from polyswarmd.utils.bloom import BloomFilter
 
 @pytest.fixture
 def log_entries():
+
     def _mk_address():
         return os.urandom(20)
 
     def _mk_topic():
         return os.urandom(32)
-    return [
-        (_mk_address(), [_mk_topic() for _ in range(1, random.randint(0, 4))])
-        for _ in range(1, random.randint(0, 30))
-    ]
+
+    return [(_mk_address(), [_mk_topic()
+                             for _ in range(1, random.randint(0, 4))])
+            for _ in range(1, random.randint(0, 30))]
 
 
 def check_bloom(bloom, log_entries):
