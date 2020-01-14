@@ -9,7 +9,7 @@ from polyswarmd.views import eth
 from polyswarmd.views.eth import build_transaction
 
 logger = logging.getLogger(__name__)
-staking = Blueprint('staking', __name__)
+staking: Blueprint = Blueprint('staking', __name__)
 
 
 @staking.route('/parameters', methods=['GET'])

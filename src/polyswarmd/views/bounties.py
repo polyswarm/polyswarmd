@@ -11,7 +11,7 @@ from requests import HTTPError
 from polyswarmartifact import ArtifactType
 from polyswarmartifact.schema import Assertion as AssertionMetadata
 from polyswarmartifact.schema import Bounty as BountyMetadata
-from polyswarmd import app, cache
+from polyswarmd.app import app, cache
 from polyswarmd.services.artifact.exceptions import ArtifactException
 from polyswarmd.utils import (
     assertion_to_dict,
@@ -31,7 +31,7 @@ from polyswarmd.views.eth import ZERO_ADDRESS, build_transaction
 MAX_PAGES_PER_REQUEST = 3
 
 logger = logging.getLogger(__name__)
-bounties = Blueprint('bounties', __name__)
+bounties: Blueprint = Blueprint('bounties', __name__)
 
 
 def calculate_bloom(artifacts):

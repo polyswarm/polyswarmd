@@ -275,9 +275,9 @@ class PolySwarmd(Config):
 
     def create_default_sub_config_if_missing(self, attribute: str, sub_config: Type[Config]):
         if not hasattr(self, attribute):
-            sub_config = sub_config({})
-            setattr(self, attribute, sub_config)
-            sub_config.load()
+            sub_config_inst: Config = sub_config({})
+            setattr(self, attribute, sub_config_inst)
+            sub_config_inst.load()
 
     def load_chains(self):
         self.chains = self.eth.get_chains(self.community)

@@ -17,7 +17,7 @@ from polyswarmd.utils.response import failure, success
 from polyswarmd.views.eth import build_transaction
 
 logger = logging.getLogger(__name__)
-offers = Blueprint('offers', __name__)
+offers: Blueprint = Blueprint('offers', __name__)
 
 _post_create_offer_channel_schema = fastjsonschema.compile({
     'type': 'object',

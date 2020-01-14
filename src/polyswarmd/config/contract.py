@@ -132,9 +132,6 @@ class Chain(Config):
         if not hasattr(self, 'free'):
             self.free = False
 
-        if not IN_TESTENV:
-            self.__bind_child_contracts()
-            self.__validate()
         self.setup_rpc()
 
     def setup_web3(self, eth_uri: str):

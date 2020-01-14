@@ -1,6 +1,6 @@
 import os
 from abc import abstractmethod, ABC
-from typing import Dict, Any, ClassVar, Optional, Tuple, Callable, List
+from typing import Dict, Any, Type, Optional, Tuple, Callable, List
 
 
 class Config(ABC):
@@ -39,7 +39,7 @@ class Config(ABC):
             if not isinstance(v, dict):
                 setattr(self, k, self.correct_type(k, v))
             elif self.module and hasattr(self.module, k.capitalize()):
-                sub_config_class: ClassVar[Config] = getattr(self.module, k.capitalize())
+                sub_config_class = getattr(self.module, k.capitalize())
                 if issubclass(sub_config_class, Config):
                     sub_config = sub_config_class(v, self.module)
                     setattr(self, k, sub_config)
