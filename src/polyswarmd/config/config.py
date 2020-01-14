@@ -75,4 +75,6 @@ class Config(ABC):
     @staticmethod
     def split(key: str) -> Tuple[str, str]:
         separated = key.split('_', 1)
-        return separated[0].lower(), separated[1] if len(separated) > 1 else ''
+        title = separated[0].lower()
+        rest = separated[1] if len(separated) > 1 else ''
+        return title, rest
