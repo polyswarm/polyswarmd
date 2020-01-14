@@ -24,7 +24,7 @@ The configuration files for each are an approximation of my own reading of _"Pol
 `make format` applies formatting to the files in `src/polyswarmd` in-place, rather than just emitting suggestions them to the user.
 
 ### Generating stubs
-`make genstubs` will print dynamically generated type-stubs for the polyswarm Websocket messages. The script which is ultimately responsible for generating these stubs is located in `src/polyswarmd/websockets/scripts/gen_stubs.py`
+`make msgstubs` will print dynamically generated type-stubs for the polyswarm Websocket messages. The script which is ultimately responsible for generating these stubs is located in `src/polyswarmd/websockets/scripts/gen_stubs.py`
 
 ## Unit tests
 `make tests` will run PolyswarmD's unit test suite. 
