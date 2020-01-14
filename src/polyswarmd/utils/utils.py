@@ -1,3 +1,4 @@
+from os import getenv
 import codecs
 import logging
 import re
@@ -11,6 +12,10 @@ from flask import g
 from polyswarmartifact import ArtifactType
 
 logger = logging.getLogger(__name__)
+
+
+# Indicates if we are inside a testing environment
+IN_TESTENV = getenv('POLY_WORK') == 'testing'
 
 
 def bool_list_to_int(bs):

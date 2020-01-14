@@ -39,7 +39,7 @@ genstubs: # generate websocket event definition type stubs
 	python -m websockets.scripts.gen_stubs | yapf
 
 test: ## run tests
-	py.test
+	POLY_WORK=testing py.test
 
 coverage: ## check code coverage
 	coverage run --source $(SRCROOT) -m pytest

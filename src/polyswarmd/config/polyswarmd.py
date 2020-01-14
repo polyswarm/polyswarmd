@@ -23,10 +23,17 @@ from polyswarmd.services.consul import ConsulService
 from polyswarmd.services.ethereum import EthereumService
 from polyswarmd.config.status import Status
 from polyswarmd.config.config import Config
+from polyswarmd.utils.utils import IN_TESTENV
 
 logger = logging.getLogger(__name__)
 
 CONFIG_LOCATIONS = ['/etc/polyswarmd', '~/.config/polyswarmd']
+if IN_TESTENV:
+    # XXX: This is a huge hack to work around the issue that you have to load a function to
+    # monkeypatch it. Because __init__.py alone has enough to break tests, this is an
+    # alternative way to signal that we shouldn't perform "ordinary" file loading
+    CONFIG_LOCATIONS = ['tests/fixtures/config/polyswarmd/']
+
 DEFAULT_FALLBACK_SIZE = 10 * 1024 * 1024
 
 

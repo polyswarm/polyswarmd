@@ -18,7 +18,7 @@ from web3.middleware import geth_poa_middleware
 from polyswarmd.config.schema import CHAIN_CONFIG_SCHEMA
 from polyswarmd.exceptions import MissingConfigValueError
 from polyswarmd.services.ethereum.rpc import EthereumRpc
-from polyswarmd.utils import camel_case_to_snake_case
+from polyswarmd.utils import camel_case_to_snake_case, IN_TESTENV
 
 logger = logging.getLogger(__name__)
 EXPECTED_CONTRACTS = ['NectarToken', 'BountyRegistry', 'ArbiterStaking', 'ERC20Relay', 'OfferRegistry', 'OfferMultiSig']
@@ -60,7 +60,9 @@ class Contract(object):
         ret = self.w3.eth.contract(address=self.w3.toChecksumAddress(address), abi=self.abi)
 
         supported_versions = SUPPORTED_CONTRACT_VERSIONS.get(self.name)
-        if supported_versions is not None and address != ZERO_ADDRESS:
+        if IN_TESTENV:
+            logger.info("We are inside a test environment, skipping contract VERSION check")
+        elif supported_versions is not None and address != ZERO_ADDRESS:
             min_version, max_version = supported_versions
             try:
                 version = tuple(int(s) for s in ret.functions.VERSION().call().split('.'))
@@ -135,11 +137,9 @@ class Chain(Config):
         super().populate(config, module)
 
     def finish(self):
-        if not hasattr(self, 'free'):
-            self.free = False
-
-        self.__bind_child_contracts()
-        self.__validate()
+        if not IN_TESTENV:
+            self.__bind_child_contracts()
+            self.__validate()
         self.setup_rpc()
 
     def setup_web3(self, eth_uri: str):
