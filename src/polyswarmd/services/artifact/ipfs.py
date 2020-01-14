@@ -39,7 +39,7 @@ class IpfsServiceClient(AbstractArtifactServiceClient):
                 f'/dns/{url.host}/tcp/{url.port}/{url.scheme}', session=True
             )
 
-        return self.client
+        return self._client
 
     @staticmethod
     def check_ls(artifacts, index, max_size=None):
