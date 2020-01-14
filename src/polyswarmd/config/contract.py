@@ -129,6 +129,9 @@ class Chain(Config):
         if not hasattr(self, 'free'):
             self.free = False
 
+        if not hasattr(self, 'chain_id'):
+            raise MissingConfigValueError('Missing chain_id')
+
         self.setup_rpc()
 
     def setup_web3(self, eth_uri: str):
