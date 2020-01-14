@@ -1,5 +1,7 @@
 import pytest
+
 from polyswarmd.config.status import Status
+
 
 @pytest.fixture
 def status(community):

@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from polyswarmd.config.polyswarmd import PolySwarmd, Profiler, Artifact
+from polyswarmd.config.polyswarmd import Artifact, PolySwarmd, Profiler
 
 
 @pytest.fixture(autouse=True)
@@ -79,7 +79,15 @@ def test_set_multi_word_value():
     config = {'artifact': {'library': {}}}
     polyswarmd = PolySwarmd(config)
     polyswarmd.overlay_environment()
-    assert config == {'artifact': {"max_size": '10', 'library': {'module': 'ipfs', 'class_name': 'IpfsServiceClient'}}}
+    assert config == {
+        'artifact': {
+            "max_size": '10',
+            'library': {
+                'module': 'ipfs',
+                'class_name': 'IpfsServiceClient'
+            }
+        }
+    }
 
 
 def test_type_hints_fix_bool_true():

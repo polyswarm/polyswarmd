@@ -2,20 +2,23 @@ import json
 import logging
 import os
 import time
-import yaml
+from typing import Any, Callable, Dict, List, Set, Tuple
+
 from consul import Timeout
-from typing import Any, Dict, List, Tuple, Set, Callable
-from web3 import Web3, HTTPProvider
+from web3 import HTTPProvider, Web3
 from web3.exceptions import MismatchedABI
 from web3.middleware import geth_poa_middleware
+import yaml
 
 from polyswarmd.config.config import Config
 from polyswarmd.exceptions import MissingConfigValueError
 from polyswarmd.services.ethereum.rpc import EthereumRpc
-from polyswarmd.utils import camel_case_to_snake_case, IN_TESTENV
+from polyswarmd.utils import IN_TESTENV, camel_case_to_snake_case
 
 logger = logging.getLogger(__name__)
-EXPECTED_CONTRACTS = ['NectarToken', 'BountyRegistry', 'ArbiterStaking', 'ERC20Relay', 'OfferRegistry', 'OfferMultiSig']
+EXPECTED_CONTRACTS = [
+    'NectarToken', 'BountyRegistry', 'ArbiterStaking', 'ERC20Relay', 'OfferRegistry', 'OfferMultiSig'
+]
 
 # Allow interfacing with contract versions in this range
 SUPPORTED_CONTRACT_VERSIONS = {
@@ -143,8 +146,12 @@ class Chain(Config):
     def setup_rpc(self):
         self.rpc = EthereumRpc(self)
 
-    def create_contract_dicts(self, contracts: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Contract]:
-        return {camel_case_to_snake_case(name): self.create_contract(name, abi, config) for name, abi in contracts.items()}
+    def create_contract_dicts(self, contracts: Dict[str, Any],
+                              config: Dict[str, Any]) -> Dict[str, Contract]:
+        return {
+            camel_case_to_snake_case(name): self.create_contract(name, abi, config)
+            for name, abi in contracts.items()
+        }
 
     def create_contract(self, name, abi, config: Dict[str, Any]) -> Contract:
         return Contract.from_json(self.w3, name, abi, config)
@@ -155,6 +162,7 @@ class Chain(Config):
 
 
 class ConsulChain(Chain):
+
     @classmethod
     def from_consul(cls, consul_client, name: str, community_key: str):
         chain = cls.fetch_config(consul_client, name, community_key)
@@ -187,7 +195,10 @@ class ConsulChain(Chain):
 
     @classmethod
     def fetch_contract_parts(cls, consul_client, key: str) -> List[Tuple[str, Dict[str, Any]]]:
-        return [cls.parse_kv_pair(kv_pair) for kv_pair in cls.fetch_contract_kv_pairs(consul_client, key)]
+        return [
+            cls.parse_kv_pair(kv_pair)
+            for kv_pair in cls.fetch_contract_kv_pairs(consul_client, key)
+        ]
 
     @classmethod
     def parse_kv_pair(cls, kv_pair) -> Tuple[str, Dict[str, Any]]:
@@ -204,8 +215,10 @@ class ConsulChain(Chain):
     @classmethod
     def fetch_contract_kv_pairs(cls, consul_client, key: str) -> List[Any]:
         filter_ = cls.contract_filter(key)
-        return [x for x in cls.fetch_from_consul_or_wait(consul_client, key, recurse=True)
-                if x.get('Key') not in filter_]
+        return [
+            x for x in cls.fetch_from_consul_or_wait(consul_client, key, recurse=True)
+            if x.get('Key') not in filter_
+        ]
 
     @classmethod
     def contract_filter(cls, key) -> Set[str]:
@@ -236,6 +249,7 @@ class ConsulChain(Chain):
 
 
 class FileChain(Chain):
+
     @classmethod
     def from_config_file(cls, name, filename):
         chain = cls.load_chain_details(filename)
@@ -255,8 +269,7 @@ class FileChain(Chain):
     @classmethod
     def load_contracts_from_dir(cls, directory) -> Dict[str, Any]:
         return {
-            name: abi
-            for root, dirs, files in os.walk(directory)
+            name: abi for root, dirs, files in os.walk(directory)
             for name, abi in cls.load_contract_files(root, files)
         }
 

@@ -1,7 +1,8 @@
 import itertools
-import pytest
 import os
 import random
+
+import pytest
 
 from polyswarmd.utils.bloom import BloomFilter
 

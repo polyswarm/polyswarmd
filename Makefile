@@ -1,6 +1,7 @@
 .PHONY: clean clean-test clean-pyc clean-build help
 .DEFAULT_GOAL := help
 SRCROOT := src/polyswarmd
+TESTSRCROOT := tests/
 
 define PRINT_HELP_PYSCRIPT
 import re, sys
@@ -31,6 +32,10 @@ mypy:  ## check types
 format: format-requirements  ## format code in Polyswarm style
 	yapf -p -r -i $(SRCROOT)
 	isort --recursive $(SRCROOT)
+
+format-tests:  ## format code in Polyswarm style
+	yapf -p -r -i $(TESTSRCROOT)
+	isort --recursive $(TESTSRCROOT)
 
 format-requirements:  ## sort requirements.txt
 	sort -u requirements.txt -o requirements.txt

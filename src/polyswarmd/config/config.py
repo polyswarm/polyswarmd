@@ -1,7 +1,7 @@
+from abc import ABC, abstractmethod
 import os
 import typing
-from abc import abstractmethod, ABC
-from typing import Dict, Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 
 class Config(ABC):

@@ -9,9 +9,9 @@ from typing import (
     Type,
     cast,
 )
-import ujson
 
 from requests_futures.sessions import FuturesSession
+import ujson
 
 from polyswarmartifact import ArtifactType
 from polyswarmartifact.schema import Assertion as AssertionMetadata

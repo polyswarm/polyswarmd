@@ -2,13 +2,13 @@ import importlib
 import logging
 import os
 import sys
-import yaml
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from urllib.parse import urlparse
 
 from consul import Consul as ConsulClient
 from redis import Redis as RedisClient
 from requests_futures.sessions import FuturesSession
-from urllib.parse import urlparse
-from typing import Dict, Any, Optional, Type, List, Tuple, Callable
+import yaml
 
 from polyswarmd.config.config import Config
 from polyswarmd.config.contract import Chain, ConsulChain, FileChain
@@ -187,7 +187,9 @@ class Websocket(Config):
         if not hasattr(self, 'enabled') or self.enabled is None:
             if os.environ.get('DISABLE_WEBSOCKETS'):
                 self.enabled = False
-                logger.warning('"DISABLE_WEBSOCKETS" environment variable is deprecated, please use WEBSOCKER_ENABLED')
+                logger.warning(
+                    '"DISABLE_WEBSOCKETS" environment variable is deprecated, please use WEBSOCKER_ENABLED'
+                )
             else:
                 self.enabled = True
 

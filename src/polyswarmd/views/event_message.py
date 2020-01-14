@@ -1,13 +1,13 @@
 import json
 import time
 from typing import Any, Dict, List, Type
-import ujson
 
 import fastjsonschema
 from flask_sockets import Sockets
 import gevent
 from gevent.queue import Empty, Queue
 from geventwebsocket import WebSocketApplication, WebSocketError
+import ujson
 
 from polyswarmd.utils import channel_to_dict, g, logging, state_to_dict, uuid
 from polyswarmd.utils.decorators.chains import chain

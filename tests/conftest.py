@@ -36,7 +36,7 @@ for pa in PRE_INIT_PATCHES:
 # raise an exception. Fixing this (e.g moving stuff outta src/polyswarmd/__init__.py) has been on the
 # todo list for some time, but for now, we just patch up methods which have unsafe side effects to
 # run unit tests without side-effects.
-import polyswarmd.app   # noqa
+import polyswarmd.app  # noqa
 
 for pa in PRE_INIT_PATCHES:
     pa.stop()
@@ -45,6 +45,7 @@ for pa in PRE_INIT_PATCHES:
 @pytest.fixture
 def community():
     return 'gamma'
+
 
 @pytest.fixture
 def token_address():
