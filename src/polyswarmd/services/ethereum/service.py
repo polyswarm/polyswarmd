@@ -8,10 +8,12 @@ class EthereumService(Service):
 
     def __init__(self, name, chain, session):
         self.chain = chain
+
         super().__init__(name, chain.eth_uri, session)
 
     def build_output(self, reachable) -> Dict[str, Any]:
         if reachable:
+            self.check_chain_id()
             return {'reachable': True, 'syncing': self.is_syncing(), 'block': self.get_block()}
         else:
             super().build_output(False)
@@ -26,3 +28,7 @@ class EthereumService(Service):
 
     def get_block(self) -> int:
         return self.chain.w3.eth.blockNumber
+
+    def check_chain_id(self):
+        if not self.chain.chain_id == self.chain.w3.version.network:
+            raise ValueError('Chain ID does not match network ID')
