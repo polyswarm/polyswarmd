@@ -23,7 +23,7 @@ def main(log_format, log_level, host, port):
 
     init_logging(log_format, log_level)
 
-    from polyswarmd import app
+    from polyswarmd.app import app
 
     server = pywsgi.WSGIServer((host, port), app, handler_class=WebSocketHandler)
 

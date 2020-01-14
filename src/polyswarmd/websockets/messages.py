@@ -134,7 +134,7 @@ class MetadataHandler:
     @classmethod
     def initialize(cls):
         """Create & assign a new implementation of _substitute_metadata"""
-        from polyswarmd import app
+        from polyswarmd.app import app
         from polyswarmd.views.bounties import substitute_metadata
         config: Optional[Dict[str, Any]] = app.config
         ai = config['POLYSWARMD'].artifact.client
