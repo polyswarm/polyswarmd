@@ -3,4 +3,5 @@ isort==4.3.21
 mypy-extensions==0.4.3
 mypy==0.740
 pytest==4.0.0
+pytest-runner==5.2
 yapf==0.28.0
