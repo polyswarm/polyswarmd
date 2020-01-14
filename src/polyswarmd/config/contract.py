@@ -108,17 +108,17 @@ class Chain(Config):
         self.name = name
         super().__init__(config)
 
-    def populate(self, config: Dict[str, Any], module):
-        self.eth_uri = config.get('eth_uri', None)
+    def populate(self):
+        self.eth_uri = self.config.get('eth_uri')
         if self.eth_uri is None:
             raise MissingConfigValueError('Missing eth_uri')
 
         self.setup_web3(self.eth_uri)
-        contract_abis = config.get('contracts')
-        del config['contracts']
-        contracts = self.create_contract_dicts(contract_abis, config)
-        config.update(contracts)
-        super().populate(config, module)
+        contract_abis = self.config.get('contracts')
+        del self.config['contracts']
+        contracts = self.create_contract_dicts(contract_abis, self.config)
+        self.config.update(contracts)
+        super().populate()
 
     def finish(self):
         if not hasattr(self, 'free'):

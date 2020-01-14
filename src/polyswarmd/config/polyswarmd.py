@@ -223,14 +223,16 @@ class PolySwarmd(Config):
 
     @staticmethod
     def from_config_file_search():
+        # Expect config in the environment
+        polyswarmd = PolySwarmd({})
         for location in CONFIG_LOCATIONS:
             location = os.path.abspath(os.path.expanduser(location))
             filename = os.path.join(location, 'polyswarmd.yml')
             if os.path.isfile(filename):
-                return PolySwarmd.create_from_file(filename)
+                polyswarmd = PolySwarmd.create_from_file(filename)
 
-        # Expect config in the environment
-        return PolySwarmd({})
+        polyswarmd.load()
+        return polyswarmd
 
     @staticmethod
     def create_from_file(path):

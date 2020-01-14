@@ -1,12 +1,19 @@
 import os
 from abc import abstractmethod, ABC
-from typing import Dict, Any, ClassVar
+from typing import Dict, Any, ClassVar, Optional, Tuple
 
 
 class Config(ABC):
+    module: Optional[Any]
+    config: Dict[str, Any]
+
     def __init__(self, config: Dict[str, Any], module=None):
-        self.overlay(self.__class__.__name__, config, module)
-        self.populate(config, module)
+        self.module = module
+        self.config = config
+
+    def load(self):
+        self.overlay_environment()
+        self.populate()
         self.finish()
 
     @abstractmethod
@@ -20,40 +27,41 @@ class Config(ABC):
         """
         raise NotImplementedError
 
-    def populate(self, config: Dict[str, Any], module):
-        for k, v in config.items():
+    def populate(self):
+        for k, v in self.config.items():
             if not isinstance(v, dict):
                 setattr(self, k, v)
+            elif self.module and hasattr(self.module, k.capitalize()):
+                sub_config_class: ClassVar[Config] = getattr(self.module, k.capitalize())
+                if issubclass(sub_config_class, Config):
+                    sub_config = sub_config_class(v, self.module)
+                    setattr(self, k, sub_config)
+                    sub_config.load()
+
+    def overlay_environment(self):
+        name = self.__class__.__name__.upper()
+        for key, value in os.environ.items():
+            if key.startswith(name):
+                self.overlay_matching_value(key.replace(f'{name}_', ''), value)
+
+    def overlay_matching_value(self, key, value):
+        current = self.config
+        rest = key
+        while True:
+            title, rest = Config.split(rest)
+            if self.module and hasattr(self.module, title.capitalize()):
+                found_value = current.get(title)
+                if found_value and isinstance(found_value, dict):
+                    current = found_value
+                else:
+                    current[title] = {}
+                    current = current[title]
             else:
-                if module and hasattr(module, k.capitalize()):
-                    sub_config: ClassVar[Config] = getattr(module, k.capitalize())
-                    if issubclass(sub_config, Config):
-                        setattr(self, k, sub_config(v, module))
+                # Not a sub config, just store the value
+                current['_'.join([title, rest.lower()]) if rest else title] = value
+                break
 
     @staticmethod
-    def overlay(root, config: Dict[str, Any], module=None):
-        for k, v in os.environ.items():
-            parts = k.split("_", 1)
-            title = parts[0]
-            if title.lower() != root.lower():
-                continue
-
-            level = config
-            while True:
-                parts = parts[1].split("_", 1)
-                # See if this can be loaded as is
-                if module and hasattr(module, parts[0].capitalize()):
-                    # remove from parts, since it is part of the path
-                    found_config = level.get(parts[0].lower())
-                    if found_config is not None and isinstance(found_config, dict):
-                        level = found_config
-                    else:
-                        level[parts[0].lower()] = {}
-                        level = level.get(parts[0].lower())
-                else:
-                    # Not a sub config, just store the value
-                    if len(parts) > 1:
-                        level['_'.join([parts[0].lower(), parts[1].lower()])] = v
-                    else:
-                        level[parts[0].lower()] = v
-                    break
+    def split(key: str) -> Tuple[str, str]:
+        separated = key.split('_', 1)
+        return separated[0].lower(), separated[1] if len(separated) > 1 else None
