@@ -95,10 +95,6 @@ class Artifact(Config):
             MissingConfigValueError('Failed to load artifact services client')
 
     @property
-    def type_hints(self) -> Dict[str, Callable]:
-        return {'limit': int, 'max_size': int, 'fallback_max_size': int}
-
-    @property
     def client(self):
         return self.library.client
 
@@ -183,10 +179,6 @@ class Profiler(Config):
         if self.enabled and self.db_uri is None:
             raise ValueError('Profiler enabled, but no db uri set')
 
-    @property
-    def type_hints(self) -> Dict[str, Callable]:
-        return {'enabled': bool}
-
 
 class Websocket(Config):
     enabled: bool
@@ -198,10 +190,6 @@ class Websocket(Config):
                 logger.warning('"DISABLE_WEBSOCKETS" environment variable is deprecated, please use WEBSOCKER_ENABLED')
             else:
                 self.enabled = True
-
-    @property
-    def type_hints(self) -> Dict[str, Callable]:
-        return {'enabled': bool}
 
 
 class Redis(Config):

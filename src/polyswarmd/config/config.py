@@ -1,6 +1,7 @@
 import os
+import typing
 from abc import abstractmethod, ABC
-from typing import Dict, Any, Type, Optional, Tuple, Callable, List
+from typing import Dict, Any, Optional, Tuple
 
 
 class Config(ABC):
@@ -22,13 +23,12 @@ class Config(ABC):
         """
         raise NotImplementedError
 
-    @property
-    def type_hints(self) -> Dict[str, Callable]:
-        return {}
-
-    def correct_type(self, key, value) -> Any:
-        cast = self.type_hints.get(key)
-        return cast(value) if cast else value
+    def correct_type(self, key: str, value: Any) -> Any:
+        cast = typing.get_type_hints(self.__class__).get(key)
+        if cast and cast in [int, str, bool]:
+            return cast(value)
+        else:
+            return value
 
     def load(self):
         self.populate()
