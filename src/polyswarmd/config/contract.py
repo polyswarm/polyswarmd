@@ -12,7 +12,7 @@ from web3.middleware import geth_poa_middleware
 from polyswarmd.config.config import Config
 from polyswarmd.exceptions import MissingConfigValueError
 from polyswarmd.services.ethereum.rpc import EthereumRpc
-from polyswarmd.utils import camel_case_to_snake_case
+from polyswarmd.utils import camel_case_to_snake_case, IN_TESTENV
 
 logger = logging.getLogger(__name__)
 EXPECTED_CONTRACTS = ['NectarToken', 'BountyRegistry', 'ArbiterStaking', 'ERC20Relay', 'OfferRegistry', 'OfferMultiSig']
@@ -44,7 +44,9 @@ class Contract(object):
         ret = self.w3.eth.contract(address=self.w3.toChecksumAddress(address), abi=self.abi)
 
         supported_versions = SUPPORTED_CONTRACT_VERSIONS.get(self.name)
-        if supported_versions is not None and address != ZERO_ADDRESS:
+        if IN_TESTENV:
+            logger.info("We are inside a test environment, skipping contract VERSION check")
+        elif supported_versions is not None and address != ZERO_ADDRESS:
             min_version, max_version = supported_versions
             try:
                 version = tuple(int(s) for s in ret.functions.VERSION().call().split('.'))
@@ -252,8 +254,11 @@ class FileChain(Chain):
 
     @classmethod
     def load_contracts_from_dir(cls, directory) -> Dict[str, Any]:
-        for root, dirs, files in os.walk(directory):
-            return {name: abi for name, abi in cls.load_contract_files(root, files)}
+        return {
+            name: abi
+            for root, dirs, files in os.walk(directory)
+            for name, abi in cls.load_contract_files(root, files)
+        }
 
     @classmethod
     def load_contract_files(cls, root: str, files: List[str]) -> List[Tuple[str, Dict[str, Any]]]:

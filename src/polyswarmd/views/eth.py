@@ -23,7 +23,7 @@ from polyswarmd.websockets import messages
 
 logger = logging.getLogger(__name__)
 
-misc = Blueprint('misc', __name__)
+misc: Blueprint = Blueprint('misc', __name__)
 
 MAX_GAS_LIMIT = 50000000
 GAS_MULTIPLIER = 1.5

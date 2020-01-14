@@ -16,7 +16,7 @@ from polyswarmd.services.artifact.exceptions import (
 from polyswarmd.utils.response import failure, success
 
 logger = logging.getLogger(__name__)
-artifacts = Blueprint('artifacts', __name__)
+artifacts: Blueprint = Blueprint('artifacts', __name__)
 
 
 def check_size(f, maxsize):

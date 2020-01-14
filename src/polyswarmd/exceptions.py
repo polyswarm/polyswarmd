@@ -12,5 +12,6 @@ class WebsocketConnectionAbortedError(Exception):
 
 
 class MissingConfigValueError(PolyswarmdException):
+
     def __init__(self, key):
         super().__init__(f'Missing {key} from config file')

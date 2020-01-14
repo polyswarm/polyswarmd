@@ -8,20 +8,30 @@ from consul import Consul as ConsulClient
 from redis import Redis as RedisClient
 from requests_futures.sessions import FuturesSession
 from urllib.parse import urlparse
-from typing import Dict, Any, Optional, ClassVar, List, Tuple, Callable
+from typing import Dict, Any, Optional, Type, List, Tuple, Callable
 
+from polyswarmd.config.config import Config
 from polyswarmd.config.contract import Chain, ConsulChain, FileChain
+from polyswarmd.config.status import Status
 from polyswarmd.exceptions import MissingConfigValueError
-from polyswarmd.services.artifact import AbstractArtifactServiceClient, ArtifactServices
+from polyswarmd.services.artifact import (
+    AbstractArtifactServiceClient,
+    ArtifactServices,
+)
 from polyswarmd.services.auth import AuthService
 from polyswarmd.services.consul import ConsulService
 from polyswarmd.services.ethereum import EthereumService
-from polyswarmd.config.status import Status
-from polyswarmd.config.config import Config
+from polyswarmd.utils.utils import IN_TESTENV
 
 logger = logging.getLogger(__name__)
 
 CONFIG_LOCATIONS = ['/etc/polyswarmd', '~/.config/polyswarmd']
+if IN_TESTENV:
+    # XXX: This is a huge hack to work around the issue that you have to load a function to
+    # monkeypatch it. Because __init__.py alone has enough to break tests, this is an
+    # alternative way to signal that we shouldn't perform "ordinary" file loading
+    CONFIG_LOCATIONS = ['tests/fixtures/config/polyswarmd/']
+
 DEFAULT_FALLBACK_SIZE = 10 * 1024 * 1024
 
 
@@ -146,11 +156,16 @@ class Eth(Config):
 
     def get_chains(self, community: str) -> Dict[str, Chain]:
         if self.consul is not None:
-            return {network: ConsulChain.from_consul(self.consul.client, network, f'chain/{community}')
-                    for network in ['home', 'side']}
+            return {
+                network: ConsulChain.from_consul(self.consul.client, network, f'chain/{community}')
+                for network in ['home', 'side']
+            }
         else:
-            return {chain: FileChain.from_config_file(chain, os.path.join(self.directory, f'{chain}chain.json'))
-                    for chain in ['home', 'side']}
+            return {
+                chain: FileChain.from_config_file(
+                    chain, os.path.join(self.directory, f'{chain}chain.json')
+                ) for chain in ['home', 'side']
+            }
 
 
 class Profiler(Config):
@@ -252,16 +267,17 @@ class PolySwarmd(Config):
             raise MissingConfigValueError('Missing community')
 
     def fill_default_sub_configs(self):
-        sub_configs = [('artifact', Artifact), ('auth', Auth), ('eth', Eth), ('profiler', Profiler), ('redis', Redis),
-                       ('websocket', Websocket)]
+        sub_configs: List[Tuple[str, Type[Config]]] = [('artifact', Artifact), ('auth', Auth),
+                                                       ('eth', Eth), ('profiler', Profiler),
+                                                       ('redis', Redis), ('websocket', Websocket)]
         for attribute, sub_config in sub_configs:
             self.create_default_sub_config_if_missing(attribute, sub_config)
 
-    def create_default_sub_config_if_missing(self, attribute: str, sub_config_class: ClassVar[Config]):
+    def create_default_sub_config_if_missing(self, attribute: str, sub_config: Type[Config]):
         if not hasattr(self, attribute):
-            sub_config = sub_config_class({})
-            setattr(self, attribute, sub_config)
-            sub_config.load()
+            sub_config_inst: Config = sub_config({})
+            setattr(self, attribute, sub_config_inst)
+            sub_config_inst.load()
 
     def load_chains(self):
         self.chains = self.eth.get_chains(self.community)
