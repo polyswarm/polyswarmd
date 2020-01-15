@@ -1,9 +1,8 @@
 import pytest
 
 
-@pytest.fixture
-def good_status(heck):
-    return heck({
+def test_get_status(sane, client):
+    assert sane(response=client.get('/status'), expected={
         'result': {
             'artifact_services': {
                 'ipfs': {
@@ -24,8 +23,3 @@ def good_status(heck):
         },
         'status': 'OK'
     })
-
-
-def test_get_status(client, good_status):
-    status = client.get('/status')
-    assert good_status == status.json

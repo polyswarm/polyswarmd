@@ -151,3 +151,12 @@ class ExpectedProxy(UserDict):
 @pytest.fixture
 def heck():
     return ExpectedProxy
+
+
+@pytest.fixture
+def sane(heck):
+    def validate(actual=None, response=None, expected=None):
+        if response:
+            actual = response.json
+        return actual == heck(expected)
+    return validate
