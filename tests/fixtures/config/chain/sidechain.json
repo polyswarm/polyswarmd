@@ -4,7 +4,7 @@
   "erc20_relay_address": "0xBc7eFcE4b8be4715630475a060B53c33829101e0",
   "offer_registry_address": "0x377A1ce373Ae0C5878C248cA34f72186A8e1Da38",
   "bounty_registry_address": "0x21262bF29FF08691C8A72bc6f22F791996E1891F",
-  "eth_uri": "http://localhost:8545",
+  "eth_uri": "http://localhost:28545",
   "chain_id": 1338,
   "free": true
 }
