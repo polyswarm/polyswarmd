@@ -1,11 +1,10 @@
 {
-  "free": true,
-  "chain_id": 31337,
-  "eth_uri": "http://localhost:7545",
-  "nectar_token_address": "0x6bc19695033ea13326ee7a4ca23fe2a4acf07764",
-  "bounty_registry_address": "0x93043aa63981e70d181049a5f0e605a86f2f4446",
-  "offer_registry_address": "0x74a6c8a715bbd0082523294d1a3cbc146ffbeb15",
-  "erc20_relay_address": "0x2e34c500aba2fb2d530fd2017c3b761423090629",
-  "arbiter_staking_address": "0x89a2d261fecc717fea00f3f449c4ec6c4277cfd8",
-  "offer_registry_address": "0x7a5a8d58c637fc9586034c9d15fcdbe75453af46"
+  "nectar_token_address": "0x2A2cEDE7598F91240068714fD83E449b19853Cb9",
+  "arbiter_staking_address": "0xd143eD6591c0F11c3b9e279bC4A5932958caaC08",
+  "erc20_relay_address": "0xBc7eFcE4b8be4715630475a060B53c33829101e0",
+  "offer_registry_address": "0x377A1ce373Ae0C5878C248cA34f72186A8e1Da38",
+  "bounty_registry_address": "0x21262bF29FF08691C8A72bc6f22F791996E1891F",
+  "eth_uri": "http://localhost:8545",
+  "chain_id": 1338,
+  "free": true
 }
