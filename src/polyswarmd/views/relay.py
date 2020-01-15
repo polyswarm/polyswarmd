@@ -28,7 +28,7 @@ def withdraw_funds():
 @relay.route('/fees', methods=['GET'])
 @chain
 def fees():
-    return success({'fees': g.chain.erc20_relay.functions.fees().call()})
+    return success({'fees': g.chain.erc20_relay.contract.functions.fees().call()})
 
 
 _send_funds_from_schema = fastjsonschema.compile({
