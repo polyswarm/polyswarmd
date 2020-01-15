@@ -1,13 +1,29 @@
 import pytest
 
-from polyswarmd.config.status import Status
-
 
 @pytest.fixture
-def status(community):
-    return Status(community=community)
+def good_status(heck):
+    return heck({
+        'result': {
+            'artifact_services': {
+                'ipfs': {
+                    'reachable': True
+                }
+            },
+            'community': 'gamma',
+            'home': {
+                'block': lambda x: x > 0,
+                'reachable': True,
+                'syncing': False
+            },
+            'side': {
+                'reachable': False
+            }
+        },
+        'status': 'OK'
+    })
 
 
-@pytest.mark.skip
-def test_get_status(status):
-    assert {'community': 'gamma'} == status.get_status()
+def test_get_status(client, good_status):
+    status = client.get('/status')
+    assert good_status == status.json

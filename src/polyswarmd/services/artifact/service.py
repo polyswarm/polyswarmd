@@ -15,4 +15,4 @@ class ArtifactServices(Service):
         super().__init__('artifact_services', artifact_client.reachable_endpoint, session)
 
     def build_output(self, reachable) -> Dict[str, Any]:
-        return {self.artifact_client.name.lower(): {'reachable': reachable,}}
+        return {self.artifact_client.name.lower(): {'reachable': reachable}}
