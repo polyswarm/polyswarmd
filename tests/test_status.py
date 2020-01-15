@@ -17,7 +17,9 @@ def good_status(heck):
                 'syncing': False
             },
             'side': {
-                'reachable': False
+                'block': lambda x: x > 0,
+                'reachable': True,
+                'syncing': False
             }
         },
         'status': 'OK'
