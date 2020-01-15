@@ -29,12 +29,12 @@ lint: doctest mypy ## check style
 mypy:  ## check types
 	mypy
 
-format: format-requirements  ## format code in Polyswarm style
+format: format-requirements format-tests ## format code in Polyswarm style
 	yapf -p -r -i $(SRCROOT)
 	isort --recursive $(SRCROOT)
 
-format-tests:  ## format code in Polyswarm style
-	yapf -p -r -i $(TESTSRCROOT)
+format-tests:  ## format test code in Polyswarm style
+	yapf -p -r -i  --exclude tests/test_suite_internals.py $(TESTSRCROOT)
 	isort --recursive $(TESTSRCROOT)
 
 format-requirements:  ## sort requirements.txt
