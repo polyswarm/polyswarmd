@@ -1,10 +1,13 @@
 from urllib.parse import urlencode
+
 import pytest
+
+from .utils import heck, sane
 
 
 @pytest.fixture
-def tx_success_response(homechain, heck, token_address, base_nonce):
-    return heck({
+def tx_success_response(homechain, token_address, base_nonce):
+    return {
         'result': {
             'transactions': [{
                 'chainId': heck.IGNORE,
@@ -17,29 +20,28 @@ def tx_success_response(homechain, heck, token_address, base_nonce):
             }]
         },
         'status': 'OK'
-    })
+    }
 
 
 @pytest.fixture
 def tx_query_string(token_address, base_nonce):
-    return {
-        'account': token_address,
-        'base_nonce': base_nonce
-    }
+    return {'account': token_address, 'base_nonce': base_nonce}
 
 
-def test_deposit_funds_success(sane, client, tx_success_response, tx_query_string):
-    assert sane(response=client.post('/relay/deposit',
-                                     query_string=tx_query_string,
-                                     json={'amount': '1'}),
-                expected=tx_success_response)
+def test_deposit_funds_success(client, tx_success_response, tx_query_string):
+    assert sane(
+        response=client.post('/relay/deposit', query_string=tx_query_string, json={'amount': '1'}),
+        expected=tx_success_response
+    )
 
 
-def test_withdrawal_funds_success(sane, client, tx_success_response, tx_query_string):
-    assert sane(response=client.post('/relay/withdrawal',
-                                     query_string=tx_query_string,
-                                     json={'amount': '1'}),
-                expected=tx_success_response)
+def test_withdrawal_funds_success(client, tx_success_response, tx_query_string):
+    assert sane(
+        response=client.post(
+            '/relay/withdrawal', query_string=tx_query_string, json={'amount': '1'}
+        ),
+        expected=tx_success_response
+    )
 
 
 def test_withdrawal_funds_success(client, chain, token_address):

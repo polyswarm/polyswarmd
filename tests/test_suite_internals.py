@@ -1,5 +1,7 @@
 import pytest  # noqa
 
+from .utils import heck
+
 
 def pytest_generate_tests(metafunc):
     # This pytest hook that is called once for each test function It takes all of the dicts found in
@@ -58,14 +60,14 @@ class TestHeck:
         ],
     }
 
-    def test_equal_simple(self, obj, heck):
+    def test_equal_simple(self, obj):
         assert {GOOD: 1} == heck(obj)
 
-    def test_equal_deep(self, obj, heck):
+    def test_equal_deep(self, obj):
         assert {F1: {F2: {F3: {N1: 1, N2: 'two', N3: [3, 4]}}}} == heck(obj)
 
-    def test_not_equal_simple(self, obj, heck):
+    def test_not_equal_simple(self, obj):
         assert {BAD: 1} != heck(obj)
 
-    def test_not_equal_deep(self, obj, heck):
+    def test_not_equal_deep(self, obj):
         assert {F1: {F2: {F3: {N1: 1, N2: 'two', N3: [3, 4]}}}} != heck(obj)

@@ -1,19 +1,14 @@
 """
    isort:skip_file
 """
-from collections import UserDict
-from collections.abc import Mapping
-
-import string
 import random
-from pathlib import Path
 import os
 import pytest
-import json
 from unittest.mock import patch
 
-import requests.adapters
-from requests.models import Response
+from .utils import read_chainfile
+import requests.adapters  # noqa
+from requests.models import Response  # noqa
 
 
 def let(obj, **kwargs):
@@ -43,7 +38,7 @@ for pa in PRE_INIT_PATCHES:
 # raise an exception. Fixing this (e.g moving stuff outta src/polyswarmd/__init__.py) has been on the
 # todo list for some time, but for now, we just patch up methods which have unsafe side effects to
 # run unit tests without side-effects.
-import polyswarmd
+import polyswarmd  # noqa
 from polyswarmd.app import app as _app  # noqa
 
 for pa in PRE_INIT_PATCHES:
@@ -54,9 +49,11 @@ for pa in PRE_INIT_PATCHES:
 def community():
     return 'gamma'
 
+
 @pytest.fixture
 def base_nonce():
     return random.randint(2**15, 2**16)
+
 
 @pytest.fixture
 def token_address():
@@ -80,83 +77,17 @@ def ZERO_ADDRESS():
     return ZERO_ADDRESS
 
 
-CHAINCFG = Path('tests/fixtures/config/chain/').resolve()
-
-def _read_chain(chain_name):
-    with open(CHAINCFG.joinpath(f'{chain_name}chain.json')) as ff:
-        cobj = json.load(ff)
-        cobj.update({'chain_name': chain_name})
-        return cobj
-
-
+# XXX: if someone knows how to artificially restrict pytest fixtures, please let me know - zv
 @pytest.fixture(params=['home'])
 def homechain(request):
-    return _read_chain(request.param)
+    return read_chainfile(request.param)
 
 
 @pytest.fixture(params=['side'])
 def sidechain(request):
-    return _read_chain(request.param)
+    return read_chainfile(request.param)
 
 
 @pytest.fixture(params=['home', 'side'])
 def chain(request):
-    return _read_chain(request.param)
-
-
-class ExpectedProxy(UserDict):
-    """MappingProxy which allows functions as value to overide inner equality checks"""
-
-    def __init__(self, data):
-        if not isinstance(data, Mapping):
-            raise ValueError("Invalid type: %s" % type(data))
-        super().__init__(data.copy())
-
-    @classmethod
-    def fixup(cls, actual, expected):
-        """Checks if `expected` is callable & `expected(actual)` is truthy, returning `actual` or `expected`"""
-        if isinstance(expected, Mapping) and len(expected) == len(actual):
-            return {k: cls.fixup(actual[k], expected[k]) for k in expected}
-        if isinstance(expected, list):
-            return [cls.fixup(actual[i], expected[i]) for i in range(len(expected))]
-        elif callable(expected):
-            if expected(actual):
-                return actual
-            else:
-                return 'EXPECT_CHECK_FAILURE=' + str(actual)
-        return expected
-
-    def __eq__(self, actual):
-        """Checks if ACTUAL is identical to EXPECTED, all funcs in actual are evaluated with ACTUAL 'cousin'"""
-        return actual == self.fixup(actual, expected=self.data)
-
-    # -----------------------------------
-
-    @staticmethod
-    def ETHADDR(addr: str) -> bool:
-        addr = (addr[2:] if addr.startswith('0x') else addr).lower()
-        return all(ch in string.hexdigits for ch in addr)
-
-    @staticmethod
-    def POSINT(num: int) -> bool:
-        try:
-            return num > 0
-        except Exception:
-            return False
-
-    @staticmethod
-    def IGNORE(x) -> bool:
-        return True
-
-@pytest.fixture
-def heck():
-    return ExpectedProxy
-
-
-@pytest.fixture
-def sane(heck):
-    def validate(actual=None, response=None, expected=None):
-        if response:
-            actual = response.json
-        return actual == heck(expected)
-    return validate
+    return read_chainfile(request.param)
