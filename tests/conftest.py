@@ -4,7 +4,7 @@
 from collections import UserDict
 from collections.abc import Mapping
 
-from string import hexdigits
+import string
 import random
 from pathlib import Path
 import os
@@ -133,18 +133,20 @@ class ExpectedProxy(UserDict):
     # -----------------------------------
 
     @staticmethod
-    def is_address(addr: str) -> bool:
-        if addr.startswith('0x'):
-            addr = addr[2:]
-        return all(ch in hexdigits for ch in addr.lower())
+    def ETHADDR(addr: str) -> bool:
+        addr = (addr[2:] if addr.startswith('0x') else addr).lower()
+        return all(ch in string.hexdigits for ch in addr)
 
     @staticmethod
-    def is_positive(num: int) -> bool:
+    def POSINT(num: int) -> bool:
         try:
             return num > 0
         except Exception:
             return False
 
+    @staticmethod
+    def IGNORE(x) -> bool:
+        return True
 
 @pytest.fixture
 def heck():
