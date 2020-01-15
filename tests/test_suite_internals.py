@@ -31,6 +31,7 @@ class TestHeck:
         ],
         'test_equal_deep': [
             {F1: {F2: {F3: {N1: 1, N2: 'two', N3: [3, 4]}}}},
+            {F1: {F2: {F3: {N1: 1, N2: 'two', N3: [3, lambda x: x == 4]}}}},
             {F1: {F2: {F3: {N1: 1, N2: lambda x: isinstance(x, str), N3: [3, 4]}}}},
             {F1: {F2: {F3: {N1: 1, N2: 'two', N3: lambda x: len(x) > 0}}}},
             {F1: {F2: {F3: {N1: lambda x: x == 1, N2: lambda x: isinstance(x, str), N3: [3, 4]}}}},
@@ -47,6 +48,7 @@ class TestHeck:
         'test_not_equal_deep': [
             {F1: {F2: {F3: {N1: 2, N2: 'two', N3: [3, 4]}}}},
             {F1: {F2: {F3: {N1: 1, N2: 'two', N3: [4, 3]}}}},
+            {F1: {F2: {F3: {N1: 1, N2: 'two', N3: [4, lambda x: x != 3]}}}},
             {F1: {F2: {F3: {N1: 1, N2: lambda x: isinstance(x, int), N3: [3, 4]}}}},
             {F1: {F2: {F3: {N1: 1, N2: 'two', N3: lambda x: len(x) == 0}}}},
             {F1: {F2: {F3: {N1: lambda x: x == 1, N2: lambda x: isinstance(x, str), N3: [4, 3]}}}},
