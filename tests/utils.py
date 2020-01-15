@@ -59,7 +59,7 @@ def sane(actual=None, response=None, expected=None):
     return actual == heck(expected)
 
 
-def read_chainfile(chain_name):
+def read_chain_cfg(chain_name):
     chain_cfg_dir = Path('tests/fixtures/config/chain/').resolve()
     chain_filename = f'{chain_name}chain.json'
     with open(chain_cfg_dir.joinpath(chain_filename)) as ff:

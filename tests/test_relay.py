@@ -6,7 +6,7 @@ from .utils import heck, sane
 
 
 @pytest.fixture
-def tx_success_response(homechain, token_address, base_nonce):
+def tx_success_response(token_address, base_nonce):
     return {
         'result': {
             'transactions': [{
@@ -44,10 +44,10 @@ def test_withdrawal_funds_success(client, tx_success_response, tx_query_string):
     )
 
 
-def test_withdrawal_funds_success(client, chain, token_address):
+def test_withdrawal_funds_success(client, chain_config, token_address):
     resp = client.get(
         f'/relay/fees?' + urlencode({
-            'chain': chain["chain_name"],
+            'chain': chain_config["chain_name"],
             'account': token_address
         })
     ).json

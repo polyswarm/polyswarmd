@@ -6,7 +6,7 @@ import os
 import pytest
 from unittest.mock import patch
 
-from .utils import read_chainfile
+from .utils import read_chain_cfg
 import requests.adapters  # noqa
 from requests.models import Response  # noqa
 
@@ -79,15 +79,19 @@ def ZERO_ADDRESS():
 
 # XXX: if someone knows how to artificially restrict pytest fixtures, please let me know - zv
 @pytest.fixture(params=['home'])
-def homechain(request):
-    return read_chainfile(request.param)
+def homechain_config(request):
+    return read_chain_cfg(request.param)
 
 
 @pytest.fixture(params=['side'])
-def sidechain(request):
-    return read_chainfile(request.param)
+def sidechain_config(request):
+    return read_chain_cfg(request.param)
 
 
 @pytest.fixture(params=['home', 'side'])
-def chain(request):
-    return read_chainfile(request.param)
+def chain_config(request):
+    return read_chain_cfg(request.param)
+
+@pytest.fixture(params=['home', 'side'])
+def chains(request, app):
+    return app.config['POLYSWARMD'].chains[request.param]
