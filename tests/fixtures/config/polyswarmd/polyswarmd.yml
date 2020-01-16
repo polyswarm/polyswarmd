@@ -18,4 +18,4 @@ profiler:
 # redis:
 #   uri: redis://localhost:6379
 websocket:
-  enabled: false
+  enabled: true

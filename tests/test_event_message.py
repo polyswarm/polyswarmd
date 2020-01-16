@@ -1,8 +1,10 @@
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from math import ceil
 import time
-from typing import Any, List
+from typing import Any, ClassVar, Optional
 
+import statistics
 import gevent
 from gevent.queue import Empty
 import pytest
@@ -10,97 +12,131 @@ import pytest
 from polyswarmd.services.ethereum.rpc import EthereumRpc
 from polyswarmd.views.event_message import WebSocket
 from polyswarmd.websockets.filter import FilterManager
-
-from .utils import HOME_CONFIG, SIDE_CONFIG
+from polyswarmd.websockets.messages import (
+    ClosedAgreement,
+    Connected,
+    SettleStateChallenged,
+    StartedSettle,
+    WebsocketFilterMessage,
+)
 
 current = time.monotonic
-
-MAX_WAIT = 4
 
 
 def elapsed(since):
     return current() - since
 
 
-def read_wrapper_queue(filters, wrapper=WebSocket('N/A'), ethrpc=None, wait=MAX_WAIT, backoff=False):
-    ethrpc.register(wrapper)
-    for filt in filters:
-        ethrpc.filter_manager.register(DumbFilter(**filt), MockFormatter, backoff=backoff)
+class TestWebsockets:
 
-    start = current()
-    msgs = []
-    while elapsed(since=start) < wait:
-        try:
-            obj = wrapper.queue.get(block=True, timeout=1)
-            msgs.append(obj)
-        except Empty:
-            pass
-    ethrpc.unregister(wrapper)
-    return msgs
+    @contextmanager
+    def start_rpc(self, filters, ws, RPC, backoff):
+        RPC.register(ws)
+        for ft in filters:
+            RPC.filter_manager.register(ft, FakeFormatter, backoff=backoff)
+        yield RPC
+        RPC.unregister(ws)
+        assert len(RPC.websockets) == 0
 
+    def rq(self, filters, ws, RPC, max_wait=3, backoff=False, timeout=1):
+        start = current()
+        count = int(sum(max_wait // f.speed for f in filters))
 
-def test_SLOW_recv(chains, wrapper, rpc):
-    wait = 2
-    speed = 0.5
-    results = read_wrapper_queue(
-        filters=[dict(speed=speed)], wrapper=wrapper, ethrpc=rpc(chains), wait=wait
-    )
-    times = [r.get('current') for r in results]
-    count = wait / speed
-    assert pytest.approx((max(times) - min(times), count))
-    assert pytest.approx((len(results), count))
+        with self.start_rpc(filters=filters, ws=ws, RPC=RPC, backoff=backoff):
+            msgs = []
+            while elapsed(since=start) < max_wait:
+                try:
+                    msgs.append(ws.queue.get(block=True, timeout=timeout))
+                except Empty:
+                    continue
+            # the number of msgs should be ~ (elapsed_time / msg_rate) * num_of_msg_srcs)
+            assert abs(len(msgs) - count) <= 1
+            return msgs
 
+    @pytest.mark.parametrize("chains", ['home'])
+    def test_SLOW_recv(self, chains, wrapper, rpc):
+        max_wait = 3
+        speed = 0.5
+        filters = [DumbFilter(speed=speed) for _ in range(3)]
+        results = self.rq(filters=filters, ws=wrapper, max_wait=max_wait, RPC=rpc(chains))
+        # we should have at least 1 results
+        assert len(results) > 0
+        # verify the time elapsed took what we thought
+        times = [r.get('current') for r in results]
+        assert abs(max(times) - min(times) - max_wait) < 0.5
+        # verify that the average time was what we expected
+        diff = [times[i] - times[i - 1] for i in range(1, len(times))]
+        assert abs(statistics.pvariance(diff) - speed) < 0.5
 
-def test_SLOW_concurrent_rpc(mock_fm, mock_ws, rpc):
-    # verify that multiple engines can run concurrently
-    # run them at different times to verify that disconnecting
-    # one doesn't affect the other.
-    fwait, lwait = 4, 8
-    fst, last = [
-        gevent.spawn(read_wrapper_queue, filters=[dict()], wait=fwait, ethrpc=rpc(HOME_CONFIG)),
-        gevent.spawn(read_wrapper_queue, filters=[dict()], wait=lwait, ethrpc=rpc(SIDE_CONFIG)),
-    ]
-    fr, lr = (k.value for k in gevent.joinall((fst, last)))
-    assert len(fr) < len(lr) + 1e-5
-    assert len(fr) > 0 and len(lr) > 0
-    assert pytest.approx((len(fr), len(lr) * (fwait//lwait)), abs=1)
+    def test_SLOW_concurrent_rpc(self, app, mock_fm, mock_ws, rpc):
+        # verify that multiple engines can run concurrently
+        # run them at different times to verify that disconnecting
+        # one doesn't affect the other.
+        chains = ((app.config['POLYSWARMD'].chains[c]) for c in ('home', 'side'))
+        base_wait = 4
+        gs = gevent.joinall([
+            gevent.spawn(
+                self.rq,
+                filters=[DumbFilter(speed=0.5)],
+                ws=WebSocket(f'N{i + 1}'),
+                max_wait=base_wait * (1+i),
+                RPC=rpc(chain)
+            ) for i, chain in enumerate(chains)
+        ])
+
+        for i in range(len(gs)):
+            assert gs[i].successful()
+            a = len(gs[i].value)
+            assert a >= 1
+            if len(gs) > a:
+                b = len(gs[i + 1].value)
+                assert a < b + 1e-5
+                assert pytest.approx((a, b * ((i+1) * base_wait) / ((i+2) * base_wait)), abs=1)
+
+    @pytest.mark.parametrize("chains", ['home'])
+    def test_SLOW_backoff(self, chains, wrapper, rpc):
+        results = self.rq(
+            filters=[DumbFilter(speed=1) for _ in range(3)],
+            ws=wrapper,
+            RPC=rpc(chains),
+            backoff=True
+        )
+        assert len(results) > 0
 
 
 @dataclass
 class DumbFilter:
     speed: float = field(default=1.0)
-    start: float = field(default_factory=current)
-    last: int = field(default=-1)
+    prev: int = field(default=0)
     attach: Any = field(default=None)
+    start: Optional[float] = field(default=None)
 
+    # Verify that _something_ is being passed in, even if we're not using it.
     def __call__(self, contract_event_name):
         return self
 
     def to_msg(self, idx):
-        return {
-            **{k: v for k, v in self.__dict__.items() if bool(v)},
-            'idx': idx,
-            'current': current(),
-        }
+        return {**self.__dict__, 'idx': idx, 'current': current()}
 
     def get_new_entries(self):
-        last = self.last
-        nxt = ceil(elapsed(self.start) / self.speed)
-        self.last = nxt
-        yield from map(self.to_msg, range(last, nxt))
+        if not self.start:
+            self.start = current()
+        prev = self.prev
+        curr = ceil(elapsed(self.start) / self.speed)
+        self.prev = curr
+        yield from map(self.to_msg, range(prev, curr))
 
 
-class MockFormatter:
-    contract_event_name = str(None)
+class FakeFormatter:
+    contract_event_name: ClassVar[str] = str(None)
 
     @classmethod
-    def serialize_message(cls, e):
-        return e
+    def serialize_message(cls, data):
+        return data
 
 
 @pytest.fixture
 def mock_ws(monkeypatch):
-    """Requests.get() mocked to return {'mock_key':'mock_response'}."""
 
     def mock_send(self, msg):
         # print(msg)
@@ -111,17 +147,11 @@ def mock_ws(monkeypatch):
 
 @pytest.fixture
 def mock_fm(monkeypatch):
-    """Requests.get() mocked to return {'mock_key':'mock_response'}."""
-
-    def mock_setup_event_filters(self, chain):
-        return True
-
-    monkeypatch.setattr(FilterManager, "setup_event_filters", mock_setup_event_filters)
+    monkeypatch.setattr(FilterManager, "setup_event_filters", lambda *_: True)
 
 
-@pytest.fixture
+@pytest.fixture(scope='function')
 def wrapper(mock_ws):
-    """Requests.get() mocked to return {'mock_key':'mock_response'}."""
     return WebSocket('ws: N/A')
 
 

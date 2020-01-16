@@ -38,44 +38,44 @@ for pa in PRE_INIT_PATCHES:
 # raise an exception. Fixing this (e.g moving stuff outta src/polyswarmd/__init__.py) has been on the
 # todo list for some time, but for now, we just patch up methods which have unsafe side effects to
 # run unit tests without side-effects.
-import polyswarmd  # noqa
+import polyswarmd as _polyswarmd  # noqa
 from polyswarmd.app import app as _app  # noqa
 
 for pa in PRE_INIT_PATCHES:
     pa.stop()
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope='session')
 def community():
     return 'gamma'
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope='session')
 def base_nonce():
     return random.randint(2**15, 2**16)
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def token_address():
     return '0x4B1867c484871926109E3C47668d5C0938CA3527'
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def app():
     return _app
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def client(app):
     app.config['TESTING'] = True
     yield app.test_client()
 
 
-@pytest.fixture(params=['home', 'side'])
+@pytest.fixture(params=['home', 'side'], scope='session')
 def chain_config(request):
     return read_chain_cfg(request.param)
 
 
-@pytest.fixture(params=['home', 'side'])
+@pytest.fixture(params=['home', 'side'], scope='session')
 def chains(request, app):
     return app.config['POLYSWARMD'].chains[request.param]
