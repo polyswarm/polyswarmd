@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 import logging
 from random import gauss
-from typing import Any, Callable, Iterable, List, NoReturn, Set, Type
+from typing import Any, Callable, ClassVar, Iterable, List, NoReturn, Set, Type
 
 import gevent
 from gevent.pool import Group
@@ -31,13 +31,14 @@ FormatClass = Type[messages.WebsocketFilterMessage]
 Message = bytes
 FilterInstaller = Callable[[str], ContractFilter]
 
-
 class FilterWrapper:
     """A utility class which wraps a contract filter with websocket-messaging features"""
     filter: ContractFilter
     filter_installer = Callable[[], ContractFilter]
     formatter: FormatClass
     backoff: bool
+    MIN_WAIT: ClassVar[float] = 0.5
+    MAX_WAIT: ClassVar[float] = 4.0
 
     def __init__(self, filter_installer: FilterInstaller, formatter: FormatClass, backoff: bool):
         self.formatter = formatter
@@ -53,17 +54,22 @@ class FilterWrapper:
         return installer(self.formatter.contract_event_name)
 
     def compute_wait(self, ctr: int) -> float:
-        """Compute the amount of wait time from a counter of (sequential) empty replies"""
-        min_wait = 0.5
-        max_wait = 4.0
+        """Compute the amount of wait time from a counter of (sequential) empty replies
 
+        >>> compute_wait(10)
+        5
+        >>> compute_wait(10)
+        5
+        >>> compute_wait(10)
+        5
+        """
         if self.backoff:
             # backoff 'exponentially'
             exp = (1 << max(0, ctr - 2)) - 1
-            result = min(max_wait, max(min_wait, exp))
+            result = min(self.MAX_WAIT, max(self.MIN_WAIT, exp))
             return abs(gauss(result, 0.1))
         else:
-            return min_wait
+            return self.MIN_WAIT
 
     def get_new_entries(self) -> List[Message]:
         return [self.formatter.serialize_message(e) for e in self.filter.get_new_entries()]
