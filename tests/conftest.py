@@ -45,12 +45,12 @@ for pa in PRE_INIT_PATCHES:
     pa.stop()
 
 
-@pytest.fixture
+@pytest.fixture(scope='module')
 def community():
     return 'gamma'
 
 
-@pytest.fixture
+@pytest.fixture(scope='module')
 def base_nonce():
     return random.randint(2**15, 2**16)
 
@@ -71,38 +71,11 @@ def client(app):
     yield app.test_client()
 
 
-@pytest.fixture
-def ZERO_ADDRESS():
-    from polyswarmd.views.eth import ZERO_ADDRESS
-    return ZERO_ADDRESS
-
-
-# XXX: if someone knows how to artificially restrict pytest fixtures, please let me know - zv
-@pytest.fixture(params=['home'])
-def homechain_config(request):
-    return read_chain_cfg(request.param)
-
-
-@pytest.fixture(params=['side'])
-def sidechain_config(request):
-    return read_chain_cfg(request.param)
-
-
 @pytest.fixture(params=['home', 'side'])
 def chain_config(request):
     return read_chain_cfg(request.param)
 
 
-@pytest.fixture
-def homechain(app):
-    return app.config['POLYSWARMD'].chains['home']
-
-@pytest.fixture
-def sidechain(app):
-    return app.config['POLYSWARMD'].chains['side']
-
 @pytest.fixture(params=['home', 'side'])
 def chains(request, app):
     return app.config['POLYSWARMD'].chains[request.param]
-
-

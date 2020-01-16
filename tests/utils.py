@@ -54,9 +54,14 @@ class heck(UserDict):
 
 
 def sane(actual=None, response=None, expected=None):
+    if not expected:
+        return False
     if response:
         actual = response.json
-    return actual == heck(expected)
+    if not actual:
+        return False
+    assert actual == heck(expected)
+    return True
 
 
 def read_chain_cfg(chain_name):
@@ -64,3 +69,7 @@ def read_chain_cfg(chain_name):
     chain_filename = f'{chain_name}chain.json'
     with open(chain_cfg_dir.joinpath(chain_filename)) as ff:
         return {**{'chain_name': chain_name}, **json.load(ff)}
+
+
+HOME_CONFIG = read_chain_cfg('home')
+SIDE_CONFIG = read_chain_cfg('side')

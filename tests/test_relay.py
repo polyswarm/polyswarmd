@@ -2,6 +2,8 @@ from urllib.parse import urlencode
 
 import pytest
 
+from polyswarmd.views.eth import TRANSFER_SIGNATURE_HASH as TX_SIG_HASH
+
 from .utils import heck, sane
 
 
@@ -11,7 +13,7 @@ def tx_success_response(token_address, base_nonce):
         'result': {
             'transactions': [{
                 'chainId': heck.IGNORE,
-                'data': lambda s: s.startswith('0xa9059cbb') and len(s) == 138 and s.endswith('1'),
+                'data': lambda s: s[2:].startswith(TX_SIG_HASH) and len(s) > len(TX_SIG_HASH) + 32,
                 'gas': heck.POSINT,
                 'gasPrice': 0,
                 'nonce': base_nonce,
@@ -44,7 +46,7 @@ def test_withdrawal_funds_success(client, tx_success_response, tx_query_string):
     )
 
 
-def test_withdrawal_funds_success(client, chain_config, token_address):
+def test_fees_endpoint(client, chain_config, token_address):
     resp = client.get(
         f'/relay/fees?' + urlencode({
             'chain': chain_config["chain_name"],
