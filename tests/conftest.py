@@ -92,6 +92,7 @@ def sidechain_config(request):
 def chain_config(request):
     return read_chain_cfg(request.param)
 
+
 @pytest.fixture(params=['home', 'side'])
 def chains(request, app):
     return app.config['POLYSWARMD'].chains[request.param]

@@ -1,51 +1,95 @@
-import pytest
+from dataclasses import dataclass, field
+from math import ceil
 import time
-from polyswarmd.websockets.filter import FilterManager
+from typing import Any, List
+
+import gevent
+from gevent.queue import Empty
+import pytest
+
 from polyswarmd.services.ethereum.rpc import EthereumRpc
 from polyswarmd.views.event_message import WebSocket
-from gevent.queue import Empty
+from polyswarmd.websockets.filter import FilterManager
 
-MAX_WAIT = 10
 current = time.monotonic
 
+MAX_WAIT = 4
 
-def elapsed(start=current()):
-    return current() - start
+
+def elapsed(since):
+    return current() - since
+
+
+def read_wrapper_queue(filters, wrapper, ethrpc, wait=MAX_WAIT):
+    ethrpc.register(wrapper)
+    for filt in filters:
+        ethrpc.filter_manager.register(DumbFilter(**filt), MockFormatter)
+
+    start = current()
+    msgs = []
+    while elapsed(since=start) < wait:
+        try:
+            obj = wrapper.queue.get(block=True, timeout=1)
+            msgs.append(obj)
+        except Empty:
+            pass
+    ethrpc.unregister(wrapper)
+    return msgs
 
 
 def test_recv(mock_fm, wrapper, rpc):
-    rpc.register(wrapper)
-    rpc.filter_manager.register(lambda *args: DumbFilter(speed=1), MockFormatter)
-    while True:
-        try:
-            msg = wrapper.queue.get(block=True, timeout=MAX_WAIT // 2)
-            assert msg is not None
-        except Empty:
-            break
-    rpc.unregister(wrapper)
+    wait = MAX_WAIT
+    speed = 0.25
+    results = read_wrapper_queue(filters=[dict(speed=speed)], wrapper=wrapper, ethrpc=rpc, wait=wait)
+    times = [r.get('current') for r in results]
+    count = wait / speed
+    assert pytest.approx((max(times) - min(times), count))
+    assert pytest.approx((len(results), count))
 
 
+def test_concurrent_rpc(mock_fm, mock_ws):
+    # verify that multiple engines can run concurrently
+    outst = [
+        gevent.spawn(
+            read_wrapper_queue,
+            filters=[dict()],
+            wrapper=WebSocket('N/A'),
+            ethrpc=EthereumRpc('n/a')
+        ),
+        gevent.spawn(
+            read_wrapper_queue,
+            filters=[dict()],
+            wrapper=WebSocket('N/A'),
+            ethrpc=EthereumRpc('n/a')
+        )
+    ]
+    vz = list(map(lambda k: k.value, gevent.joinall(outst)))
+    assert len(vz) == len(outst)
+    assert all(len(vz[0]) == len(v) for v in vz)
+
+
+@dataclass
 class DumbFilter:
-    def __init__(self, expected_msgs=[], speed=1):
-        self.expected_msgs = expected_msgs
-        self.speed = speed
-        self.start = current()
-        self.last = 0
+    speed: float = field(default=1.0)
+    start: float = field(default_factory=current)
+    last: int = field(default=-1)
+    attach: Any = field(default=None)
 
-    @property
-    def expected(self):
-        if self.expected_msgs:
-            yield from self.expected_msgs
-        else:
-            yield from [{'speed': self.speed, 'idx': i, 'when': current()}
-                        for i in range(MAX_WAIT // self.speed)]
+    def __call__(self, contract_event_name):
+        return self
+
+    def to_msg(self, idx):
+        return {
+            **{k: v for k, v in self.__dict__.items() if bool(v)},
+            'idx': idx,
+            'current': current(),
+        }
 
     def get_new_entries(self):
         last = self.last
-        current = int(self.speed * elapsed(self.start))
-        expected = list(self.expected)
-        self.last = current
-        return expected[last:current]
+        nxt = ceil(elapsed(self.start) / self.speed)
+        self.last = nxt
+        yield from map(self.to_msg, range(last, nxt))
 
 
 class MockFormatter:
@@ -59,8 +103,9 @@ class MockFormatter:
 @pytest.fixture
 def mock_ws(monkeypatch):
     """Requests.get() mocked to return {'mock_key':'mock_response'}."""
+
     def mock_send(self, msg):
-        print(msg)
+        self.queue.put_nowait(msg)
 
     monkeypatch.setattr(WebSocket, "send", mock_send)
 
@@ -68,8 +113,10 @@ def mock_ws(monkeypatch):
 @pytest.fixture
 def mock_fm(monkeypatch):
     """Requests.get() mocked to return {'mock_key':'mock_response'}."""
+
     def mock_setup_event_filters(self, chain):
         return True
+
     monkeypatch.setattr(FilterManager, "setup_event_filters", mock_setup_event_filters)
 
 
