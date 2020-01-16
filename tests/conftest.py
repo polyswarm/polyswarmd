@@ -93,6 +93,16 @@ def chain_config(request):
     return read_chain_cfg(request.param)
 
 
+@pytest.fixture
+def homechain(app):
+    return app.config['POLYSWARMD'].chains['home']
+
+@pytest.fixture
+def sidechain(app):
+    return app.config['POLYSWARMD'].chains['side']
+
 @pytest.fixture(params=['home', 'side'])
 def chains(request, app):
     return app.config['POLYSWARMD'].chains[request.param]
+
+

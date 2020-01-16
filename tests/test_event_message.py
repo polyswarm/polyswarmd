@@ -20,10 +20,10 @@ def elapsed(since):
     return current() - since
 
 
-def read_wrapper_queue(filters, wrapper, ethrpc, wait=MAX_WAIT):
+def read_wrapper_queue(filters, wrapper=WebSocket('N/A'), ethrpc=None, wait=MAX_WAIT, backoff=False):
     ethrpc.register(wrapper)
     for filt in filters:
-        ethrpc.filter_manager.register(DumbFilter(**filt), MockFormatter)
+        ethrpc.filter_manager.register(DumbFilter(**filt), MockFormatter, backoff=backoff)
 
     start = current()
     msgs = []
@@ -37,35 +37,39 @@ def read_wrapper_queue(filters, wrapper, ethrpc, wait=MAX_WAIT):
     return msgs
 
 
-def test_SLOW_recv(mock_fm, wrapper, rpc):
-    wait = MAX_WAIT
-    speed = 0.25
-    results = read_wrapper_queue(filters=[dict(speed=speed)], wrapper=wrapper, ethrpc=rpc, wait=wait)
+def test_SLOW_recv(chains, wrapper, rpc):
+    wait = 2
+    speed = 0.5
+    results = read_wrapper_queue(filters=[dict(speed=speed)], wrapper=wrapper, ethrpc=rpc(chains), wait=wait)
     times = [r.get('current') for r in results]
     count = wait / speed
     assert pytest.approx((max(times) - min(times), count))
     assert pytest.approx((len(results), count))
 
 
-def test_SLOW_concurrent_rpc(mock_fm, mock_ws):
+def test_SLOW_concurrent_rpc(homechain, sidechain, mock_fm, mock_ws, rpc):
     # verify that multiple engines can run concurrently
-    outst = [
+    # run them at different times to verify that disconnecting
+    # one doesn't affect the other.
+    fwait, lwait = 4, 8
+    fst, last = [
         gevent.spawn(
             read_wrapper_queue,
             filters=[dict()],
-            wrapper=WebSocket('N/A'),
-            ethrpc=EthereumRpc('n/a')
+            wait=fwait,
+            ethrpc=rpc(homechain)
         ),
         gevent.spawn(
             read_wrapper_queue,
             filters=[dict()],
-            wrapper=WebSocket('N/A'),
-            ethrpc=EthereumRpc('n/a')
-        )
+            wait=lwait,
+            ethrpc=rpc(sidechain)
+        ),
     ]
-    vz = list(map(lambda k: k.value, gevent.joinall(outst)))
-    assert len(vz) == len(outst)
-    assert all(len(vz[0]) == len(v) for v in vz)
+    fr, lr = (k.value for k in gevent.joinall((fst, last)))
+    assert len(fr) < len(lr)
+    assert len(fr) > 0 and len(lr) > 0
+    assert pytest.approx((len(fr), len(lr) * (fwait // lwait)))
 
 
 @dataclass
@@ -105,6 +109,7 @@ def mock_ws(monkeypatch):
     """Requests.get() mocked to return {'mock_key':'mock_response'}."""
 
     def mock_send(self, msg):
+        # print(msg)
         self.queue.put_nowait(msg)
 
     monkeypatch.setattr(WebSocket, "send", mock_send)
@@ -127,5 +132,5 @@ def wrapper(mock_ws):
 
 
 @pytest.fixture
-def rpc(chains):
-    return EthereumRpc(chains)
+def rpc(mock_fm):
+    return EthereumRpc
