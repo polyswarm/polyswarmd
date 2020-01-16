@@ -222,13 +222,14 @@ class TestWebsockets:
     @pytest.mark.parametrize("chains", ['home'])
     def test_SLOW_backoff(self, chains, rpc, mock_ws):
         """verify backoff works"""
-        max_wait = 3
+        max_wait = 4
+        speed = 0.5
         filters = [
-            DumbFilter(speed=1, backoff=True),
-            DumbFilter(speed=1, backoff=False),
-            DumbFilter(speed=1, backoff=True),
-            DumbFilter(speed=1, backoff=False),
-            DumbFilter(speed=1, backoff=True),
+            DumbFilter(speed=speed, backoff=True),
+            DumbFilter(speed=speed, backoff=False),
+            DumbFilter(speed=speed, backoff=True),
+            DumbFilter(speed=speed, backoff=False),
+            DumbFilter(speed=speed, backoff=True),
         ]
         enrc = self.events(
             filters=filters,
@@ -236,6 +237,7 @@ class TestWebsockets:
             max_wait=max_wait,
             RPC=rpc(chains),
         )
+        print(enrc)
         # just to be sure
         assert len(enrc) > 0
         assert enrc.sources == len(filters)
@@ -243,6 +245,8 @@ class TestWebsockets:
         assert pytest.approx((enrc.elapsed, max_wait))
         # verify that the average time was what we expected
         assert enrc.latency_var < 1e-1
+        # verify that the average time was what we expected
+        assert pytest.approx((enrc.latency_avg, speed))
 
 
 @pytest.fixture
