@@ -76,10 +76,10 @@ class mkevent(namedtuple('mkevent',
             return self.__getattribute__(k)
         return super().__getitem__(k)
 
-
 @pytest.fixture(autouse=True)
 def add_websockets_doctest_deps(doctest_namespace):
     TestChain = namedtuple('TestChain', ['blockNumber'])
+    FakeFormatter = namedtuple('FakeFormatter', ['contract_event_name'])
     doctest_namespace['decoded_msg'] = lambda wsmsg: pprint(json.loads(wsmsg.decode('ascii')))
     doctest_namespace["chain1"] = TestChain(117)
     doctest_namespace["chain2"] = TestChain(220)
@@ -87,3 +87,5 @@ def add_websockets_doctest_deps(doctest_namespace):
     doctest_namespace["addr2"] = "0x00000000000000000000000000000002"
     doctest_namespace["mkevent"] = mkevent
     doctest_namespace["pprint"] = pprint
+    doctest_namespace['fake_formatter'] = FakeFormatter
+    doctest_namespace['identity'] = lambda *args: args

@@ -56,18 +56,19 @@ class FilterWrapper:
     def compute_wait(self, ctr: int) -> float:
         """Compute the amount of wait time from a counter of (sequential) empty replies
 
-        >>> compute_wait(10)
-        5
-        >>> compute_wait(10)
-        5
-        >>> compute_wait(10)
-        5
+        >>> tv = (1, 3, 6, 10, 100)
+        >>> backoff = FilterWrapper(identity, fake_formatter, backoff=True)
+        >>> list(map(backoff.compute_wait, tv))
+        [0.5, 1, 4.0, 4.0, 4.0]
+        >>> no_backoff = FilterWrapper(identity, fake_formatter, backoff=False)
+        >>> list(map(no_backoff.compute_wait, tv))
+        [0.5, 0.5, 0.5, 0.5, 0.5]
         """
         if self.backoff:
             # backoff 'exponentially'
             exp = (1 << max(0, ctr - 2)) - 1
             result = min(self.MAX_WAIT, max(self.MIN_WAIT, exp))
-            return abs(gauss(result, 0.1))
+            return result
         else:
             return self.MIN_WAIT
 
