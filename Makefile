@@ -48,6 +48,9 @@ doctest: ## run doctests
 	(cd $(SRCROOT) && python -m websockets)
 
 test: doctest ## run tests
+	py.test -k "not test_SLOW"
+
+test-all: doctest ## run tests, including slow ones
 	py.test
 
 clean: clean-build clean-pyc clean-test ## remove all build, test, coverage and Python artifacts

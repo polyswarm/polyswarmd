@@ -37,7 +37,7 @@ def read_wrapper_queue(filters, wrapper, ethrpc, wait=MAX_WAIT):
     return msgs
 
 
-def test_recv(mock_fm, wrapper, rpc):
+def test_SLOW_recv(mock_fm, wrapper, rpc):
     wait = MAX_WAIT
     speed = 0.25
     results = read_wrapper_queue(filters=[dict(speed=speed)], wrapper=wrapper, ethrpc=rpc, wait=wait)
@@ -47,7 +47,7 @@ def test_recv(mock_fm, wrapper, rpc):
     assert pytest.approx((len(results), count))
 
 
-def test_concurrent_rpc(mock_fm, mock_ws):
+def test_SLOW_concurrent_rpc(mock_fm, mock_ws):
     # verify that multiple engines can run concurrently
     outst = [
         gevent.spawn(
