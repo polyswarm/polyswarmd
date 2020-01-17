@@ -1,6 +1,5 @@
 from collections.abc import Collection
 from contextlib import contextmanager
-from dataclasses import dataclass, field
 from math import ceil
 import pprint
 import statistics
@@ -49,14 +48,15 @@ class NOPMessage(WebsocketMessage):
     event: ClassVar[str] = 'nop'
 
 
-@dataclass
 class DumbFilter:
-    speed: float = field(default=1.0)
-    prev: int = field(default=0)
-    extra: Any = field(default_factory=dict)
-    start: Optional[float] = field(default=None)
-    backoff: bool = field(default=True)
-    ident: Optional[str] = field(default=None)
+    def __init__(self, speed=1.0, prev=0, extra={}, start=None, backoff=True, ident=None, source=None):
+        self.speed = speed
+        self.prev = prev
+        self.extra = extra
+        self.start = start
+        self.backoff = backoff
+        self.ident = ident
+        self.source = source
 
     # Verify that _something_ is being passed in, even if we're not using it.
     def __call__(self, contract_event_name):
