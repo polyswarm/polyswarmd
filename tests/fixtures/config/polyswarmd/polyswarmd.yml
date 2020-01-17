@@ -10,12 +10,9 @@ artifact:
 community: gamma
 eth:
   trace_transactions: true
-  directory: "/home/zv/polyswarm/polyswarmd/tests/fixtures/config/chain/"
-  # consul:
-  #    uri: http://localhost:8500
+  consul:
+      uri: http://localhost:8500
 profiler:
   enabled: false
-# redis:
-#   uri: redis://localhost:6379
 websocket:
   enabled: true
