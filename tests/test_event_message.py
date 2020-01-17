@@ -66,7 +66,14 @@ class DumbFilter:
         # XXX: do not use id(self) here, the lifetime of each dumbfilter does not overlap
         if not self.ident:
             self.ident = str(uuid.uuid4())
-        return {FILTERID: self.ident, NTH: idx, TX_TS: now(), 'speed': self.speed, START: self.start}
+        return {
+            FILTERID: self.ident,
+            NTH: idx,
+            TX_TS: now(),
+            'speed': self.speed,
+            START: self.start,
+            BACKOFF: self.backoff
+        }
 
     def get_new_entries(self):
         if not self.start:
@@ -80,12 +87,19 @@ class DumbFilter:
 class enrich(Collection):
     msgs: List[Mapping]
 
+    elapsed = property(lambda msgs: max(msgs[TX_TS]) - min(msgs[TX_TS]))
+    bundles = property(lambda msgs: [v for v in msgs[TXDIFF] if v > 1e-1])
+    responses = property(lambda msgs: len(msgs.bundles))
+    latency_var = property(lambda msgs: statistics.pvariance(msgs.bundles))
+    latency_avg = property(lambda msgs: statistics.mean(msgs.bundles))
+    usertime_avg = property(lambda msgs: statistics.mean(msgs[CPUTIME]))
+    sources = property(lambda msgs: len(set(msgs[FILTERID])))
+
     def __init__(self, messages, extra={}):
         self.msgs = []
         prev = {}
         for msg in messages:
             data = msg.get('data', {})
-            del msg['data']
             msg[FILTERID] = data.get(FILTERID, -1)
             msg[NTH] = data.get(NTH, -1)
             msg[TX_TS] = data.get(TX_TS, -1)
@@ -105,42 +119,12 @@ class enrich(Collection):
     def __len__(self):
         return len(self.msgs)
 
-    def __str__(self):
-        props = ['elapsed', 'responses', 'latency_var', 'latency_avg', 'usertime_avg']
-        return f'{type(self)}=[{self.msgs[0:3]}...]\n' + pprint.pformat({
-            k: getattr(self, k) for k in props
-        })
-
-    def mx(self, key):
+    def __getitem__(self, key):
         return [msg[key] for msg in self.msgs]
 
-    @property
-    def elapsed(self):
-        return max(self.mx(TX_TS)) - min(self.mx(TX_TS))
-
-    @property
-    def bundles(self):
-        return [v for v in self.mx(TXDIFF) if v > 1e-1]
-
-    @property
-    def responses(self):
-        return len(self.bundles)
-
-    @property
-    def latency_var(self):
-        return statistics.pvariance(self.bundles)
-
-    @property
-    def latency_avg(self):
-        return statistics.mean(self.bundles)
-
-    @property
-    def usertime_avg(self):
-        return statistics.mean(self.mx(CPUTIME))
-
-    @property
-    def sources(self):
-        return len(set(self.mx(FILTERID)))
+    def __str__(self):
+        props = ['elapsed', 'responses', 'latency_var', 'latency_avg', 'usertime_avg']
+        return '<%s summary=%s>' % (type(self), {k: getattr(self, k) for k in props})
 
 
 class TestWebsockets:
@@ -237,7 +221,6 @@ class TestWebsockets:
             max_wait=max_wait,
             RPC=rpc(chains),
         )
-        print(enrc)
         # just to be sure
         assert len(enrc) > 0
         assert enrc.sources == len(filters)
