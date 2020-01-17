@@ -36,9 +36,7 @@ def test_deposit_funds_success(client, tx_success_response, tx_query_string):
 
 
 def test_withdrawal_funds_success(client, tx_success_response, tx_query_string):
-    response = client.post(
-            '/relay/withdrawal', query_string=tx_query_string, json={'amount': '1'}
-        )
+    response = client.post('/relay/withdrawal', query_string=tx_query_string, json={'amount': '1'})
     assert response.json == tx_success_response
 
 

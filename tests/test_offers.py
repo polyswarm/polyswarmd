@@ -1,6 +1,5 @@
 from .utils import failed, heck
 
-
 # def test_get_balance_total_stake(client, mock_w3, token_address, balances):
 #     assert sane(
 #         response=client.get(f'/offers/'),

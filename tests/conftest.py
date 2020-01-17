@@ -60,6 +60,7 @@ def base_nonce():
 def balances(token_address):
     return {token_address: 12345}
 
+
 @pytest.fixture
 def bounty_parameters():
     return {
@@ -73,6 +74,7 @@ def bounty_parameters():
         'bounty_fee': 62500000000000000,
         'max_duration': 100
     }
+
 
 @pytest.fixture(scope='session')
 def token_address():
@@ -105,8 +107,10 @@ def contract_fns(token_address, balances, bounty_parameters):
     fn_table = {}
 
     def patch_contract(func):
+
         def driver(self, *args):
             return func(*args)
+
         fn_table[func.__name__] = driver
         return driver
 
@@ -153,6 +157,7 @@ _ContractFunction_call = web3.contract.ContractFunction.call
 
 @pytest.fixture
 def mock_w3(monkeypatch, contract_fns):
+
     def original_call(self, *args):
         print("WARNING: Using non-mocked contract function: ", self.fn_name)
         return _ContractFunction_call(self, *args)
