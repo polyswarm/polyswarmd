@@ -9,6 +9,8 @@ from unittest.mock import patch
 from .utils import read_chain_cfg
 import requests.adapters  # noqa
 from requests.models import Response  # noqa
+import web3.contract
+# import web3.utils.datatypes
 
 
 def let(obj, **kwargs):
@@ -55,6 +57,24 @@ def base_nonce():
     return random.randint(2**15, 2**16)
 
 
+@pytest.fixture
+def balances(token_address):
+    return {token_address: 12345}
+
+@pytest.fixture
+def bounty_parameters():
+    return {
+        'arbiter_lookback_range': 100,
+        'arbiter_vote_window': 100,
+        'assertion_bid_maximum': 1000000000000000000,
+        'assertion_bid_minimum': 62500000000000000,
+        'assertion_fee': 31250000000000000,
+        'assertion_reveal_window': 10,
+        'bounty_amount_minimum': 100,
+        'bounty_fee': 62500000000000000,
+        'max_duration': 100
+    }
+
 @pytest.fixture(scope='session')
 def token_address():
     return '0x4B1867c484871926109E3C47668d5C0938CA3527'
@@ -79,3 +99,69 @@ def chain_config(request):
 @pytest.fixture(params=['home', 'side'], scope='session')
 def chains(request, app):
     return app.config['POLYSWARMD'].chains[request.param]
+
+
+@pytest.fixture
+def contract_fns(token_address, balances, bounty_parameters):
+    fn_table = {}
+
+    def patch_contract(func):
+        def driver(self, *args):
+            return func(*args)
+        fn_table[func.__name__] = driver
+        return driver
+
+    @patch_contract
+    def balanceOf(address):
+        return balances[address]
+
+    @patch_contract
+    def withdrawableBalanceOf(address):
+        return balances[address]
+
+    @patch_contract
+    def bountyFee():
+        return bounty_parameters['bounty_fee']
+
+    @patch_contract
+    def assertionFee():
+        return bounty_parameters['assertion_fee']
+
+    @patch_contract
+    def assertionRevealWindow():
+        return bounty_parameters['assertion_reveal_window']
+
+    @patch_contract
+    def arbiterVoteWindow():
+        return bounty_parameters['arbiter_vote_window']
+
+    @patch_contract
+    def ASSERTION_BID_ARTIFACT_MAXIMUM():
+        return bounty_parameters['assertion_bid_maximum']
+
+    @patch_contract
+    def ASSERTION_BID_ARTIFACT_MINIMUM():
+        return bounty_parameters['assertion_bid_minimum']
+
+    for name, value in bounty_parameters.items():
+        fn_table[name.upper()] = lambda s: value
+
+    return fn_table
+
+
+_ContractFunction_call = web3.contract.ContractFunction.call
+
+
+@pytest.fixture
+def mock_w3(monkeypatch, contract_fns):
+    def original_call(self, *args):
+        print("WARNING: Using non-mocked contract function: ", self.fn_name)
+        return _ContractFunction_call(self, *args)
+
+    def mock_call(w3_cfn, *args, **kwargs):
+        args = w3_cfn.args
+        name = w3_cfn.fn_name
+        fn = contract_fns.get(name, original_call)
+        return fn(w3_cfn, *args)
+
+    monkeypatch.setattr(web3.contract.ContractFunction, "call", mock_call)

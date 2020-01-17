@@ -19,11 +19,18 @@ class heck(UserDict):
     def fixup(self, actual, expected):
         """Checks if `expected` is callable & `expected(actual)` is truthy, returning `actual` or `expected`"""
         if isinstance(expected, Collection) and isinstance(actual, Collection):
-            assert len(expected) == len(actual)
             if isinstance(expected, Mapping):
-                return {k: self.fixup(actual[k], expected[k]) for k in expected}
+                return {
+                    k: self.fixup(actual[k], expected[k])
+                    for k in expected
+                    if k in actual and k in expected
+                }
             elif isinstance(expected, list):
-                return [self.fixup(actual[i], expected[i]) for i, _ in enumerate(expected)]
+                return [
+                    self.fixup(actual[i], expected[i])
+                    for i, _ in enumerate(expected)
+                    if len(actual) < i
+                ]
         elif callable(expected):
             return actual if expected(actual) else f'FIXUPFAIL={actual}'
         elif expected == self.IGNORE:
@@ -63,6 +70,10 @@ def sane(expected, actual=None, response=None):
     return actual is not None
 
 
+def failed(response):
+    return (response.status_code >= 400) or response.json.get('STATUS') == 'FAIL'
+
+
 def read_chain_cfg(chain_name):
-    cfgpath = f'tests/fixtures/config/chain/{chain_name}chain.json'
+    cfgpath = f'tests/cixtures/config/chain/{chain_name}chain.json'
     return {'chain_name': chain_name, **json.load(open(cfgpath))}
