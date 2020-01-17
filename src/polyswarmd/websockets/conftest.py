@@ -68,13 +68,12 @@ _EVTDEFAULT = {
 }
 
 
-class mkevent(namedtuple('mkevent',
-                         _EVTDEFAULT.keys(),
-                         defaults=_EVTDEFAULT.values())):
+class mkevent(namedtuple('mkevent', _EVTDEFAULT.keys(), defaults=_EVTDEFAULT.values())):  # type: ignore
     def __getitem__(self, k):
         if (type(k) == str):
             return self.__getattribute__(k)
         return super().__getitem__(k)
+
 
 @pytest.fixture(autouse=True)
 def add_websockets_doctest_deps(doctest_namespace):

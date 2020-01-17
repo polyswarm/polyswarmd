@@ -16,7 +16,7 @@ export PRINT_HELP_PYSCRIPT
 help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
-lint: doctest mypy ## check style
+lint: mypy ## check style
 # static checks
 	-flake8 $(SRCROOT)
 # style checks
