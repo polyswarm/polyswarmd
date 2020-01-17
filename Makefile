@@ -78,4 +78,4 @@ coverage: ## check code coverage
 	coverage run --source $(SRCROOT) -m pytest
 	coverage report -m
 	coverage html
-	$(BROWSER) htmlcov/index.html
+	google-chrome htmlcov/index.html
