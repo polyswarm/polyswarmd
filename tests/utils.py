@@ -10,6 +10,7 @@ import string
 class heck(UserDict):
     """MappingProxy which allows functions as value to overide inner equality checks"""
     IGNORE = b'\x03'
+    FAILED = b'\x15'
 
     def __init__(self, data):
         if not isinstance(data, Mapping):
@@ -20,19 +21,11 @@ class heck(UserDict):
         """Checks if `expected` is callable & `expected(actual)` is truthy, returning `actual` or `expected`"""
         if isinstance(expected, Collection) and isinstance(actual, Collection):
             if isinstance(expected, Mapping):
-                return {
-                    k: self.fixup(actual[k], expected[k])
-                    for k in expected
-                    if k in actual and k in expected
-                }
+                return {k: self.fixup(actual[k], expected[k]) for k in expected}
             elif isinstance(expected, list):
-                return [
-                    self.fixup(actual[i], expected[i])
-                    for i, _ in enumerate(expected)
-                    if len(actual) < i
-                ]
+                return [self.fixup(actual[i], expected[i]) for i, _ in enumerate(expected)]
         elif callable(expected):
-            return actual if expected(actual) else f'FIXUPFAIL={actual}'
+            return actual if expected(actual) else self.FAILED
         elif expected == self.IGNORE:
             return actual
         return expected
@@ -64,16 +57,10 @@ class heck(UserDict):
         return isinstance(x, str) and len(x) > 0
 
 
-def sane(expected, actual=None, response=None):
-    actual = actual or response.json
-    assert actual == heck(expected)
-    return actual is not None
-
-
 def failed(response):
     return (response.status_code >= 400) or response.json.get('STATUS') == 'FAIL'
 
 
 def read_chain_cfg(chain_name):
-    cfgpath = f'tests/cixtures/config/chain/{chain_name}chain.json'
+    cfgpath = f'tests/fixtures/config/chain/{chain_name}chain.json'
     return {'chain_name': chain_name, **json.load(open(cfgpath))}

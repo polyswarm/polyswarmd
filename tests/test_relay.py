@@ -4,12 +4,12 @@ import pytest
 
 from polyswarmd.views.eth import TRANSFER_SIGNATURE_HASH as TX_SIG_HASH
 
-from .utils import heck, sane
+from .utils import heck
 
 
 @pytest.fixture
 def tx_success_response(token_address, base_nonce):
-    return {
+    return heck({
         'result': {
             'transactions': [{
                 'chainId': heck.IGNORE,
@@ -22,7 +22,7 @@ def tx_success_response(token_address, base_nonce):
             }]
         },
         'status': 'OK'
-    }
+    })
 
 
 @pytest.fixture
@@ -31,19 +31,15 @@ def tx_query_string(token_address, base_nonce):
 
 
 def test_deposit_funds_success(client, tx_success_response, tx_query_string):
-    assert sane(
-        response=client.post('/relay/deposit', query_string=tx_query_string, json={'amount': '1'}),
-        expected=tx_success_response
-    )
+    response = client.post('/relay/deposit', query_string=tx_query_string, json={'amount': '1'})
+    assert response.json == tx_success_response
 
 
 def test_withdrawal_funds_success(client, tx_success_response, tx_query_string):
-    assert sane(
-        response=client.post(
+    response = client.post(
             '/relay/withdrawal', query_string=tx_query_string, json={'amount': '1'}
-        ),
-        expected=tx_success_response
-    )
+        )
+    assert response.json == tx_success_response
 
 
 def test_fees_endpoint(client, chain_config, token_address):

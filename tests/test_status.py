@@ -1,12 +1,8 @@
-import pytest
-
-from .utils import sane
+from .utils import heck
 
 
 def test_get_status(client):
-    assert sane(
-        response=client.get('/status'),
-        expected={
+    assert client.get('/status').json == heck({
             'result': {
                 'artifact_services': {
                     'ipfs': {
@@ -26,5 +22,4 @@ def test_get_status(client):
                 }
             },
             'status': 'OK'
-        }
-    )
+        })
