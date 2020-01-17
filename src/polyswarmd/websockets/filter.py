@@ -39,6 +39,7 @@ class FilterWrapper:
     backoff: bool
     MIN_WAIT: ClassVar[float] = 0.5
     MAX_WAIT: ClassVar[float] = 4.0
+    JITTER: ClassVar[float] = 0.1
 
     def __init__(self, filter_installer: FilterInstaller, formatter: FormatClass, backoff: bool):
         self.formatter = formatter
@@ -56,18 +57,24 @@ class FilterWrapper:
     def compute_wait(self, ctr: int) -> float:
         """Compute the amount of wait time from a counter of (sequential) empty replies
 
+        >>> FilterWrapper.JITTER = 0.0
         >>> tv = (0, 1, 3, 6, 10, 100)
         >>> backoff = FilterWrapper(identity, fake_formatter, backoff=True)
-        >>> list(map(backoff.compute_wait, tv))
-        [0.5, 0.5, 1, 4.0, 4.0, 4.0]
+        >>> wait_times = list(map(backoff.compute_wait, tv))
+        >>> wait_times
+        [0.5, 0.5, 1.0, 4.0, 4.0, 4.0]
         >>> no_backoff = FilterWrapper(identity, fake_formatter, backoff=False)
         >>> list(map(no_backoff.compute_wait, tv))
         [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+        >>> FilterWrapper.JITTER = 0.1
+        >>> all(n != j and approx((n, j)) for n, j in zip(wait_times, map(backoff.compute_wait, tv)))
+        True
         """
         if self.backoff:
             # backoff 'exponentially'
             exp = (1 << max(0, ctr - 2)) - 1
-            return min(self.MAX_WAIT, max(self.MIN_WAIT, exp))
+            base_wait = min(self.MAX_WAIT, max(self.MIN_WAIT, exp))
+            return abs(gauss(base_wait, self.JITTER))
         else:
             return self.MIN_WAIT
 

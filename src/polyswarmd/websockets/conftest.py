@@ -2,7 +2,7 @@ import pytest
 import json
 from collections import namedtuple
 from pprint import pprint
-from . import messages
+from . import messages, filter
 import ujson
 
 
@@ -88,3 +88,4 @@ def add_websockets_doctest_deps(doctest_namespace):
     doctest_namespace["pprint"] = pprint
     doctest_namespace['fake_formatter'] = FakeFormatter
     doctest_namespace['identity'] = lambda *args: args
+    doctest_namespace['approx'] = pytest.approx
