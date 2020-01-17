@@ -68,12 +68,29 @@ _EVTDEFAULT = {
 }
 
 
-class mkevent(namedtuple('mkevent', _EVTDEFAULT.keys(), defaults=_EVTDEFAULT.values())):  # type: ignore
+class mkevent:
+    BBLOCK = 117
+    def __init__(self, *args, **kwargs):
+        event_default = {
+            'args': {},
+            'event': 'test event',
+            'logIndex': 19845,
+            'transactionIndex': 1276,
+            'transactionHash': (11).to_bytes(16, byteorder='big'),
+            'address': '0xFACE0EEE000000000000000000000001',
+            'blockHash': (90909090).to_bytes(16, byteorder='big'),
+            'blockNumber': self.BBLOCK,
+        }
+        for i, (attr, default) in enumerate(event_default.items()):
+            if len(args) > i:
+                setattr(self, attr, args[i])
+            elif attr in kwargs:
+                setattr(self, attr, kwargs[attr])
+            else:
+                setattr(self, attr, default)
     def __getitem__(self, k):
         if (type(k) == str):
             return self.__getattribute__(k)
-        return super().__getitem__(k)
-
 
 @pytest.fixture(autouse=True)
 def add_websockets_doctest_deps(doctest_namespace):

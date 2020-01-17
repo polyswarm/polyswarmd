@@ -1,8 +1,10 @@
 from setuptools import find_packages, setup
 
+
 def parse_requirements():
     with open('requirements.txt', 'r') as f:
         return ['{2} @ {0}'.format(*r.partition('#egg=')) if '#egg=' in r else r for r in f.read().splitlines()]
+
 
 setup(name='polyswarmd',
       version='2.2.0',
