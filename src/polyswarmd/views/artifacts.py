@@ -25,16 +25,16 @@ def check_size(f, maxsize):
     >>> from collections import namedtuple
     >>> from io import StringIO
     >>> from werkzeug.datastructures import FileStorage
-    >>> check_size(FileStorage(stream=StringIO('')), 1)
+    >>> check_size(FileStorage(stream=StringIO('')), 1) #doctest:+ELLIPSIS
     Traceback (most recent call last):
     ...
-    polyswarmd.artifacts.exceptions.ArtifactEmptyException
+    polyswarmd.services.artifact.exceptions.ArtifactEmptyException
     >>> check_size(namedtuple('TestFile', 'content_length')(32), 64)
     True
-    >>> check_size(namedtuple('TestFile', 'content_length')(16), 11)
+    >>> check_size(namedtuple('TestFile', 'content_length')(16), 11) #doctest:+ELLIPSIS
     Traceback (most recent call last):
     ...
-    polyswarmd.artifacts.exceptions.ArtifactTooLargeException
+    polyswarmd.services.artifact.exceptions.ArtifactTooLargeException
     """
     size = get_size(f)
     if maxsize < size:
