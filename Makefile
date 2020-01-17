@@ -41,16 +41,13 @@ format-requirements:  ## sort requirements.txt
 	sort -u requirements.txt -o requirements.txt
 	sort -u requirements.dev.txt -o requirements.dev.txt
 
-msgstubs: # generate websocket event definition type stubs
+msgstubs: ## generate websocket event definition type stubs
 	(cd $(SRCROOT) && python -m websockets.scripts.gen_stubs | yapf)
 
-test-doctest: ## run doctests
-	py.test --doctest-modules $(SRCROOT)/websockets/*.py
-
-test: ## run tests
+quicktest: ## run tests
 	py.test -k "not test_SLOW"
 
-test-all: test-doctest ## run tests, including slow ones
+test: ## run tests, including slow ones
 	py.test
 
 clean: clean-build clean-pyc clean-test ## remove all build, test, coverage and Python artifacts
@@ -75,7 +72,7 @@ clean-test: ## remove test and coverage artifacts
 	rm -fr .pytest_cache
 
 coverage: ## check code coverage
-	coverage run --source $(SRCROOT) -m pytest
+	coverage run --source $(SRCROOT) -m pytest --doctest-modules
 	coverage report -m
 	coverage html
 	google-chrome htmlcov/index.html
