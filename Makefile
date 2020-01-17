@@ -16,7 +16,7 @@ export PRINT_HELP_PYSCRIPT
 help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
-lint: doctest mypy ## check style
+lint: mypy ## check style
 # static checks
 	-flake8 $(SRCROOT)
 # style checks
@@ -29,25 +29,25 @@ lint: doctest mypy ## check style
 mypy:  ## check types
 	mypy
 
-format: format-requirements  ## format code in Polyswarm style
+format: format-requirements format-tests ## format code in Polyswarm style
 	yapf -p -r -i $(SRCROOT)
 	isort --recursive $(SRCROOT)
 
-format-tests:  ## format code in Polyswarm style
-	yapf -p -r -i $(TESTSRCROOT)
+format-tests:  ## format test code in Polyswarm style
+	yapf -p -r -i  --exclude tests/test_suite_internals.py $(TESTSRCROOT)
 	isort --recursive $(TESTSRCROOT)
 
 format-requirements:  ## sort requirements.txt
 	sort -u requirements.txt -o requirements.txt
 	sort -u requirements.dev.txt -o requirements.dev.txt
 
-msgstubs: # generate websocket event definition type stubs
+msgstubs: ## generate websocket event definition type stubs
 	(cd $(SRCROOT) && python -m websockets.scripts.gen_stubs | yapf)
 
-doctest: ## run doctests
-	(cd $(SRCROOT) && python -m websockets)
+quicktest: ## run tests
+	py.test -k "not test_SLOW"
 
-test: doctest ## run tests
+test: ## run tests, including slow ones
 	py.test
 
 clean: clean-build clean-pyc clean-test ## remove all build, test, coverage and Python artifacts
@@ -72,7 +72,7 @@ clean-test: ## remove test and coverage artifacts
 	rm -fr .pytest_cache
 
 coverage: ## check code coverage
-	coverage run --source $(SRCROOT) -m pytest
+	coverage run --source $(SRCROOT) -m pytest --doctest-modules
 	coverage report -m
 	coverage html
-	$(BROWSER) htmlcov/index.html
+	google-chrome htmlcov/index.html

@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 import logging
 from random import gauss
-from typing import Any, Callable, Iterable, List, NoReturn, Set, Type
+from typing import Any, Callable, ClassVar, Iterable, List, NoReturn, Set, Type
 
 import gevent
 from gevent.pool import Group
@@ -31,13 +31,15 @@ FormatClass = Type[messages.WebsocketFilterMessage]
 Message = bytes
 FilterInstaller = Callable[[str], ContractFilter]
 
-
 class FilterWrapper:
     """A utility class which wraps a contract filter with websocket-messaging features"""
     filter: ContractFilter
     filter_installer = Callable[[], ContractFilter]
     formatter: FormatClass
     backoff: bool
+    MIN_WAIT: ClassVar[float] = 0.5
+    MAX_WAIT: ClassVar[float] = 4.0
+    JITTER: ClassVar[float] = 0.1
 
     def __init__(self, filter_installer: FilterInstaller, formatter: FormatClass, backoff: bool):
         self.formatter = formatter
@@ -53,17 +55,28 @@ class FilterWrapper:
         return installer(self.formatter.contract_event_name)
 
     def compute_wait(self, ctr: int) -> float:
-        """Compute the amount of wait time from a counter of (sequential) empty replies"""
-        min_wait = 0.5
-        max_wait = 4.0
+        """Compute the amount of wait time from a counter of (sequential) empty replies
 
+        >>> FilterWrapper.JITTER = 0.0
+        >>> tv = (0, 1, 3, 6, 10, 100)
+        >>> backoff = FilterWrapper(identity, fake_formatter, backoff=True)
+        >>> wait_times = list(map(backoff.compute_wait, tv))
+        >>> wait_times
+        [0.5, 0.5, 1.0, 4.0, 4.0, 4.0]
+        >>> no_backoff = FilterWrapper(identity, fake_formatter, backoff=False)
+        >>> list(map(no_backoff.compute_wait, tv))
+        [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+        >>> FilterWrapper.JITTER = 0.1
+        >>> all(n != j and approx((n, j)) for n, j in zip(wait_times, map(backoff.compute_wait, tv)))
+        True
+        """
         if self.backoff:
             # backoff 'exponentially'
             exp = (1 << max(0, ctr - 2)) - 1
-            result = min(max_wait, max(min_wait, exp))
-            return abs(gauss(result, 0.1))
+            base_wait = min(self.MAX_WAIT, max(self.MIN_WAIT, exp))
+            return abs(gauss(base_wait, self.JITTER))
         else:
-            return min_wait
+            return self.MIN_WAIT
 
     def get_new_entries(self) -> List[Message]:
         return [self.formatter.serialize_message(e) for e in self.filter.get_new_entries()]

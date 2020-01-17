@@ -6,16 +6,16 @@ artifact:
     module: polyswarmd.services.artifact.ipfs
     class_name: IpfsServiceClient
     args:
-      - http://ipfs:5001
+      - http://localhost:5001
 community: gamma
 eth:
   trace_transactions: true
   directory: "/home/zv/polyswarm/polyswarmd/tests/fixtures/config/chain/"
   # consul:
-  #    uri: http://consul:8500
+  #    uri: http://localhost:8500
 profiler:
   enabled: false
 # redis:
-#   uri: redis://redis:6379
+#   uri: redis://localhost:6379
 websocket:
-  enabled: false
+  enabled: true
