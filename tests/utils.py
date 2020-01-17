@@ -49,6 +49,13 @@ class heck(UserDict):
             return False
 
     @staticmethod
+    def UINT(num: int) -> bool:
+        try:
+            return num >= 0
+        except Exception:
+            return False
+
+    @staticmethod
     def ARRAY(x) -> bool:
         return isinstance(x, list)
 

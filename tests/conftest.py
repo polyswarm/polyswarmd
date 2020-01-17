@@ -10,7 +10,6 @@ from .utils import read_chain_cfg
 import requests.adapters  # noqa
 from requests.models import Response  # noqa
 import web3.contract
-# import web3.utils.datatypes
 
 
 def let(obj, **kwargs):
