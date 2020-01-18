@@ -7,8 +7,11 @@ import pytest
 from unittest.mock import patch
 
 from .utils import read_chain_cfg
-import requests.adapters  # noqa
-from requests.models import Response  # noqa
+import web3.datastructures
+
+import web3.manager
+
+import web3.eth
 import web3.contract
 
 
@@ -23,11 +26,6 @@ PRE_INIT_PATCHES = (
     # don't both with patching gevent methods inside pytest
     patch('gevent.monkey.patch_all', return_value=None),
     # # fake out the underlying ipfshttpclient connect
-    # patch('ipfshttpclient.connect', return_value=True),
-    # # replace requests.adapter's send method
-    # patch.object(
-    #     requests.adapters.HTTPAdapter, 'send', return_value=let(Response(), status_code=200)
-    # ),
     # set `POLY_WORK` to be 'testing' (if not already set)
     patch('os.getenv', lambda *args, **kwargs: 'testing' if args[0] == 'POLY_WORK' else os.getenv)
 )
@@ -47,6 +45,32 @@ for pa in PRE_INIT_PATCHES:
 
 
 @pytest.fixture(scope='session')
+def app():
+    return _app
+
+
+@pytest.fixture(scope='session')
+def client(app):
+    app.config['TESTING'] = True
+    yield app.test_client()
+
+
+@pytest.fixture(params=['home', 'side'], scope='session')
+def chain_config(request):
+    return read_chain_cfg(request.param)
+
+
+@pytest.fixture(params=['home', 'side'], scope='session')
+def chains(request, app):
+    return app.config['POLYSWARMD'].chains[request.param]
+
+
+@pytest.fixture
+def chain_id():
+    return 1337
+
+
+@pytest.fixture(scope='session')
 def community():
     return 'gamma'
 
@@ -59,6 +83,11 @@ def base_nonce():
 @pytest.fixture
 def balances(token_address):
     return {token_address: 12345}
+
+
+@pytest.fixture
+def block_number(token_address):
+    return 5197
 
 
 @pytest.fixture
@@ -81,25 +110,9 @@ def token_address():
     return '0x4B1867c484871926109E3C47668d5C0938CA3527'
 
 
-@pytest.fixture(scope='session')
-def app():
-    return _app
-
-
-@pytest.fixture(scope='session')
-def client(app):
-    app.config['TESTING'] = True
-    yield app.test_client()
-
-
-@pytest.fixture(params=['home', 'side'], scope='session')
-def chain_config(request):
-    return read_chain_cfg(request.param)
-
-
-@pytest.fixture(params=['home', 'side'], scope='session')
-def chains(request, app):
-    return app.config['POLYSWARMD'].chains[request.param]
+@pytest.fixture
+def gas_limit():
+    return 94040201
 
 
 @pytest.fixture
@@ -152,20 +165,52 @@ def contract_fns(token_address, balances, bounty_parameters):
     return fn_table
 
 
-_ContractFunction_call = web3.contract.ContractFunction.call
-
-
 @pytest.fixture
-def mock_w3(monkeypatch, contract_fns):
+def web3_blocking_values(balances, token_address, block_number, chain_id, gas_limit):
+    return {
+        'eth_blockNumber':
+            block_number,
+        'eth_call':
+            lambda data, to: '0x' + '0'*64,
+        'eth_getBalance':
+            lambda token_address, block: balances[token_address],
+        'eth_getBlockByNumber':
+            lambda *_: web3.datastructures.AttributeDict({'gasLimit': gas_limit}),
+        'eth_getTransactionCount':
+            lambda token_address, block: balances[token_address],
+        'eth_syncing':
+            False,
+        'net_version':
+            chain_id
+    }
 
-    def original_call(self, *args):
-        print("WARNING: Using non-mocked contract function: ", self.fn_name)
-        return _ContractFunction_call(self, *args)
+
+@pytest.fixture(autouse=True)
+def mock_polyswarmd(monkeypatch):
+    """Mock the polyswarmd functions which call out to external services"""
+    monkeypatch.setattr(_polyswarmd.config.service.Service, "test_reachable", lambda *_: True)
+    monkeypatch.setattr(
+        _polyswarmd.services.ethereum.service.EthereumService, "check_chain_id", lambda *_: True
+    )
+
+
+@pytest.fixture(autouse=True)
+def mock_w3(monkeypatch, contract_fns, web3_blocking_values):
+    _ContractFunction_call = web3.contract.ContractFunction.call
 
     def mock_call(w3_cfn, *args, **kwargs):
-        args = w3_cfn.args
         name = w3_cfn.fn_name
-        fn = contract_fns.get(name, original_call)
-        return fn(w3_cfn, *args)
+        if name not in contract_fns:
+            print("WARNING: Using non-mocked contract function: ", name)
+        fn = contract_fns.get(name, _ContractFunction_call)
+        return fn(w3_cfn, *w3_cfn.args)
 
+    def mock_request_blocking(self, method, params):
+        """
+        Make a synchronous request using the provider
+        """
+        mock = web3_blocking_values[method]
+        return mock(*params) if callable(mock) else mock
+
+    monkeypatch.setattr(web3.manager.RequestManager, "request_blocking", mock_request_blocking)
     monkeypatch.setattr(web3.contract.ContractFunction, "call", mock_call)

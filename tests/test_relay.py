@@ -12,7 +12,7 @@ def tx_success_response(token_address, base_nonce):
     return heck({
         'result': {
             'transactions': [{
-                'chainId': heck.IGNORE,
+                'chainId': heck.SUBSTITUTE,
                 'data': lambda s: s[2:].startswith(TX_SIG_HASH) and len(s) > len(TX_SIG_HASH) + 32,
                 'gas': heck.POSINT,
                 'gasPrice': 0,
