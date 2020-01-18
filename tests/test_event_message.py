@@ -44,16 +44,13 @@ class NOPMessage(WebsocketMessage):
 class DumbFilter:
 
     def __init__(
-        self, speed=1.0, prev=0, extra={}, start=None, backoff=True, ident=None, source=None
+        self, speed=1.0, prev=0, extra={}, backoff=True, ident=None, source=None
     ):
         self.speed = (1/speed) * STRIDE
-        self.prev = prev
         self.extra = extra
         self.backoff = backoff
-        self._start = start
         self.ident = ident or str(uuid.uuid4())
         self.source = source or self.uniform(self.speed)
-        self.constructed = now()
 
     @property
     def start(self):
@@ -69,9 +66,7 @@ class DumbFilter:
         return {
             FILTER: self.ident,
             NTH: idx,
-            'step': step,
             TX_TS: now(),
-            'speed': self.speed,
             START: self.start,
             BACKOFF: self.backoff
         }
