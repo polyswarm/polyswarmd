@@ -84,7 +84,7 @@ class DumbFilter:
         # from a future change to the code where `FilterManager` should die/`FilterManager.flush()`
         # after `EthereumRpc.unregister()` or in a surrounding contextmanager
         except StopIteration:
-            yield []
+            yield tuple()
 
     def close(self):
         try:
