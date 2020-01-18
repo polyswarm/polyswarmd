@@ -2,7 +2,7 @@ import pytest
 import json
 from collections import namedtuple
 from pprint import pprint
-from . import messages, filter
+from polyswarmd.websockets import messages, filter
 import ujson
 
 
