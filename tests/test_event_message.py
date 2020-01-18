@@ -79,12 +79,8 @@ class DumbFilter:
     def get_new_entries(self) -> Iterator:
         try:
             yield from next(self.source)
-        # XXX As of 01/17/20, `filter_manager` will continue to fetch events if all websockets
-        # disconnect, therefore this `StopIteration` handler won't surface issues which would arise
-        # from a future change to the code where `FilterManager` should die/`FilterManager.flush()`
-        # after `EthereumRpc.unregister()` or in a surrounding contextmanager
         except StopIteration:
-            yield tuple()
+            yield StopIteration
 
     def close(self):
         try:
