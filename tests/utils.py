@@ -3,14 +3,16 @@ This file contains utilities *FOR TESTING*, it should *NOT* contain tests of pol
 """
 from collections import UserDict
 from collections.abc import Collection, Mapping
+from curses.ascii import CAN as CANCEL
+from curses.ascii import SUB as SUBSTITUTE
 import json
 import string
 
 
 class heck(UserDict):
     """MappingProxy which allows functions as value to overide inner equality checks"""
-    IGNORE = b'\x03'
-    FAILED = b'\x15'
+    SUBSTITUTE = bytes([chr(SUBSTITUTE)])
+    FAILED = bytes([chr(CANCEL)])
 
     def __init__(self, data):
         if not isinstance(data, Mapping):
@@ -26,7 +28,7 @@ class heck(UserDict):
                 return [self.fixup(actual[i], expected[i]) for i, _ in enumerate(expected)]
         elif callable(expected):
             return actual if expected(actual) else self.FAILED
-        elif expected == self.IGNORE:
+        elif expected == self.SUBSTITUTE:
             return actual
         return expected
 
