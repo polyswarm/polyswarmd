@@ -58,36 +58,25 @@ def client(app):
 @pytest.fixture(params=['home', 'side'], scope='session')
 def chain_config(request):
     return read_chain_cfg(request.param)
-
-
 @pytest.fixture(params=['home', 'side'], scope='session')
 def chains(request, app):
     return app.config['POLYSWARMD'].chains[request.param]
 
 
 @pytest.fixture
-def chain_id():
-    return 1337
-
-
+def chain_id(): return 1337
 @pytest.fixture(scope='session')
-def community():
-    return 'gamma'
-
-
+def community(): return 'gamma'
 @pytest.fixture(scope='session')
-def base_nonce():
-    return random.randint(2**15, 2**16)
-
-
+def base_nonce(): return 1248924
 @pytest.fixture
-def balances(token_address):
-    return {token_address: 12345}
-
-
+def balances(token_address): return {token_address: 12345}
+@pytest.fixture(scope='session')
+def token_address(): return '0x4B1867c484871926109E3C47668d5C0938CA3527'
 @pytest.fixture
-def block_number(token_address):
-    return 5197
+def gas_limit(): return 94040201
+@pytest.fixture
+def block_number(token_address): return 5197
 
 
 @pytest.fixture
@@ -105,18 +94,15 @@ def bounty_parameters():
     }
 
 
-@pytest.fixture(scope='session')
-def token_address():
-    return '0x4B1867c484871926109E3C47668d5C0938CA3527'
-
-
-@pytest.fixture
-def gas_limit():
-    return 94040201
-
 
 @pytest.fixture
 def contract_fns(token_address, balances, bounty_parameters):
+    """mock out values of contract functions
+
+    NOTE: if the function shares a name with a patched function here, that value will be used, e.g
+    `contract_fns` does *not* distinguish between contracts.
+    """
+
     fn_table = {}
 
     def patch_contract(func):
@@ -167,6 +153,7 @@ def contract_fns(token_address, balances, bounty_parameters):
 
 @pytest.fixture
 def web3_blocking_values(balances, token_address, block_number, chain_id, gas_limit):
+    """mock values for `web3.manager.request_blocking`"""
     return {
         'eth_blockNumber':
             block_number,
@@ -187,7 +174,7 @@ def web3_blocking_values(balances, token_address, block_number, chain_id, gas_li
 
 @pytest.fixture(autouse=True)
 def mock_polyswarmd(monkeypatch):
-    """Mock the polyswarmd functions which call out to external services"""
+    """Mock polyswarmd functions which call out to external services"""
     monkeypatch.setattr(_polyswarmd.config.service.Service, "test_reachable", lambda *_: True)
     monkeypatch.setattr(
         _polyswarmd.services.ethereum.service.EthereumService, "check_chain_id", lambda *_: True
@@ -196,6 +183,7 @@ def mock_polyswarmd(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def mock_w3(monkeypatch, contract_fns, web3_blocking_values):
+    """Mock out underlying w3py functions so that tests can be run sans-geth"""
     _ContractFunction_call = web3.contract.ContractFunction.call
 
     def mock_call(w3_cfn, *args, **kwargs):
@@ -206,9 +194,6 @@ def mock_w3(monkeypatch, contract_fns, web3_blocking_values):
         return fn(w3_cfn, *w3_cfn.args)
 
     def mock_request_blocking(self, method, params):
-        """
-        Make a synchronous request using the provider
-        """
         mock = web3_blocking_values[method]
         return mock(*params) if callable(mock) else mock
 
