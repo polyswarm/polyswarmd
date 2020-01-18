@@ -58,25 +58,46 @@ def client(app):
 @pytest.fixture(params=['home', 'side'], scope='session')
 def chain_config(request):
     return read_chain_cfg(request.param)
+
+
 @pytest.fixture(params=['home', 'side'], scope='session')
 def chains(request, app):
     return app.config['POLYSWARMD'].chains[request.param]
 
 
 @pytest.fixture
-def chain_id(): return 1337
+def chain_id():
+    return 1337
+
+
 @pytest.fixture(scope='session')
-def community(): return 'gamma'
+def community():
+    return 'gamma'
+
+
 @pytest.fixture(scope='session')
-def base_nonce(): return 1248924
+def base_nonce():
+    return 1248924
+
+
 @pytest.fixture
-def balances(token_address): return {token_address: 12345}
+def balances(token_address):
+    return {token_address: 12345}
+
+
 @pytest.fixture(scope='session')
-def token_address(): return '0x4B1867c484871926109E3C47668d5C0938CA3527'
+def token_address():
+    return '0x4B1867c484871926109E3C47668d5C0938CA3527'
+
+
 @pytest.fixture
-def gas_limit(): return 94040201
+def gas_limit():
+    return 94040201
+
+
 @pytest.fixture
-def block_number(token_address): return 5197
+def block_number(token_address):
+    return 5197
 
 
 @pytest.fixture
@@ -92,7 +113,6 @@ def bounty_parameters():
         'bounty_fee': 62500000000000000,
         'max_duration': 100
     }
-
 
 
 @pytest.fixture

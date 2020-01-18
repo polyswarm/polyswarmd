@@ -26,7 +26,7 @@ CPUTIME = 'pipeline_latency'
 MAXWAIT = 'max_wait'
 BACKOFF = 'backoff'
 START = 'start'
-FILTERID = 'filter'
+FILTER = 'filter'
 NTH = 'nth'
 
 STRIDE = 10
@@ -67,7 +67,7 @@ class DumbFilter:
 
     def to_msg(self, idx, step=None):
         return {
-            FILTERID: self.ident,
+            FILTER: self.ident,
             NTH: idx,
             'step': step,
             TX_TS: now(),
@@ -112,22 +112,23 @@ class enrich(Collection):
     latency_var = property(lambda msgs: statistics.pvariance(msgs.bundles))
     latency_avg = property(lambda msgs: statistics.mean(msgs.bundles))
     usertime_avg = property(lambda msgs: statistics.mean(msgs[CPUTIME]))
-    sources = property(lambda msgs: len(set(msgs[FILTERID])))
+    sources = property(lambda msgs: len(set(msgs[FILTER])))
 
     def __init__(self, messages, extra={}):
-        self.msgs = []
+        self.msgs = self.enrich_messages(messages, extra)
+
+    def enrich_messages(self, messages, extra={}):
         prev = {}
+        enriched = []
         for msg in messages:
             data = msg.get('data', {})
-            msg[FILTERID] = data.get(FILTERID, -1)
-            msg[NTH] = data.get(NTH, -1)
-            msg[TX_TS] = data.get(TX_TS, -1)
-            msg[TXDIFF] = msg[TX_TS] - prev.get(TX_TS, msg[TX_TS])
-            msg[CPUTIME] = now() - msg[TX_TS]
-            if extra:
-                msg.update(extra)
-            self.msgs.append(msg)
-            prev = msg
+            emsg = {FILTER: data.get(FILTER), NTH: data.get(NTH), TX_TS: data.get(TX_TS, -1)}
+            emsg[TXDIFF] = emsg[TX_TS] - prev.get(TX_TS, emsg[TX_TS])
+            emsg[CPUTIME] = now() - emsg[TX_TS]
+            msg.update(extra)
+            enriched.append(emsg)
+            prev = emsg
+        return enriched
 
     def __iter__(self):
         return iter(self.msgs)
@@ -273,9 +274,3 @@ def mock_fm(monkeypatch):
 @pytest.fixture
 def rpc(mock_fm):
     return EthereumRpc
-
-
-@pytest.fixture
-def nowait(monkeypatch):
-    monkeypatch.setattr(FilterWrapper, "JITTER", 0)
-    monkeypatch.setattr(FilterWrapper, "MIN_WAIT", 0)
