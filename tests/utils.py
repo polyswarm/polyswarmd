@@ -11,8 +11,8 @@ import string
 
 class heck(UserDict):
     """MappingProxy which allows functions as value to overide inner equality checks"""
-    SUBSTITUTE = bytes([chr(SUBSTITUTE)])
-    FAILED = bytes([chr(CANCEL)])
+    SUBSTITUTE = bytes([SUBSTITUTE])
+    FAILED = bytes([CANCEL])
 
     def __init__(self, data):
         if not isinstance(data, Mapping):

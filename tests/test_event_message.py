@@ -1,10 +1,9 @@
 from collections.abc import Collection
 from contextlib import contextmanager
-from math import ceil
-import pprint
+from curses.ascii import EOT as END_OF_TRANSMISSION
 import statistics
 import time
-from typing import Any, ClassVar, List, Mapping, Optional
+from typing import ClassVar, Generator, Iterator, List, Mapping
 import uuid
 
 import gevent
@@ -14,16 +13,8 @@ import ujson
 
 from polyswarmd.services.ethereum.rpc import EthereumRpc
 from polyswarmd.views.event_message import WebSocket
-from polyswarmd.websockets.filter import FilterManager
-from polyswarmd.websockets.messages import (
-    ClosedAgreement,
-    Connected,
-    SettleStateChallenged,
-    StartedSettle,
-    WebsocketEventMessage,
-    WebsocketFilterMessage,
-    WebsocketMessage,
-)
+from polyswarmd.websockets.filter import FilterManager, FilterWrapper
+from polyswarmd.websockets.messages import WebsocketMessage
 
 now = time.time
 BEGIN = now()
@@ -38,6 +29,8 @@ START = 'start'
 FILTERID = 'filter'
 NTH = 'nth'
 
+STRIDE = 10
+
 
 def elapsed(since):
     return now() - since
@@ -49,39 +42,69 @@ class NOPMessage(WebsocketMessage):
 
 
 class DumbFilter:
-    def __init__(self, speed=1.0, prev=0, extra={}, start=None, backoff=True, ident=None, source=None):
-        self.speed = speed
+
+    def __init__(
+        self, speed=1.0, prev=0, extra={}, start=None, backoff=True, ident=None, source=None
+    ):
+        self.speed = (1/speed) * STRIDE
         self.prev = prev
         self.extra = extra
-        self.start = start
         self.backoff = backoff
-        self.ident = ident
-        self.source = source
+        self._start = start
+        self.ident = ident or str(uuid.uuid4())
+        self.source = source or self.uniform(self.speed)
+        self.constructed = now()
+
+    @property
+    def start(self):
+        if not self._start:
+            self._start = now()
+        return self._start
 
     # Verify that _something_ is being passed in, even if we're not using it.
     def __call__(self, contract_event_name):
         return self
 
-    def to_msg(self, idx):
-        # XXX: do not use id(self) here, the lifetime of each dumbfilter does not overlap
-        if not self.ident:
-            self.ident = str(uuid.uuid4())
+    def to_msg(self, idx, step=None):
         return {
             FILTERID: self.ident,
             NTH: idx,
+            'step': step,
             TX_TS: now(),
             'speed': self.speed,
             START: self.start,
             BACKOFF: self.backoff
         }
 
-    def get_new_entries(self):
-        if not self.start:
-            self.start = now()
-        prev = self.prev
-        curr = ceil(elapsed(self.start) / self.speed)
-        yield from map(self.to_msg, range(prev, curr))
-        self.prev = curr
+    def get_new_entries(self) -> Iterator:
+        try:
+            yield from next(self.source)
+        # XXX As of 01/17/20, `filter_manager` will continue to fetch events if all websockets
+        # disconnect, therefore this `StopIteration` handler won't surface issues which would arise
+        # from a future change to the code where `FilterManager` should die/`FilterManager.flush()`
+        # after `EthereumRpc.unregister()` or in a surrounding contextmanager
+        except StopIteration:
+            yield []
+
+    def close(self):
+        try:
+            self.source.send(END_OF_TRANSMISSION)
+        except StopIteration as e:
+            return e.value
+
+    def uniform(self, frequency: int, offset=0) -> Generator:
+        s = 1
+        msg_ctr = 0
+        while True:
+            msgs = []
+            for point in range(s, s + STRIDE):
+                if frequency % point == 0 + offset:
+                    msg_ctr += 1
+                    msgs.append(self.to_msg(msg_ctr, step=s))
+            done = yield msgs
+            if done == END_OF_TRANSMISSION:
+                return msg_ctr
+            s += STRIDE
 
 
 class enrich(Collection):
@@ -166,11 +189,11 @@ class TestWebsockets:
         speed = 0.5
         sources = 10
         filters = [DumbFilter(speed=speed) for _ in range(sources)]
-        count = int(sum(max_wait // f.speed for f in filters))
         enrc = self.events(filters=filters, ws=mock_ws('NA'), max_wait=max_wait, RPC=rpc(chains))
         # just to be sure
         assert len(enrc) > 0
         # the number of msgs should be ~ (elapsed_time / msg_rate) * num_of_msg_srcs)
+        count = sum(f.close() for f in filters)
         assert abs(len(enrc) - count) <= 1
         assert enrc.sources == sources
         # verify the time elapsed took what we thought
@@ -221,6 +244,7 @@ class TestWebsockets:
             max_wait=max_wait,
             RPC=rpc(chains),
         )
+        list(f.close() for f in filters)
         # just to be sure
         assert len(enrc) > 0
         assert enrc.sources == len(filters)
@@ -246,9 +270,16 @@ def mock_ws(monkeypatch):
 
 @pytest.fixture
 def mock_fm(monkeypatch):
+    monkeypatch.setattr(FilterWrapper, "JITTER", 0)
     monkeypatch.setattr(FilterManager, "setup_event_filters", lambda s, *_: s.flush())
 
 
 @pytest.fixture
 def rpc(mock_fm):
     return EthereumRpc
+
+
+@pytest.fixture
+def nowait(monkeypatch):
+    monkeypatch.setattr(FilterWrapper, "JITTER", 0)
+    monkeypatch.setattr(FilterWrapper, "MIN_WAIT", 0)
