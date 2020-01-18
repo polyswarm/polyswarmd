@@ -15,7 +15,5 @@ eth:
   #    uri: http://localhost:8500
 profiler:
   enabled: false
-# redis:
-#   uri: redis://localhost:6379
 websocket:
   enabled: true
