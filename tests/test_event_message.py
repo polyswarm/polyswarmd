@@ -51,6 +51,7 @@ class DumbFilter:
         self.backoff = backoff
         self.ident = ident or str(uuid.uuid4())
         self.source = source or self.uniform(self.speed)
+        self._start = None
 
     @property
     def start(self):
