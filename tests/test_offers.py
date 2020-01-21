@@ -1,44 +1,12 @@
-import io
+from .utils import failed, heck
 
-import polyswarmd
-import json
+# def test_get_balance_total_stake(client, mock_w3, token_address, balances):
+#     assert sane(
+#         response=client.get(f'/offers/'),
+#         expected=heck({
+#             'result': str(balances[token_address]),
+#             'status': 'OK'
+#         })
+#     )
 
-from polyswarmd import utils, app
-from polyswarmd.eth import ZERO_ADDRESS
-from tests import client, test_account
-
-def test_post_to_state(client):
-    token = app.config['POLYSWARMD'].chains['home'].nectar_token.address
-    expected = ('{{"result":{{"state":"0x0000000000000000000000000000000000000000000000000000000000000001'
-    '00000000000000000000000000000000000000000000000000000000000004d20000000000000000000000004b1867c48487'
-    '1926109e3c47668d5c0938ca35270000000000000000000000004b1867c484871926109e3c47668d5c0938ca352700000000'
-    '0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
-    '0000000000000089544000000000000000000000000000000000000000000000000000000000000013880000000000000000'
-    '00000000{}00000000000000000000000000000000000000000000000000000000000004d200000000000000000000000000'
-    '00000000000000000000000000000000249f0000000000000000000000000000000000000000000000000000000000000000'
-    '0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
-    '0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
-    '0000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000'
-    '00000000000000000000030000000000000000000000000000000000000000000000000000000074657374"}},"status":"'
-    'OK"}}\n').format(token.replace('0x', ''))
-    mock_state_dict = {
-        'guid': '1234',
-        'close_flag': 1,
-        'nonce': 1234,
-        'offer_amount': 2400000,
-        'expert': test_account,
-        'expert_balance': 5000,
-        'ambassador': test_account,
-        'ambassador_balance': 9000000,
-        'msig_address': ZERO_ADDRESS,
-        'mask': [True, False],
-        'verdicts': [True, True],
-        'meta_data': 'test'
-    }
-    rv = client.post(
-        f'/offers/state?account={test_account}',
-        content_type='application/json',
-        data=json.dumps(mock_state_dict)
-    )
-
-    assert rv.data == expected.encode()
+#     assert failed(client.get(f'/balances/INVALID/staking/total'))

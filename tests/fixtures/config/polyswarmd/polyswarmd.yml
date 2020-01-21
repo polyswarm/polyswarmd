@@ -1,0 +1,19 @@
+artifact:
+  max_size: 34603008
+  fallback_max_size: 10485760
+  limit: 256
+  library:
+    module: polyswarmd.services.artifact.ipfs
+    class_name: IpfsServiceClient
+    args:
+      - http://localhost:5001
+community: gamma
+eth:
+  trace_transactions: true
+  directory: "tests/fixtures/config/chain/"
+  # consul:
+  #    uri: http://localhost:8500
+profiler:
+  enabled: false
+websocket:
+  enabled: true

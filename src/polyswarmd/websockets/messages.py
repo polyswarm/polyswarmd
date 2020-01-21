@@ -9,9 +9,9 @@ from typing import (
     Type,
     cast,
 )
-import ujson
 
 from requests_futures.sessions import FuturesSession
+import ujson
 
 from polyswarmartifact import ArtifactType
 from polyswarmartifact.schema import Assertion as AssertionMetadata
@@ -134,12 +134,12 @@ class MetadataHandler:
     @classmethod
     def initialize(cls):
         """Create & assign a new implementation of _substitute_metadata"""
-        from polyswarmd import app
-        from polyswarmd.bounties import substitute_metadata
+        from polyswarmd.app import app
+        from polyswarmd.views.bounties import substitute_metadata
         config: Optional[Dict[str, Any]] = app.config
-        ai = config['POLYSWARMD'].artifact_client
+        ai = config['POLYSWARMD'].artifact.client
         session = FuturesSession(adapter_kwargs={'max_retries': 3})
-        redis = config['POLYSWARMD'].redis
+        redis = config['POLYSWARMD'].redis.client
 
         def _substitute_metadata_impl(uri: str, validate=None):
             return substitute_metadata(uri, ai, session, validate=validate, redis=redis)

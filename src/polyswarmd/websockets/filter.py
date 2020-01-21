@@ -1,7 +1,6 @@
-from contextlib import contextmanager
 import logging
 from random import gauss
-from typing import Any, Callable, Iterable, List, NoReturn, Set, Type
+from typing import Any, Callable, Iterable, List, NoReturn, Type
 
 import gevent
 from gevent.pool import Group
@@ -32,12 +31,25 @@ Message = bytes
 FilterInstaller = Callable[[str], ContractFilter]
 
 
+class FilterManagerResetWarning(RuntimeWarning):
+
+    def __init__(self, wrappers: Iterable['FilterWrapper']):
+        message = (
+            "Attempted to initialize a FilterManager with existing filters: "
+            ', '.join(map(str, (hasattr(fw, 'filter') and fw.filter.filter_id for fw in wrappers)))
+        )
+        super().__init__(message)
+
+
 class FilterWrapper:
     """A utility class which wraps a contract filter with websocket-messaging features"""
     filter: ContractFilter
     filter_installer = Callable[[], ContractFilter]
     formatter: FormatClass
     backoff: bool
+    MIN_WAIT: float = 0.5
+    MAX_WAIT: float = 4.0
+    JITTER: float = 0.1
 
     def __init__(self, filter_installer: FilterInstaller, formatter: FormatClass, backoff: bool):
         self.formatter = formatter
@@ -53,17 +65,28 @@ class FilterWrapper:
         return installer(self.formatter.contract_event_name)
 
     def compute_wait(self, ctr: int) -> float:
-        """Compute the amount of wait time from a counter of (sequential) empty replies"""
-        min_wait = 0.5
-        max_wait = 4.0
+        """Compute the amount of wait time from a counter of (sequential) empty replies
 
+        >>> FilterWrapper.JITTER = 0.0
+        >>> tv = (0, 1, 3, 6, 10, 100)
+        >>> backoff = FilterWrapper(identity, fake_formatter, backoff=True)
+        >>> wait_times = list(map(backoff.compute_wait, tv))
+        >>> wait_times
+        [0.5, 0.5, 1.0, 4.0, 4.0, 4.0]
+        >>> no_backoff = FilterWrapper(identity, fake_formatter, backoff=False)
+        >>> list(map(no_backoff.compute_wait, tv))
+        [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+        >>> FilterWrapper.JITTER = 0.1
+        >>> all(n != j and approx((n, j)) for n, j in zip(wait_times, map(backoff.compute_wait, tv)))
+        True
+        """
         if self.backoff:
             # backoff 'exponentially'
             exp = (1 << max(0, ctr - 2)) - 1
-            result = min(max_wait, max(min_wait, exp))
-            return abs(gauss(result, 0.1))
+            base_wait = min(self.MAX_WAIT, max(self.MIN_WAIT, exp))
+            return abs(gauss(base_wait, self.JITTER))
         else:
-            return min_wait
+            return self.MIN_WAIT
 
     def get_new_entries(self) -> List[Message]:
         return [self.formatter.serialize_message(e) for e in self.filter.get_new_entries()]
@@ -109,7 +132,7 @@ class FilterManager:
     """Manages access to filtered Ethereum events."""
 
     def __init__(self):
-        self.wrappers = set()
+        self.wrappers = []
         self.pool = Group()
 
     def register(
@@ -117,13 +140,8 @@ class FilterManager:
     ):
         """Add a new filter, with an optional associated WebsocketMessage-serializer class"""
         wrapper = FilterWrapper(filter_installer, fmt_cls, backoff)
-        self.wrappers.add(wrapper)
+        self.wrappers.append(wrapper)
         logger.debug('Registered new filter: %s', wrapper)
-
-    def flush(self):
-        """End all event polling, uninstall all filters and remove their corresponding wrappers"""
-        self.pool.kill()
-        self.wrappers.clear()
 
     def fetch(self):
         """Return a queue of currently managed contract events"""
@@ -135,8 +153,7 @@ class FilterManager:
     def setup_event_filters(self, chain: Any):
         """Setup the most common event filters"""
         if len(self.wrappers) != 0:
-            logger.exception("Attempting to initialize already initialized filter manager")
-            self.flush()
+            raise FilterManagerResetWarning(self.wrappers)
 
         bounty_contract = chain.bounty_registry.contract
 

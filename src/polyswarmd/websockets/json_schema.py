@@ -1,6 +1,7 @@
 from functools import partial
 import operator
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     ClassVar,
@@ -14,10 +15,14 @@ from typing import (
 )
 import uuid
 
-try:
-    from typing import TypedDict
-except ImportError:
+# HACK: please upgrade me to python 3.8
+if TYPE_CHECKING:
     from mypy_extensions import TypedDict
+else:
+
+    def TypedDict(*args, **kwargs):
+        return object
+
 
 SchemaType = str
 SchemaFormat = str
@@ -25,16 +30,16 @@ SchemaExtraction = Dict[Any, Any]
 
 SchemaDef = TypedDict(
     'SchemaDef', {
-        'type': SchemaType,
-        'format': SchemaFormat,
+        'type': 'SchemaType',
+        'format': 'SchemaFormat',
         'enum': Iterable[Any],
-        'items': SchemaType,
+        'items': 'SchemaType',
         'srckey': Union[str, Callable[[str, Any], Any]],
     },
     total=False
 )
 
-JSONSchema = TypedDict('JSONSchema', {'properties': Mapping[str, SchemaDef]}, total=False)
+JSONSchema = TypedDict('JSONSchema', {'properties': Mapping[str, 'SchemaDef']}, total=False)
 
 
 def compose(f, g):

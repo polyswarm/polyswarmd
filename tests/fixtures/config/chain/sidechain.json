@@ -1,0 +1,10 @@
+{
+  "nectar_token_address": "0x2A2cEDE7598F91240068714fD83E449b19853Cb9",
+  "arbiter_staking_address": "0xd143eD6591c0F11c3b9e279bC4A5932958caaC08",
+  "erc20_relay_address": "0xBc7eFcE4b8be4715630475a060B53c33829101e0",
+  "offer_registry_address": "0x377A1ce373Ae0C5878C248cA34f72186A8e1Da38",
+  "bounty_registry_address": "0x21262bF29FF08691C8A72bc6f22F791996E1891F",
+  "eth_uri": "http://localhost:7545",
+  "chain_id": 1338,
+  "free": true
+}

@@ -11,18 +11,56 @@
 
 New developers are encouraged to visit the [PolySwarm Documentation](https://docs.polyswarm.io) and build on top of [`polyswarm-client`](https://github.com/polyswarm/polyswarm-client) rather than directly writing code against the comparatively low-level `polyswarmd`.
 
+### `make`
 
-### Linting and Types
-PolyswarmD has some [mypy](https://mypy.readthedocs.io/en/latest/) types and is configured to type existing untyped PolyswarmD code (although it lacks types for many external libraries, these can be generated with `stubgen`, although in my experience the gain isn't worth the cost of setting them up).
+There are a selection of useful rules covering routine tasks made in the project `Makefile`,
 
-### Linting
-A script for linting the repository with [yapf](https://github.com/google/yapf), [isort](https://github.com/timothycrosley/isort) [mypy](https://mypy.readthedocs.io/en/latest/), [flake8](http://flake8.pycqa.org/en/latest/) as well as running doctests for `polyswarmd.websockets`, which lives at `./scripts/lint.sh`.
+- `make test` - Run all `pytest` unittests & doctests
+    + `make quicktest` - Run all "NOT SLOW" tests (PolyswarmD has some
+                        slow-running tests to verify certain WebSocket behavior,
+                        this will skip those)
+    + `make coverage` - Print a test coverage report
+- `make lint` - Linting the source directory with
+            [yapf](https://github.com/google/yapf),
+            [isort](https://github.com/timothycrosley/isort)
+            [mypy](https://mypy.readthedocs.io/en/latest/),
+            [flake8](http://flake8.pycqa.org/en/latest/) as well as running
+            doctests for `polyswarmd.websockets` & verifying `requirements*.txt`
+            is sorted.
+    + `make mypy` - Run [mypy](https://mypy.readthedocs.io/en/stable/) type
+                   checking
+- `make format` - format source code in Polyswarm style
+    + `make format-tests` - format test code
+    + `make format-requirements` - format `requirements*.txt`
+- `make clean` - Clean `build/`, `*.pyc` and more
+- `make msgstubs` - Regenerate the dynamically generated type-stubs for the
+                    websocket messages in `polyswarmd.websockets.message`.
+- `make help` - Print available rules
 
-The configuration files for each are an approximation of my own reading of _"Polyswarm style"_. If you'd like to use these settings in other projects, you can copy `setup.cfg`. `PolyswarmD` serves as the backbone for many projects, so it's configuration should also function as a reasonable base for other project's linting style; if something changes, please open a PR to add or modify it's linting config in `setup.cfg`.
+## Example Config
 
-#### Formatting
-`./scripts/lint.sh` can be run with the `-i` (in-place update) flag, which causes it to prompt the user to format all the source files located in `src/polyswarmd/`
-
-### Generating stubs
-`./scripts/lint.sh` can be run with `--stubs` flag to print dynamically generated type-stubs for the polyswarm Websocket messages. The script which is ultimately responsible for generating these stubs is located in `src/polyswarmd/websockets/scripts/gen_stubs.py`
+```yaml
+artifact:
+  max_size: 34603008
+  fallback_max_size: 10485760
+  limit: 256
+  library:
+    module: polyswarmd.services.artifact.ipfs
+    class_name: IpfsServiceClient
+    args:
+      - http://localhost:5001
+community: gamma
+eth:
+  trace_transactions: true
+  consul:
+    uri: http://localhost:8500
+  # directory: /path/to/config 
+profiler:
+  enabled: false
+  # db_uri: http://db:1234
+redis:
+  uri: redis://localhost:6379
+websocket:
+  enabled: true
+```
 

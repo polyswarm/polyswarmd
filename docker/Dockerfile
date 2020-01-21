@@ -13,6 +13,7 @@ COPY requirements.txt ./
 RUN set -x && pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+COPY ./config/polyswarmd.yml /etc/polyswarmd/polyswarmd.yml
 RUN set -x && pip install .
 
 # You can set log format and level in command line by e.g. `polyswarmd.wsgi:app(log_format='text', log_level='WARNING')`

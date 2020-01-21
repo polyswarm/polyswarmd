@@ -44,11 +44,13 @@ build:
 ###############################################################
 
 test:
+  stage: test
   tags:
     - kube
-  stage: test
+  before_script:
+    - docker pull $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
   script:
-    - echo "Still to be implemented"
+    - docker run $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA make ci-test
 
 ###############################################################
 # End-to-end Stage

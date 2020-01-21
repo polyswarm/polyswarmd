@@ -1,0 +1,5 @@
+{
+  "ipfs_uri": "http://localhost:5001",
+  "artifact_limit": 256,
+  "profiler_enabled": false
+}

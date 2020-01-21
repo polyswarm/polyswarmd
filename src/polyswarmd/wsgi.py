@@ -2,7 +2,7 @@ import logging
 import os
 import sys
 
-from polyswarmd.logger import init_logging
+from polyswarmd.utils.logger import init_logging
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ def app(*args, **kwargs):
         logging.exception(e)
         sys.exit(-1)
 
-    from polyswarmd import app as application
+    from polyswarmd.app import app as application
 
     logger.critical("polyswarmd is ready!")
     return application
