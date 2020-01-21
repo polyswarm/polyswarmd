@@ -1,6 +1,6 @@
 import logging
 from random import gauss
-from typing import Any, Callable, ClassVar, Iterable, List, NoReturn, Type
+from typing import Any, Callable, Iterable, List, NoReturn, Type
 
 import gevent
 from gevent.pool import Group
@@ -47,9 +47,9 @@ class FilterWrapper:
     filter_installer = Callable[[], ContractFilter]
     formatter: FormatClass
     backoff: bool
-    MIN_WAIT: ClassVar[float] = 0.5
-    MAX_WAIT: ClassVar[float] = 4.0
-    JITTER: ClassVar[float] = 0.1
+    MIN_WAIT: float = 0.5
+    MAX_WAIT: float = 4.0
+    JITTER: float = 0.1
 
     def __init__(self, filter_installer: FilterInstaller, formatter: FormatClass, backoff: bool):
         self.formatter = formatter
