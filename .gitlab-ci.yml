@@ -47,17 +47,19 @@ test:
   stage: test
   tags:
     - kube
-  script:
+  before_script:
     - docker pull $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
-    - docker run $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA make test
+  script:
+    - docker run $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA pip install -r requirements.dev.txt; make test
 
 test-mypy:
   stage: test
   tags:
     - kube
-  script:
+  before_script:
     - docker pull $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
-    - docker run $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA make mypy
+  script:
+    - docker run $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA pip install -r requirements.dev.txt; make mypy
 
 ###############################################################
 # End-to-end Stage
