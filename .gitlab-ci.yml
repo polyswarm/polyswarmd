@@ -57,7 +57,7 @@ test-mypy:
     - kube
   script:
     - docker pull $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
-    - docker run $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA make mypi
+    - docker run $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA make mypy
 
 ###############################################################
 # End-to-end Stage
