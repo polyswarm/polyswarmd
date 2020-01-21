@@ -1,9 +1,11 @@
-from collections.abc import Collection
+from collections import UserList
 from contextlib import contextmanager
 from curses.ascii import EOT as END_OF_TRANSMISSION
+import itertools
 import statistics
 import time
 from typing import ClassVar, Generator, Iterator, List, Mapping
+import unittest.mock
 import uuid
 
 import gevent
@@ -13,133 +15,158 @@ import ujson
 
 from polyswarmd.services.ethereum.rpc import EthereumRpc
 from polyswarmd.views.event_message import WebSocket
-from polyswarmd.websockets.filter import FilterManager, FilterWrapper
+from polyswarmd.websockets.filter import FilterManager, FilterWrapper, ContractFilter
 from polyswarmd.websockets.messages import WebsocketMessage
 
-now = time.time
-BEGIN = now()
-WHEN = 'time'
+BEGIN = time.time()
+
+
+def now():
+    return int(1000 * (time.time() - BEGIN))
+
+
 TX_TS = 'sent'
-RX_TS = 'recieved'
 TXDIFF = 'interval'
 CPUTIME = 'pipeline_latency'
-MAXWAIT = 'max_wait'
-BACKOFF = 'backoff'
 START = 'start'
 FILTER = 'filter'
+STEP = 'step'
 NTH = 'nth'
+TICK = 'tick'
 
+# How many 'ticks' should happen in a single step, allowing us to test more than one message being
+# returned at one time
 STRIDE = 10
 
+# Generator for printable names used in debugging
+FILTER_IDS = map(''.join, itertools.product(map(lambda x: chr(x + ord('A')), range(26)), repeat=2))
 
-def elapsed(since):
-    return now() - since
+
+@pytest.fixture
+def mock_sleep(monkeypatch):
+    """If loaded, `gevent.sleep` simply returns a no-op unittest.Mock"""
+    mock = unittest.mock.Mock(gevent.sleep)
+    monkeypatch.setattr(gevent, "sleep", mock)
+    return mock
+
+
+@pytest.fixture
+def rpc(monkeypatch):
+    def patch(chain):
+        RPC = EthereumRpc(chain)
+        RPC.register = unittest.mock.Mock(wraps=RPC.register)
+        RPC.unregister = unittest.mock.Mock(wraps=RPC.unregister)
+        RPC.poll = unittest.mock.Mock(wraps=RPC.poll)
+        RPC.filter_manager.setup_event_filters = unittest.mock.Mock(FilterManager.setup_event_filters)
+        return RPC
+    return patch
 
 
 class NOPMessage(WebsocketMessage):
-    contract_event_name: ClassVar[str] = 'test'
-    event: ClassVar[str] = 'nop'
+    """Stub for a polyswarmd.websocket.message object"""
+    contract_event_name: ClassVar[str] = 'NOP_CONTRACT'
+    event: ClassVar[str] = 'NOP_EVENT'
 
 
-class DumbFilter:
+class MockFilter(ContractFilter):
+    """Mock implementation of a Web3Py Filter.
 
-    def __init__(
-        self, speed=1.0, prev=0, extra={}, backoff=True, ident=None, source=None
-    ):
-        self.speed = (1/speed) * STRIDE
-        self.extra = extra
+    If no ``source`` generator is provided, it creates an event message generator running for for
+    ``end`` "steps" and yielding ``1/rate`` messages on average.
+    """
+
+    def __init__(self, rate=1.0, source=None, end=100, backoff=False):
+        # The rate at which this filter should generate new messages
+        self.poll_interval = rate
+        self.source = source or self.uniform(int(self.poll_interval * STRIDE), end=end)
         self.backoff = backoff
-        self.ident = ident or str(uuid.uuid4())
-        self.source = source or self.uniform(self.speed)
-        self._start = None
+        self.stopped = False
 
-    @property
-    def start(self):
-        if not self._start:
-            self._start = now()
-        return self._start
-
-    # Verify that _something_ is being passed in, even if we're not using it.
     def __call__(self, contract_event_name):
+        # Verify that _something_ is being passed in, even if we're not using it.
+        assert contract_event_name == NOPMessage.contract_event_name
+        self.current = -1
+        self.filter_id = next(FILTER_IDS)
+        self.sent = 0
+        self.start = now()
         return self
 
-    def to_msg(self, idx, step=None):
-        return {
-            FILTER: self.ident,
-            NTH: idx,
-            TX_TS: now(),
-            START: self.start,
-            BACKOFF: self.backoff
-        }
+    def format_entry(self, entry, extra={}):
+        return {FILTER: self.filter_id, NTH: self.sent, TX_TS: now(), START: self.start, **extra}
 
     def get_new_entries(self) -> Iterator:
         try:
             yield from next(self.source)
         except StopIteration:
-            yield StopIteration
+            self.stopped = True
+            raise gevent.GreenletExit
 
     def close(self):
         try:
             self.source.send(END_OF_TRANSMISSION)
         except StopIteration as e:
+            self.stopped = True
             return e.value
 
-    def uniform(self, frequency: int, offset=0) -> Generator:
-        s = 1
-        msg_ctr = 0
-        while True:
-            msgs = []
-            for point in range(s, s + STRIDE):
-                if frequency % point == 0 + offset:
-                    msg_ctr += 1
-                    msgs.append(self.to_msg(msg_ctr, step=s))
+    def uniform(self, rate: int, end: int, offset=0) -> Generator:
+        """Event message generator, runs for ``end`` steps, yielding ``1/rate`` messages each step
+
+        Even though there are ``end`` steps, we send up to ``end * STRIDE`` messages to accommodate
+        testing multiple messages in a single ``get_new_entries`` response. the proportion of
+        messages to steps is just a simple proportion, e.g with a ``rate`` of 1/2 & 100 steps, 200
+        messages should have been formatted."""
+        for step in range(end):
+            msgs = [
+                self.format_entry({
+                    STEP: step,
+                    TICK: p
+                }) for p in range(step * STRIDE, (step+1) * STRIDE) if p % rate == 0
+            ]
             done = yield msgs
             if done == END_OF_TRANSMISSION:
-                return msg_ctr
-            s += STRIDE
+                break
+            self.sent += len(msgs)
+        return step
 
 
-class enrich(Collection):
-    msgs: List[Mapping]
-
+class enrich(UserList):
     elapsed = property(lambda msgs: max(msgs[TX_TS]) - min(msgs[TX_TS]))
-    bundles = property(lambda msgs: [v for v in msgs[TXDIFF] if v > 1e-1])
-    responses = property(lambda msgs: len(msgs.bundles))
-    latency_var = property(lambda msgs: statistics.pvariance(msgs.bundles))
-    latency_avg = property(lambda msgs: statistics.mean(msgs.bundles))
+    steps = property(lambda msgs: [v for v in msgs[STEP] if v > 1e-1])
+    responses = property(lambda msgs: len(msgs.steps))
+    latency_var = property(lambda msgs: statistics.pvariance(msgs.steps))
+    latency_avg = property(lambda msgs: statistics.mean(msgs.steps))
     usertime_avg = property(lambda msgs: statistics.mean(msgs[CPUTIME]))
     sources = property(lambda msgs: len(set(msgs[FILTER])))
 
     def __init__(self, messages, extra={}):
-        self.msgs = self.enrich_messages(messages, extra)
+        self.data = list(self.enrich_messages(messages, extra))
 
     def enrich_messages(self, messages, extra={}):
+        assert len(messages) > 0
         prev = {}
-        enriched = []
-        for msg in messages:
-            data = msg.get('data', {})
-            emsg = {FILTER: data.get(FILTER), NTH: data.get(NTH), TX_TS: data.get(TX_TS, -1)}
+        for msg in map(ujson.loads, messages):
+            # ensure we got an 'event' tag - included with all WebsocketMessage
+            assert msg['event'] == NOPMessage.event
+            emsg = msg['data']
+            emsg[TX_TS] = emsg.get(TX_TS, -1)
             emsg[TXDIFF] = emsg[TX_TS] - prev.get(TX_TS, emsg[TX_TS])
-            emsg[CPUTIME] = now() - emsg[TX_TS]
             msg.update(extra)
-            enriched.append(emsg)
+            yield emsg
             prev = emsg
-        return enriched
 
-    def __iter__(self):
-        return iter(self.msgs)
-
-    def __contains__(self, o):
-        return o in self.msgs
-
-    def __len__(self):
-        return len(self.msgs)
+    def by_source(self):
+        sources = {}
+        for msg in self:
+            sources[msg[FILTER]] = sources.get(msg[FILTER], []) + [msg]
+        return sources
 
     def __getitem__(self, key):
-        return [msg[key] for msg in self.msgs]
+        if isinstance(key, int):
+            return super().__getitem__(key)
+        return [msg[key] for msg in self.data]
 
     def __str__(self):
-        props = ['elapsed', 'responses', 'latency_var', 'latency_avg', 'usertime_avg']
+        props = ['elapsed', 'responses', 'usertime_avg']
         return '<%s summary=%s>' % (type(self), {k: getattr(self, k) for k in props})
 
 
@@ -152,121 +179,88 @@ class TestWebsockets:
             RPC.filter_manager.register(ft, NOPMessage, backoff=ft.backoff)
         yield RPC
         RPC.unregister(ws)
+        for mock in [RPC.poll, RPC.register, RPC.unregister, RPC.filter_manager.setup_event_filters]:
+            mock.assert_called_once()
+        assert len(RPC.filter_manager.pool) == 0
         assert len(RPC.websockets) == 0
 
-    def events(self, filters, ws, RPC, max_wait=3, timeout=1):
-        """Mimic the behavior of /events endpoint for tests"""
+    def events(self, filters, RPC, ws=None):
+        """Mimic the behavior of ``/events`` endpoint
 
-        # NOTE: KEEP IMPL CLOSE TO `event_message.py#init_websockets#events(ws)`
-        # I wasn't able to find how to use a Flask app client with `Sockets` without
-        # making some changes to how `init_websockets` works, so this function
-        # just reproduces that behavior in this testable environment, please let
-        # met know if you've figured out a way around this -zv
-        start = now()
+        Keep the implementation of this test as close as possible to
+        `event_message.py#init_websockets#events(ws)`, e.g please do
+        do not switch this to `join()` the pool, etc.
 
+        If you find a way to use `Flask.test_client` with `Sockets`, please let me know - zv
+        """
+        ws = ws or WebSocket(str(uuid.uuid4()))
         with self.start_rpc(filters=filters, ws=ws, RPC=RPC):
             msgs = []
-            while elapsed(since=start) < max_wait:
+            while True:
                 try:
-                    msg = ws.queue.get(block=True, timeout=timeout)
+                    msg = ws.queue.get(block=True, timeout=0)
                     msgs.append(msg)
                     # print(msg)
                 except Empty:
-                    continue
-            return enrich(msgs)
+                    break
+            enriched = enrich(msgs)
+            assert enriched.sources == len(filters)
+            return enriched
 
-    @pytest.mark.parametrize("chains", ['home'])
-    def test_SLOW_recv(self, chains, mock_ws, rpc):
-        """Verify that we can recieve msgs with uniform timing"""
-        max_wait = 3
-        speed = 0.5
-        sources = 10
-        filters = [DumbFilter(speed=speed) for _ in range(sources)]
-        enrc = self.events(filters=filters, ws=mock_ws('NA'), max_wait=max_wait, RPC=rpc(chains))
-        # just to be sure
-        assert len(enrc) > 0
-        # the number of msgs should be ~ (elapsed_time / msg_rate) * num_of_msg_srcs)
-        count = sum(f.close() for f in filters)
-        assert abs(len(enrc) - count) <= 1
-        assert enrc.sources == sources
-        # verify the time elapsed took what we thought
-        assert pytest.approx((enrc.elapsed, max_wait))
-        # verify that the average time was what we expected
-        assert pytest.approx((enrc.latency_avg, speed))
-        assert enrc.latency_var < 1e-1
+    def test_recv(self, chains, rpc, mock_sleep):
+        """
+        - Verify that we can recieve messages through ``EthereumRPC``'s ``FilterManager``
+        - The number of messages sent should equal the number of messages recieved
+        """
+        filters = [MockFilter(rate=1 / 2) for i in range(10)]
+        enriched = self.events(filters=filters, RPC=rpc(chains))
+        assert len(enriched) == sum(f.sent for f in filters)
 
-    def test_SLOW_concurrent_rpc(self, app, mock_ws, rpc):
-        """verify multiple engines can run concurrently without interfering with each other"""
-        chains = [app.config['POLYSWARMD'].chains[c] for c in ('home', 'side')]
-        base_wait = 4
+    def test_concurrent_rpc(self, app, rpc, mock_sleep):
+        """
+        - Test multiple concurrent RPC & FilterManager instances:
+        - Two ``EthereumRPC``, ``FilterManager`` & ``Websocket``s should be able to operate
+          independently of one another on different chains"""
+        rate = 1 / 2
         gs = gevent.joinall([
             gevent.spawn(
                 self.events,
-                filters=[DumbFilter(speed=0.5), DumbFilter(speed=0.5)],
-                ws=mock_ws(f'N{i + 1}'),
-                # run them for different lengths of time to help verify isolation
-                max_wait=base_wait * (1+i),
-                RPC=rpc(chain)
-            ) for i, chain in enumerate(chains)
+                filters=[MockFilter(rate=rate, end=100 + (1+i)*50) for _ in range(2)],
+                RPC=RPC
+            ) for i, RPC in enumerate(map(rpc, app.config['POLYSWARMD'].chains.values()))
         ])
+        # need good greenlets
+        assert all(g.successful() for g in gs)
+        ag, bg = map(lambda g: g.value, gs)
+        # we should ahve gotten at least end * rate - 5 messages
+        assert len(ag) >= 600
+        # the second RPC ran for longer, therefore should have more messages
+        assert len(bg) / len(ag) == 200 / 150
 
-        for i in range(len(gs)):
-            assert gs[i].successful()
-            a = len(gs[i].value)
-            assert a >= 1
-            if len(gs) > a:
-                b = len(gs[i + 1].value)
-                assert a < b + 1e-5
-                assert pytest.approx((a, b * ((i+1) * base_wait) / ((i+2) * base_wait)), abs=1)
+    def test_backoff(self, chains, rpc, mock_sleep):
+        """
+        - Validate filter-request backoff logic:
+        - Filters with identical message intervals but differing in wait parameters should differ in
+          the number of messages ultimately dispatched
+        - We should automatically introduce random variance to prevent a large number of clients
+          from simultaneous reconnects
+        - Filters should never wait more than 30x their minimum wait time
+        """
+        rate = 11 / 2
+        filters = [MockFilter(rate=rate*i, backoff=True, end=300) for i in range(1, 6)]
+        enriched = self.events(filters=filters, RPC=rpc(chains))
 
-    @pytest.mark.parametrize("chains", ['home'])
-    def test_SLOW_backoff(self, chains, rpc, mock_ws):
-        """verify backoff works"""
-        max_wait = 4
-        speed = 0.5
-        filters = [
-            DumbFilter(speed=speed, backoff=True),
-            DumbFilter(speed=speed, backoff=False),
-            DumbFilter(speed=speed, backoff=True),
-            DumbFilter(speed=speed, backoff=False),
-            DumbFilter(speed=speed, backoff=True),
-        ]
-        enrc = self.events(
-            filters=filters,
-            ws=mock_ws('NA'),
-            max_wait=max_wait,
-            RPC=rpc(chains),
-        )
-        list(f.close() for f in filters)
-        # just to be sure
-        assert len(enrc) > 0
-        assert enrc.sources == len(filters)
-        # verify the time elapsed took what we thought
-        assert pytest.approx((enrc.elapsed, max_wait))
-        # verify that the average time was what we expected
-        assert enrc.latency_var < 1e-1
-        # verify that the average time was what we expected
-        assert pytest.approx((enrc.latency_avg, speed))
+        sleeps = [s for s in map(lambda x: x[0][0], mock_sleep.call_args_list)]
+        rounded = set([round(s*2)/2 for s in sleeps])
+        # we should never have a (base) wait time more than 10x larger than the smallest (nonzero) wait time
+        assert min(filter(lambda x: x > 0, rounded)) * 10 > max(rounded)
+        # we should be adding a random factor to each `compute_wait` output
+        assert len(sleeps) > len(rounded)
+        # We should see each of the wait periods (rounded to the nearest 0.5) at least once
+        assert len(rounded) - 2*(int(FilterWrapper.MAX_WAIT) - int(FilterWrapper.MIN_WAIT)) <= 1
 
-
-@pytest.fixture
-def mock_ws(monkeypatch):
-
-    def mock_send(self, msg_bytes):
-        msg = ujson.loads(msg_bytes)
-        assert isinstance(msg, object)
-        self.queue.put_nowait(msg)
-
-    monkeypatch.setattr(WebSocket, "send", mock_send)
-    return WebSocket
-
-
-@pytest.fixture
-def mock_fm(monkeypatch):
-    monkeypatch.setattr(FilterWrapper, "JITTER", 0)
-    monkeypatch.setattr(FilterManager, "setup_event_filters", lambda s, *_: s.flush())
-
-
-@pytest.fixture
-def rpc(mock_fm):
-    return EthereumRpc
+        # verify that despite the backoff, sources with a higher rate churn out more events
+        by_src = enriched.by_source()
+        for i in range(len(filters) - 1):
+            f, s = map(lambda idx: filters[idx].filter_id, (i, i + 1))
+            assert len(by_src[f]) > len(by_src[s])
