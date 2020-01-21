@@ -19,7 +19,10 @@ import uuid
 if TYPE_CHECKING:
     from mypy_extensions import TypedDict
 else:
-    TypedDict = lambda *args, **kwargs: object
+
+    def TypedDict(*args, **kwargs):
+        return object
+
 
 SchemaType = str
 SchemaFormat = str

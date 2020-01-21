@@ -1,7 +1,6 @@
 """
    isort:skip_file
 """
-import random
 import os
 import pytest
 from unittest.mock import patch

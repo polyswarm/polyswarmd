@@ -1,9 +1,11 @@
-import pytest
-import json
 from collections import namedtuple
+import json
 from pprint import pprint
-from polyswarmd.websockets import messages, filter
+
+import pytest
 import ujson
+
+from polyswarmd.websockets import messages
 
 
 @pytest.fixture(autouse=True)

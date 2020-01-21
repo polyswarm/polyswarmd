@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import time
-from typing import Any, Callable, Dict, List, Set, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 from consul import Timeout
 from web3 import HTTPProvider, Web3

@@ -259,15 +259,20 @@ def cache_contract_view(
     """Returns tuple with boolean to indicate chached, and the response from chain, or from redis cache
 
     >>> from collections import namedtuple
-    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', None)
+    >>> ContractCall = namedtuple('ContractCall', 'call')
+    >>> cache_contract_view(ContractCall(lambda : '12'), '', None)
     (False, '12')
-    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'exists'))(lambda k: '13', lambda k: True))
+    >>> Redis = namedtuple('Redis', ('get', 'set', 'exists'))
+    >>> cache_contract_view(ContractCall(lambda : '12'), '', redis=Redis(lambda k: '13', None, lambda k: True))
     (True, '13')
-    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, ex: None, lambda k: False))
+    >>> cache_contract_view(ContractCall(lambda : '12'), '',
+    ... redis=Redis(lambda k: '13', lambda k, v, ex: None, lambda k: False))
     (False, '12')
-    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, ex: None, lambda k: True), invalidate=True)
+    >>> cache_contract_view(ContractCall(lambda : '12'), '',
+    ... redis=Redis(lambda k: '13', lambda k, v, ex: None, lambda k: True), invalidate=True)
     (False, '12')
-    >>> cache_contract_view(namedtuple('ContractCall', 'call')(lambda : '12'), '', redis=namedtuple('Redis', ('get', 'set', 'exists'))(lambda k: '13', lambda k, v, ex: None, lambda k: True), invalidate=False)
+    >>> cache_contract_view(ContractCall(lambda : '12'), '', redis=
+    ... Redis(lambda k: '13', lambda k, v, ex: None, lambda k: True), invalidate=False)
     (True, '13')
     """
     if redis is None:

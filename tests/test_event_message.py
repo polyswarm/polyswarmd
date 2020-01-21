@@ -15,7 +15,11 @@ import ujson
 
 from polyswarmd.services.ethereum.rpc import EthereumRpc
 from polyswarmd.views.event_message import WebSocket
-from polyswarmd.websockets.filter import FilterManager, FilterWrapper, ContractFilter
+from polyswarmd.websockets.filter import (
+    ContractFilter,
+    FilterManager,
+    FilterWrapper,
+)
 from polyswarmd.websockets.messages import WebsocketMessage
 
 BEGIN = time.time()
@@ -52,13 +56,17 @@ def mock_sleep(monkeypatch):
 
 @pytest.fixture
 def rpc(monkeypatch):
+
     def patch(chain):
         RPC = EthereumRpc(chain)
         RPC.register = unittest.mock.Mock(wraps=RPC.register)
         RPC.unregister = unittest.mock.Mock(wraps=RPC.unregister)
         RPC.poll = unittest.mock.Mock(wraps=RPC.poll)
-        RPC.filter_manager.setup_event_filters = unittest.mock.Mock(FilterManager.setup_event_filters)
+        RPC.filter_manager.setup_event_filters = unittest.mock.Mock(
+            FilterManager.setup_event_filters
+        )
         return RPC
+
     return patch
 
 
@@ -80,7 +88,6 @@ class MockFilter(ContractFilter):
         self.poll_interval = rate
         self.source = source or self.uniform(int(self.poll_interval * STRIDE), end=end)
         self.backoff = backoff
-        self.stopped = False
 
     def __call__(self, contract_event_name):
         # Verify that _something_ is being passed in, even if we're not using it.
@@ -98,14 +105,12 @@ class MockFilter(ContractFilter):
         try:
             yield from next(self.source)
         except StopIteration:
-            self.stopped = True
             raise gevent.GreenletExit
 
     def close(self):
         try:
             self.source.send(END_OF_TRANSMISSION)
         except StopIteration as e:
-            self.stopped = True
             return e.value
 
     def uniform(self, rate: int, end: int, offset=0) -> Generator:
@@ -142,10 +147,11 @@ class enrich(UserList):
         self.data = list(self.enrich_messages(messages, extra))
 
     def enrich_messages(self, messages, extra={}):
+        # ensure we've got some messages
         assert len(messages) > 0
         prev = {}
         for msg in map(ujson.loads, messages):
-            # ensure we got an 'event' tag - included with all WebsocketMessage
+            # ensure we got an 'event' tag which should be included with all WebsocketMessage
             assert msg['event'] == NOPMessage.event
             emsg = msg['data']
             emsg[TX_TS] = emsg.get(TX_TS, -1)
@@ -225,7 +231,7 @@ class TestWebsockets:
         gs = gevent.joinall([
             gevent.spawn(
                 self.events,
-                filters=[MockFilter(rate=rate, end=100 + (1+i)*50) for _ in range(2)],
+                filters=[MockFilter(rate=rate, end=100 + (1+i) * 50) for _ in range(2)],
                 RPC=RPC
             ) for i, RPC in enumerate(map(rpc, app.config['POLYSWARMD'].chains.values()))
         ])
@@ -247,17 +253,17 @@ class TestWebsockets:
         - Filters should never wait more than 30x their minimum wait time
         """
         rate = 11 / 2
-        filters = [MockFilter(rate=rate*i, backoff=True, end=300) for i in range(1, 6)]
+        filters = [MockFilter(rate=rate * i, backoff=True, end=300) for i in range(1, 6)]
         enriched = self.events(filters=filters, RPC=rpc(chains))
 
         sleeps = [s for s in map(lambda x: x[0][0], mock_sleep.call_args_list)]
-        rounded = set([round(s*2)/2 for s in sleeps])
+        rounded = set([round(s * 2) / 2 for s in sleeps])
         # we should never have a (base) wait time more than 10x larger than the smallest (nonzero) wait time
         assert min(filter(lambda x: x > 0, rounded)) * 10 > max(rounded)
         # we should be adding a random factor to each `compute_wait` output
         assert len(sleeps) > len(rounded)
         # We should see each of the wait periods (rounded to the nearest 0.5) at least once
-        assert len(rounded) - 2*(int(FilterWrapper.MAX_WAIT) - int(FilterWrapper.MIN_WAIT)) <= 1
+        assert len(rounded) - 2 * (int(FilterWrapper.MAX_WAIT) - int(FilterWrapper.MIN_WAIT)) <= 1
 
         # verify that despite the backoff, sources with a higher rate churn out more events
         by_src = enriched.by_source()
