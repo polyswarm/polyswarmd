@@ -1,10 +1,10 @@
 from collections import UserList
 from contextlib import contextmanager
 from curses.ascii import EOT as END_OF_TRANSMISSION
-import itertools
 import statistics
 import time
 from typing import ClassVar, Generator, Iterator, List, Mapping
+from string import ascii_lowercase
 import unittest.mock
 import uuid
 
@@ -43,7 +43,7 @@ TICK = 'tick'
 STRIDE = 10
 
 # Generator for printable names used in debugging
-FILTER_IDS = map(''.join, itertools.product(map(lambda x: chr(x + ord('A')), range(26)), repeat=2))
+FILTER_IDS = (l1 + l2 for l1 in ascii_lowercase for l2 in ascii_lowercase)
 
 
 @pytest.fixture
@@ -98,39 +98,20 @@ class MockFilter(ContractFilter):
         self.start = now()
         return self
 
-    def format_entry(self, entry, extra={}):
-        return {FILTER: self.filter_id, NTH: self.sent, TX_TS: now(), START: self.start, **extra}
+    def format_entry(self, step):
+        self.sent += 1
+        return {FILTER: self.filter_id, NTH: self.sent, TX_TS: now(), START: self.start, STEP: step}
 
     def get_new_entries(self) -> Iterator:
         try:
-            yield from next(self.source)
+            yield from filter(None, [next(self.source) for i in range(STRIDE)])
         except StopIteration:
             raise gevent.GreenletExit
 
-    def close(self):
-        try:
-            self.source.send(END_OF_TRANSMISSION)
-        except StopIteration as e:
-            return e.value
-
     def uniform(self, rate: int, end: int, offset=0) -> Generator:
-        """Event message generator, runs for ``end`` steps, yielding ``1/rate`` messages each step
-
-        Even though there are ``end`` steps, we send up to ``end * STRIDE`` messages to accommodate
-        testing multiple messages in a single ``get_new_entries`` response. the proportion of
-        messages to steps is just a simple proportion, e.g with a ``rate`` of 1/2 & 100 steps, 200
-        messages should have been formatted."""
-        for step in range(end):
-            msgs = [
-                self.format_entry({
-                    STEP: step,
-                    TICK: p
-                }) for p in range(step * STRIDE, (step+1) * STRIDE) if p % rate == 0
-            ]
-            done = yield msgs
-            if done == END_OF_TRANSMISSION:
-                break
-            self.sent += len(msgs)
+        """Event message generator, runs for ``end`` steps, yielding ``1/rate`` messages each step"""
+        for step in range(0, end * STRIDE):
+            yield self.format_entry(step=step) if step % rate == 0 else None
         return step
 
 
