@@ -76,3 +76,11 @@ coverage: ## check code coverage
 	coverage report -m
 	coverage html
 	google-chrome htmlcov/index.html
+
+ci-test: # install requirements, then run tests
+	pip install -r requirements.dev.txt
+	test
+
+ci-mypy: # install requirements, then run mypy
+	pip install -r requirements.dev.txt
+	mypy

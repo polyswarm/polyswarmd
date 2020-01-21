@@ -50,16 +50,17 @@ test:
   before_script:
     - docker pull $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
   script:
-    - docker run $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA pip install -r requirements.dev.txt; make test
+    - docker run $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA make ci-test
 
 test-mypy:
   stage: test
   tags:
     - kube
+  allow_failure: true
   before_script:
     - docker pull $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
   script:
-    - docker run $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA pip install -r requirements.dev.txt; make mypy
+    - docker run $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA make ci-mypy
 
 ###############################################################
 # End-to-end Stage
