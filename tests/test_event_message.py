@@ -99,12 +99,13 @@ class MockFilter(ContractFilter):
         return self
 
     def format_entry(self, step):
-        self.sent += 1
         return {FILTER: self.filter_id, NTH: self.sent, TX_TS: now(), START: self.start, STEP: step}
 
     def get_new_entries(self) -> Iterator:
         try:
-            yield from filter(None, [next(self.source) for i in range(STRIDE)])
+            msgs = list(filter(None, [next(self.source) for i in range(STRIDE)]))
+            yield from msgs
+            self.sent += len(msgs)
         except StopIteration:
             raise gevent.GreenletExit
 
