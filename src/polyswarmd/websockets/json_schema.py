@@ -1,6 +1,7 @@
 from functools import partial
 import operator
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     ClassVar,
@@ -9,7 +10,6 @@ from typing import (
     List,
     Mapping,
     SupportsInt,
-    TYPE_CHECKING,
     Union,
     cast,
 )
@@ -19,12 +19,14 @@ import uuid
 if TYPE_CHECKING:
     from mypy_extensions import TypedDict
 else:
-    TypedDict = lambda *args, **kwargs: object
+
+    def TypedDict(*args, **kwargs):
+        return object
+
 
 SchemaType = str
 SchemaFormat = str
 SchemaExtraction = Dict[Any, Any]
-
 
 SchemaDef = TypedDict(
     'SchemaDef', {
@@ -38,7 +40,6 @@ SchemaDef = TypedDict(
 )
 
 JSONSchema = TypedDict('JSONSchema', {'properties': Mapping[str, 'SchemaDef']}, total=False)
-
 
 
 def compose(f, g):

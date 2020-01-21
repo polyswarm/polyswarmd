@@ -1,7 +1,7 @@
 from .utils import failed, heck
 
 
-def test_get_balance_total_stake(client, mock_w3, token_address, balances):
+def test_get_balance_total_stake(client, token_address, balances):
     assert client.get(f'/balances/{token_address}/staking/total').json == {
         'result': str(balances[token_address]),
         'status': 'OK'
@@ -10,7 +10,7 @@ def test_get_balance_total_stake(client, mock_w3, token_address, balances):
     assert failed(client.get(f'/balances/INVALID/staking/total'))
 
 
-def test_get_balance_withdrawable_stake(client, mock_w3, token_address, balances):
+def test_get_balance_withdrawable_stake(client, token_address, balances):
     assert client.get(f'/balances/{token_address}/staking/withdrawable').json == {
         'result': str(balances[token_address]),
         'status': 'OK'

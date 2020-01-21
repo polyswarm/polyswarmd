@@ -1,7 +1,6 @@
-from contextlib import contextmanager
 import logging
 from random import gauss
-from typing import Any, Callable, ClassVar, Iterable, List, NoReturn, Set, Type
+from typing import Any, Callable, ClassVar, Iterable, List, NoReturn, Type
 
 import gevent
 from gevent.pool import Group
@@ -30,6 +29,17 @@ class ContractFilter:
 FormatClass = Type[messages.WebsocketFilterMessage]
 Message = bytes
 FilterInstaller = Callable[[str], ContractFilter]
+
+
+class FilterManagerResetWarning(RuntimeWarning):
+
+    def __init__(self, wrappers: Iterable['FilterWrapper']):
+        message = (
+            "Attempted to initialize a FilterManager with existing filters: "
+            ', '.join(map(str, (hasattr(fw, 'filter') and fw.filter.filter_id for fw in wrappers)))
+        )
+        super().__init__(message)
+
 
 class FilterWrapper:
     """A utility class which wraps a contract filter with websocket-messaging features"""
@@ -122,7 +132,7 @@ class FilterManager:
     """Manages access to filtered Ethereum events."""
 
     def __init__(self):
-        self.wrappers = set()
+        self.wrappers = []
         self.pool = Group()
 
     def register(
@@ -130,13 +140,8 @@ class FilterManager:
     ):
         """Add a new filter, with an optional associated WebsocketMessage-serializer class"""
         wrapper = FilterWrapper(filter_installer, fmt_cls, backoff)
-        self.wrappers.add(wrapper)
+        self.wrappers.append(wrapper)
         logger.debug('Registered new filter: %s', wrapper)
-
-    def flush(self):
-        """End all event polling, uninstall all filters and remove their corresponding wrappers"""
-        self.pool.kill()
-        self.wrappers.clear()
 
     def fetch(self):
         """Return a queue of currently managed contract events"""
@@ -148,8 +153,7 @@ class FilterManager:
     def setup_event_filters(self, chain: Any):
         """Setup the most common event filters"""
         if len(self.wrappers) != 0:
-            logger.exception("Attempting to initialize already initialized filter manager")
-            self.flush()
+            raise FilterManagerResetWarning(self.wrappers)
 
         bounty_contract = chain.bounty_registry.contract
 

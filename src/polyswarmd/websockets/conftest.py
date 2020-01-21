@@ -1,9 +1,11 @@
-import pytest
-import json
 from collections import namedtuple
+import json
 from pprint import pprint
-from . import messages, filter
+
+import pytest
 import ujson
+
+from polyswarmd.websockets import messages
 
 
 @pytest.fixture(autouse=True)
@@ -55,21 +57,10 @@ def mock_md_fetch(monkeypatch):
     monkeypatch.setattr(messages.MetadataHandler, "_substitute_metadata", mock_sub)
 
 
-BBLOCK = 117
-_EVTDEFAULT = {
-    'args': {},
-    'event': 'test event',
-    'logIndex': 19845,
-    'transactionIndex': 1276,
-    'transactionHash': (11).to_bytes(16, byteorder='big'),
-    'address': '0xFACE0EEE000000000000000000000001',
-    'blockHash': (90909090).to_bytes(16, byteorder='big'),
-    'blockNumber': BBLOCK,
-}
-
-
 class mkevent:
-    BBLOCK = 117
+    DEFAULT_BLOCK = 117
+    ALTERNATE_BLOCK = 220
+
     def __init__(self, *args, **kwargs):
         event_default = {
             'args': {},
@@ -79,7 +70,7 @@ class mkevent:
             'transactionHash': (11).to_bytes(16, byteorder='big'),
             'address': '0xFACE0EEE000000000000000000000001',
             'blockHash': (90909090).to_bytes(16, byteorder='big'),
-            'blockNumber': self.BBLOCK,
+            'blockNumber': self.DEFAULT_BLOCK,
         }
         for i, (attr, default) in enumerate(event_default.items()):
             if len(args) > i:
@@ -88,17 +79,19 @@ class mkevent:
                 setattr(self, attr, kwargs[attr])
             else:
                 setattr(self, attr, default)
+
     def __getitem__(self, k):
         if (type(k) == str):
             return self.__getattribute__(k)
+
 
 @pytest.fixture(autouse=True)
 def add_websockets_doctest_deps(doctest_namespace):
     TestChain = namedtuple('TestChain', ['blockNumber'])
     FakeFormatter = namedtuple('FakeFormatter', ['contract_event_name'])
     doctest_namespace['decoded_msg'] = lambda wsmsg: pprint(json.loads(wsmsg.decode('ascii')))
-    doctest_namespace["chain1"] = TestChain(117)
-    doctest_namespace["chain2"] = TestChain(220)
+    doctest_namespace["chain1"] = TestChain(mkevent.DEFAULT_BLOCK)
+    doctest_namespace["chain2"] = TestChain(mkevent.ALTERNATE_BLOCK)
     doctest_namespace["addr1"] = "0x00000000000000000000000000000001"
     doctest_namespace["addr2"] = "0x00000000000000000000000000000002"
     doctest_namespace["mkevent"] = mkevent

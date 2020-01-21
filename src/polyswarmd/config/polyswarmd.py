@@ -2,7 +2,7 @@ import importlib
 import logging
 import os
 import sys
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Optional, Tuple, Type
 from urllib.parse import urlparse
 
 from consul import Consul as ConsulClient

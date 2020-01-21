@@ -1,14 +1,16 @@
 """
    isort:skip_file
 """
-import random
 import os
 import pytest
 from unittest.mock import patch
 
 from .utils import read_chain_cfg
-import requests.adapters  # noqa
-from requests.models import Response  # noqa
+import web3.datastructures
+
+import web3.manager
+
+import web3.eth
 import web3.contract
 
 
@@ -23,11 +25,6 @@ PRE_INIT_PATCHES = (
     # don't both with patching gevent methods inside pytest
     patch('gevent.monkey.patch_all', return_value=None),
     # # fake out the underlying ipfshttpclient connect
-    # patch('ipfshttpclient.connect', return_value=True),
-    # # replace requests.adapter's send method
-    # patch.object(
-    #     requests.adapters.HTTPAdapter, 'send', return_value=let(Response(), status_code=200)
-    # ),
     # set `POLY_WORK` to be 'testing' (if not already set)
     patch('os.getenv', lambda *args, **kwargs: 'testing' if args[0] == 'POLY_WORK' else os.getenv)
 )
@@ -44,41 +41,6 @@ from polyswarmd.app import app as _app  # noqa
 
 for pa in PRE_INIT_PATCHES:
     pa.stop()
-
-
-@pytest.fixture(scope='session')
-def community():
-    return 'gamma'
-
-
-@pytest.fixture(scope='session')
-def base_nonce():
-    return random.randint(2**15, 2**16)
-
-
-@pytest.fixture
-def balances(token_address):
-    return {token_address: 12345}
-
-
-@pytest.fixture
-def bounty_parameters():
-    return {
-        'arbiter_lookback_range': 100,
-        'arbiter_vote_window': 100,
-        'assertion_bid_maximum': 1000000000000000000,
-        'assertion_bid_minimum': 62500000000000000,
-        'assertion_fee': 31250000000000000,
-        'assertion_reveal_window': 10,
-        'bounty_amount_minimum': 100,
-        'bounty_fee': 62500000000000000,
-        'max_duration': 100
-    }
-
-
-@pytest.fixture(scope='session')
-def token_address():
-    return '0x4B1867c484871926109E3C47668d5C0938CA3527'
 
 
 @pytest.fixture(scope='session')
@@ -103,7 +65,63 @@ def chains(request, app):
 
 
 @pytest.fixture
+def chain_id():
+    return 1337
+
+
+@pytest.fixture(scope='session')
+def community():
+    return 'gamma'
+
+
+@pytest.fixture(scope='session')
+def base_nonce():
+    return 1248924
+
+
+@pytest.fixture
+def balances(token_address):
+    return {token_address: 12345}
+
+
+@pytest.fixture(scope='session')
+def token_address():
+    return '0x4B1867c484871926109E3C47668d5C0938CA3527'
+
+
+@pytest.fixture
+def gas_limit():
+    return 94040201
+
+
+@pytest.fixture
+def block_number(token_address):
+    return 5197
+
+
+@pytest.fixture
+def bounty_parameters():
+    return {
+        'arbiter_lookback_range': 100,
+        'arbiter_vote_window': 100,
+        'assertion_bid_maximum': 1000000000000000000,
+        'assertion_bid_minimum': 62500000000000000,
+        'assertion_fee': 31250000000000000,
+        'assertion_reveal_window': 10,
+        'bounty_amount_minimum': 100,
+        'bounty_fee': 62500000000000000,
+        'max_duration': 100
+    }
+
+
+@pytest.fixture
 def contract_fns(token_address, balances, bounty_parameters):
+    """mock out values of contract functions
+
+    NOTE: if the function shares a name with a patched function here, that value will be used, e.g
+    `contract_fns` does *not* distinguish between contracts.
+    """
+
     fn_table = {}
 
     def patch_contract(func):
@@ -152,20 +170,51 @@ def contract_fns(token_address, balances, bounty_parameters):
     return fn_table
 
 
-_ContractFunction_call = web3.contract.ContractFunction.call
-
-
 @pytest.fixture
-def mock_w3(monkeypatch, contract_fns):
+def web3_blocking_values(balances, token_address, block_number, chain_id, gas_limit):
+    """mock values for `web3.manager.request_blocking`"""
+    return {
+        'eth_blockNumber':
+            block_number,
+        'eth_call':
+            lambda data, to: '0x' + '0'*64,
+        'eth_getBalance':
+            lambda token_address, block: balances[token_address],
+        'eth_getBlockByNumber':
+            lambda *_: web3.datastructures.AttributeDict({'gasLimit': gas_limit}),
+        'eth_getTransactionCount':
+            lambda token_address, block: balances[token_address],
+        'eth_syncing':
+            False,
+        'net_version':
+            chain_id
+    }
 
-    def original_call(self, *args):
-        print("WARNING: Using non-mocked contract function: ", self.fn_name)
-        return _ContractFunction_call(self, *args)
+
+@pytest.fixture(autouse=True)
+def mock_polyswarmd(monkeypatch):
+    """Mock polyswarmd functions which call out to external services"""
+    monkeypatch.setattr(_polyswarmd.config.service.Service, "test_reachable", lambda *_: True)
+    monkeypatch.setattr(
+        _polyswarmd.services.ethereum.service.EthereumService, "check_chain_id", lambda *_: True
+    )
+
+
+@pytest.fixture(autouse=True)
+def mock_w3(monkeypatch, contract_fns, web3_blocking_values):
+    """Mock out underlying w3py functions so that tests can be run sans-geth"""
+    _ContractFunction_call = web3.contract.ContractFunction.call
 
     def mock_call(w3_cfn, *args, **kwargs):
-        args = w3_cfn.args
         name = w3_cfn.fn_name
-        fn = contract_fns.get(name, original_call)
-        return fn(w3_cfn, *args)
+        if name not in contract_fns:
+            print("WARNING: Using non-mocked contract function: ", name)
+        fn = contract_fns.get(name, _ContractFunction_call)
+        return fn(w3_cfn, *w3_cfn.args)
 
+    def mock_request_blocking(self, method, params):
+        mock = web3_blocking_values[method]
+        return mock(*params) if callable(mock) else mock
+
+    monkeypatch.setattr(web3.manager.RequestManager, "request_blocking", mock_request_blocking)
     monkeypatch.setattr(web3.contract.ContractFunction, "call", mock_call)
