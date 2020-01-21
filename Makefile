@@ -77,9 +77,8 @@ coverage: ## check code coverage
 	coverage html
 	google-chrome htmlcov/index.html
 
-ci-test: dev-dependencies test ## install dependencies and test
-
-ci-mypy: dev-dependencies mypy ## install dependencies and mypy
+ci-test: dev-dependencies test ## install dev-dependencies and test
 
 dev-dependencies: # Install developer requirements
-	pip install -r requirements.dev.txt
+	pip install -r <(cat requirements.dev.txt | grep -v 'mypy')
+  pip install .
