@@ -1,6 +1,7 @@
 from functools import partial
 import operator
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     ClassVar,
@@ -9,7 +10,6 @@ from typing import (
     List,
     Mapping,
     SupportsInt,
-    TYPE_CHECKING,
     Union,
     cast,
 )
@@ -25,7 +25,6 @@ SchemaType = str
 SchemaFormat = str
 SchemaExtraction = Dict[Any, Any]
 
-
 SchemaDef = TypedDict(
     'SchemaDef', {
         'type': 'SchemaType',
@@ -38,7 +37,6 @@ SchemaDef = TypedDict(
 )
 
 JSONSchema = TypedDict('JSONSchema', {'properties': Mapping[str, 'SchemaDef']}, total=False)
-
 
 
 def compose(f, g):
