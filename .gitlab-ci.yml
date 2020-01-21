@@ -44,11 +44,20 @@ build:
 ###############################################################
 
 test:
+  stage: test
   tags:
     - kube
-  stage: test
   script:
-    - echo "Still to be implemented"
+    - docker pull $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
+    - docker run $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA make test
+
+test-mypy:
+  stage: test
+  tags:
+    - kube
+  script:
+    - docker pull $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
+    - docker run $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA make mypi
 
 ###############################################################
 # End-to-end Stage
