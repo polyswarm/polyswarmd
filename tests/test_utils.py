@@ -1,5 +1,5 @@
 import pytest
-import ujson as json
+import ujson
 
 import polyswarmd.utils
 
@@ -58,7 +58,7 @@ def test_state_to_dict(client, token_address, app, ZERO_ADDRESS):
         rv = client.post(
             f'/offers/state?account={token_address}',
             content_type='application/json',
-            data=json.dumps(mock_state_dict)
+            data=ujson.dumps(mock_state_dict)
         )
         state = rv.json['result']['state']
         expected = {

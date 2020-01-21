@@ -3,7 +3,7 @@
 """
 import os
 import pytest
-from unittest.mock import patch
+import unittest.mock
 
 from .utils import read_chain_cfg
 import web3.datastructures
@@ -13,20 +13,15 @@ import web3.manager
 import web3.eth
 import web3.contract
 
-
-def let(obj, **kwargs):
-    for attr, val in kwargs.items():
-        setattr(obj, attr, val)
-    return obj
-
-
 # a list of function patches to be applied prior `import polyswarmd`
 PRE_INIT_PATCHES = (
     # don't both with patching gevent methods inside pytest
-    patch('gevent.monkey.patch_all', return_value=None),
+    unittest.mock.patch('gevent.monkey.patch_all', return_value=None),
     # # fake out the underlying ipfshttpclient connect
     # set `POLY_WORK` to be 'testing' (if not already set)
-    patch('os.getenv', lambda *args, **kwargs: 'testing' if args[0] == 'POLY_WORK' else os.getenv)
+    unittest.mock.patch(
+        'os.getenv', lambda *args, **kwargs: 'testing' if args[0] == 'POLY_WORK' else os.getenv
+    )
 )
 
 for pa in PRE_INIT_PATCHES:
@@ -90,6 +85,12 @@ def token_address():
 
 
 @pytest.fixture
+def TX_SIG_HASH():
+    from polyswarmd.views.eth import TRANSFER_SIGNATURE_HASH as TX_SIG_HASH
+    return TX_SIG_HASH
+
+
+@pytest.fixture
 def gas_limit():
     return 94040201
 
@@ -97,6 +98,11 @@ def gas_limit():
 @pytest.fixture
 def block_number(token_address):
     return 5197
+
+
+@pytest.fixture
+def fees_schedule():
+    return 91027619323716
 
 
 @pytest.fixture
@@ -115,7 +121,7 @@ def bounty_parameters():
 
 
 @pytest.fixture
-def contract_fns(token_address, balances, bounty_parameters):
+def contract_fns(token_address, balances, bounty_parameters, fees_schedule):
     """mock out values of contract functions
 
     NOTE: if the function shares a name with a patched function here, that value will be used, e.g
@@ -163,6 +169,10 @@ def contract_fns(token_address, balances, bounty_parameters):
     @patch_contract
     def ASSERTION_BID_ARTIFACT_MINIMUM():
         return bounty_parameters['assertion_bid_minimum']
+
+    @patch_contract
+    def fees():
+        return fees_schedule
 
     for name, value in bounty_parameters.items():
         fn_table[name.upper()] = lambda s: value

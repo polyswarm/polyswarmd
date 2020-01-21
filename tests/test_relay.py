@@ -2,13 +2,11 @@ from urllib.parse import urlencode
 
 import pytest
 
-from polyswarmd.views.eth import TRANSFER_SIGNATURE_HASH as TX_SIG_HASH
-
 from .utils import heck
 
 
 @pytest.fixture
-def tx_success_response(token_address, base_nonce):
+def tx_success_response(token_address, base_nonce, TX_SIG_HASH):
     return heck({
         'result': {
             'transactions': [{
@@ -40,14 +38,11 @@ def test_withdrawal_funds_success(client, tx_success_response, tx_query_string):
     assert response.json == tx_success_response
 
 
-def test_fees_endpoint(client, chain_config, token_address):
+def test_fees_endpoint(client, chain_config, token_address, fees_schedule):
     resp = client.get(
         f'/relay/fees?' + urlencode({
             'chain': chain_config["chain_name"],
             'account': token_address
         })
     ).json
-    assert resp['status'] == 'OK'
-    fees = resp['result']['fees']
-    assert isinstance(fees, int)
-    assert fees >= 0
+    assert resp == {'status': 'OK', 'result': {'fees': fees_schedule}}
