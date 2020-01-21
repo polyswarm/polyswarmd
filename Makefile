@@ -81,4 +81,4 @@ ci-test: dev-dependencies test ## install dev-dependencies and test
 
 dev-dependencies: # Install developer requirements
 	bash -c "pip install -r <(cat requirements.dev.txt | grep -v 'mypy')"
-	echo pip install .
+	pip install .
