@@ -131,12 +131,8 @@ def contract_fns(token_address, balances, bounty_parameters, fees_schedule):
     fn_table = {}
 
     def patch_contract(func):
-
-        def driver(self, *args):
-            return func(*args)
-
-        fn_table[func.__name__] = driver
-        return driver
+        fn_table[func.__name__] = lambda s, *args: func(*args)
+        return fn_table[func.__name__]
 
     @patch_contract
     def balanceOf(address):
