@@ -396,7 +396,7 @@ def events_from_transaction(txhash, chain):
     # EXTRACTION CLASS is any class which inherits from `EventLogMessage'.
     # NOTE EXTRACTION CLASS's name is used to id the contract event, which is then pass to it's own `extract` fn
     # XXX The `extract' method is a conversion function also used to convert events for WebSocket consumption.
-    contracts: List[Tuple[Any, List[Tuple[str, Type[messages.EventLogMessage]]]]]
+    contracts: List[Tuple[Any, List[Tuple[str, Type[messages.ContractEvent]]]]]
     contracts = [
         (g.chain.nectar_token.contract.events, [('transfers', messages.Transfer)]),
         (

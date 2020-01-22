@@ -5,7 +5,7 @@ from pprint import pprint
 import pytest
 import ujson
 
-from polyswarmd.websockets import messages
+from polyswarmd.websockets import types
 
 
 @pytest.fixture(autouse=True)
@@ -17,7 +17,7 @@ def mock_md_fetch(monkeypatch):
     haven't been as easy as just overwriting messages here
     """
 
-    def mock_sub(uri, validate):
+    def mock_sub(cls, uri):
         # These are fake URIs, intended to resemble the output that substitute_metadata might
         # actually encounter.
         fake_uris = {
@@ -47,14 +47,14 @@ def mock_md_fetch(monkeypatch):
         if uri in fake_uris:
             content = json.loads(fake_uris[uri])
 
-        if validate:
-            if validate(content):
+        if cls._metadata_validator:
+            if cls._metadata_validator(content):
                 return content
             else:
                 return None
         return uri
 
-    monkeypatch.setattr(messages.MetadataHandler, "_substitute_metadata", mock_sub)
+    monkeypatch.setattr(types.ArtifactMetadata, "substitute", mock_sub)
 
 
 class mkevent(UserDict):
@@ -67,9 +67,9 @@ class mkevent(UserDict):
             'event': 'test event',
             'logIndex': 19845,
             'transactionIndex': 1276,
-            'transactionHash': (11).to_bytes(16, byteorder='big'),
-            'address': '0xFACE0EEE000000000000000000000001',
-            'blockHash': (90909090).to_bytes(16, byteorder='big'),
+            'transactionHash': (11).to_bytes(32, byteorder='big'),
+            'address': '0xFACE0EEE00000000000000000000000000000001',
+            'blockHash': (90909090).to_bytes(32, byteorder='big'),
             'blockNumber': self.DEFAULT_BLOCK,
         }
         for i, (attr, default) in enumerate(event_default.items()):
@@ -90,8 +90,8 @@ def add_websockets_doctest_deps(doctest_namespace):
     doctest_namespace['decoded_msg'] = lambda wsmsg: pprint(json.loads(wsmsg.decode('ascii')))
     doctest_namespace["chain1"] = TestChain(mkevent.DEFAULT_BLOCK)
     doctest_namespace["chain2"] = TestChain(mkevent.ALTERNATE_BLOCK)
-    doctest_namespace["addr1"] = "0x00000000000000000000000000000001"
-    doctest_namespace["addr2"] = "0x00000000000000000000000000000002"
+    doctest_namespace["addr1"] = "0x0000000000000000000000000000000000000001"
+    doctest_namespace["addr2"] = "0x0000000000000000000000000000000000000002"
     doctest_namespace["mkevent"] = mkevent
     doctest_namespace["pprint"] = pprint
     doctest_namespace['fake_formatter'] = FakeFormatter

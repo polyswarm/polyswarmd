@@ -1,7 +1,5 @@
-import abc
 from typing import (
     Any,
-    Callable,
     ClassVar,
     Dict,
     Generic,
@@ -11,54 +9,92 @@ from typing import (
     Type,
     TypeVar,
     cast,
+    get_type_hints,
 )
-import uuid
 
-from pydantic import BaseModel, Field, constr
-from requests_futures.sessions import FuturesSession
+from pydantic import BaseModel
+from pydantic.generics import GenericModel
 import ujson
 
-from polyswarmartifact import ArtifactType as _ArtifactType
-from polyswarmartifact.schema import Assertion as AssertionMetadata
-from polyswarmartifact.schema import Bounty as BountyMetadata
+from polyswarmartifact.schema import Assertion, Bounty
 from polyswarmd.utils import safe_int_to_bool_list
+from polyswarmd.websockets.types import (
+    ArtifactMetadata,
+    ArtifactTypeField,
+    BoolVector,
+    BountyGuid,
+    EthereumAddress,
+    EventData,
+    EventGUID,
+    EventId,
+    TXID,
+    From,
+    MessageField,
+    To,
+    TypeVarType,
+    Uint256,
+)
+
+EventDataT = TypeVar('EventDataT', bound='BaseEvent')
 
 
-class EventData(Mapping):
-    """Event data returned from web3 filter requests"""
-    args: Dict[str, Any]
-    event: str
-    logIndex: int
-    transactionIndex: int
-    transactionHash: bytes
-    address: str
-    blockHash: bytes
-    blockNumber: int
+class WebsocketSerializable:
+    __event__: ClassVar[str]
 
-
-class WebsocketMessage(BaseModel):
-    "Represent a message that can be handled by polyswarm-client"
     @classmethod
     def serialize_message(cls: Any, data: Any) -> bytes:
         return ujson.dumps(cls.to_message(data)).encode('ascii')
 
     @classmethod
-    def to_message(cls: Any, data: Any):
-        raise NotImplementedError
+    def to_message(cls, data: Any):
+        return {'event': cls.__event__, 'data': data}
 
 
-class Connected(WebsocketMessage):
-    event_id: ClassVar[str] = 'connected'
-    start_time: str
+class WebsocketMessage(GenericModel, Generic[EventDataT], WebsocketSerializable):
+    "Represent a message that can be handled by polyswarm-client"
+    event: EventId
+    data: EventDataT
+    block_number: Uint256
+    txhash: TXID
 
     @classmethod
-    def to_message(cls: Any, data: Any):
-        return cls.parse_obj(data).dict()
+    def event_type(cls) -> Type[EventDataT]:
+        return get_type_hints(cls)['data']
+
+    @classmethod
+    def to_message(cls, data: EventData) -> Dict:
+        return cls.from_event(data).dict()
+
+    @classmethod
+    def from_event(cls, data: EventData) -> 'WebsocketMessage[EventDataT]':
+        event_type = cls.event_type()
+        return cls(
+            event=event_type.__event__,
+            block_number=data['blockNumber'],
+            txhash=data['transactionHash'].hex(),
+            data=event_type.parse_obj(data.get('args'))
+        )
 
 
-class EventLogMessage(BaseModel):
-    "Extract `EventData` based on schema"
+class BaseEvent(WebsocketSerializable, BaseModel):
+    __event__: ClassVar[EventId]
+    event_types: ClassVar[Dict[EventId, Type]] = {}
 
+    # The use of metaclasses complicates type-checking and inheritance, so to set a dynamic
+    # class-property and type-checking annotations, we set it inside __init_subclass__.
+    @classmethod
+    def __init_subclass__(cls):
+        if hasattr(cls, '__event__'):
+            BaseEvent.event_types[cls.__event__] = cls
+        super().__init_subclass__()
+
+    @classmethod
+    def to_message(cls: Type, data: EventData) -> Dict:
+        type_var: TypeVarType = cast(TypeVarType, cls)
+        return WebsocketMessage[type_var].to_message(data)
+
+
+class ContractEvent(BaseEvent):
     contract_event_name: ClassVar
 
     # The use of metaclasses complicates type-checking and inheritance, so to set a dynamic
@@ -68,159 +104,87 @@ class EventLogMessage(BaseModel):
         cls.contract_event_name = cls.__name__
         super().__init_subclass__()
 
+    def __init__(self, *args, **kwargs):
+        # build the BoolVector ahead of time
+        if 'numArtifacts' in kwargs:
+            for attr, typ in self.__annotations__.items():
+                if typ == BoolVector and attr in kwargs:
+                    kwargs[attr] = safe_int_to_bool_list(kwargs[attr], kwargs['numArtifacts'])
+
+        super().__init__(*args, **kwargs)
+
     @classmethod
     def extract(cls: Any, instance: Mapping):
         "Extract the fields indicated in schema from the event log message"
         return cls.parse_obj(instance).dict()
 
 
-class MetadataHandler:
-    """Handles calling polyswarmd.bounties.substitute_metadata, only available at runtime
-
-    doctest:
-    When the doctest runs, MetadataHandler._substitute_metadata is already defined outside this
-    doctest (in __main__.py). Running this as a doctest will not trigger network IO.
-
-    >>> msg = {'event': 'test', 'data': { 'metadata': 'uri' }}
-    >>> MetadataHandler.fetch(msg, validate=None)
-    {'event': 'test', 'data': {'metadata': 'uri'}}
-    """
-    # partially applied `substitute_metadata' with AI, redis & session prefilled.
-    _substitute_metadata: ClassVar[Optional[Callable[[str, bool], Any]]] = None
-
-    @classmethod
-    def initialize(cls):
-        """Create & assign a new implementation of _substitute_metadata"""
-        from polyswarmd.app import app
-        from polyswarmd.views.bounties import substitute_metadata
-        config: Optional[Dict[str, Any]] = app.config
-        ai = config['POLYSWARMD'].artifact.client
-        session = FuturesSession(adapter_kwargs={'max_retries': 3})
-        redis = config['POLYSWARMD'].redis.client
-
-        def _substitute_metadata_impl(uri: str, validate=None):
-            return substitute_metadata(uri, ai, session, validate=validate, redis=redis)
-
-        cls._substitute_metadata = _substitute_metadata_impl
-
-    @classmethod
-    def fetch(cls, msg: WebsocketMessage,
-              validate=AssertionMetadata.validate) -> WebsocketMessage:
-        """Fetch metadata with URI from `msg', validate it and merge the result"""
-        data = msg.get('data')
-        if not data:
-            return msg
-
-        data.update(metadata=cls.substitute_metadata(data.get('metadata'), validate))
-        return msg
-
-    @classmethod
-    def substitute_metadata(cls, uri: str, validate):
-        "Handles the actual call to `_substitute_metadata`"
-        if not cls._substitute_metadata:
-            cls.initialize()
-        return cls._substitute_metadata(uri, validate)
+class Connected(BaseEvent):
+    __event__: ClassVar[EventId] = 'connected'
+    start_time: str
 
 
-def MessageField(*args, **kwargs):
-    return Field(kwargs.get('default'), *args, **kwargs)
-
-
-class Guid(str):
-
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
-    @classmethod
-    def validate(cls, v):
-        return cls(str(uuid.UUID(int=int(v))))
-
-
-class ArtifactType(str):
-    """The type for `ArtifactType`"""
-
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
-    @classmethod
-    def validate(cls, v):
-        if isinstance(v, int):
-            return cls(_ArtifactType.to_string(_ArtifactType(v)))
-        elif isinstance(v, str):
-            return cls(v)
-        else:
-            raise ValueError(f"Could not build an ArtifactType from value provided: {v}")
-
-
-EthereumAddr = constr(min_length=34, max_length=42)
-Uint256 = int
-BoolVector = List[bool]
-BountyGuid = MessageField(alias='bountyGuid')
-
-# 'from' is a reserved word in python, so it can't be used as an attribute of a class until this is
-# changed, we just serialize the `_from` field to it's expeted value at serialization-time
-From = MessageField(alias='from')
-
-
-class Transfer(EventLogMessage):
+class Transfer(ContractEvent):
     """Transfer
 
     doctest:
 
     >>> pprint(Transfer.extract({'to': addr1, 'from': addr2, 'value': 1 }))
-    {'from': '0x00000000000000000000000000000002',
-     'to': '0x00000000000000000000000000000001',
+    {'from': '0x0000000000000000000000000000000000000002',
+     'to': '0x0000000000000000000000000000000000000001',
      'value': '1'}
     """
-
-    to: EthereumAddr
+    recipient: EthereumAddress = To
     value: str
-    from_: EthereumAddr = From
+    sender: EthereumAddress = From
 
     def dict(self, *args, **kwargs):
         return super().dict(by_alias=True, *args, **kwargs)
 
 
-class NewDeposit(EventLogMessage):
+class NewDeposit(ContractEvent):
     """NewDeposit
 
     doctest:
 
     >>> NewDeposit.extract({'from': addr2, 'value': 1 })
-    {'value': 1, 'from': '0x00000000000000000000000000000002'}
+    {'value': 1, 'from': '0x0000000000000000000000000000000000000002'}
     >>> NewDeposit.contract_event_name
     'NewDeposit'
     """
     value: Uint256
-    from_: EthereumAddr = From
+    sender: EthereumAddress = From
 
     def dict(self, *args, **kwargs):
         return super().dict(by_alias=True, *args, **kwargs)
 
 
-class NewWithdrawal(EventLogMessage):
+class NewWithdrawal(ContractEvent):
     """NewWithdrawal
 
     doctest:
 
     >>> NewWithdrawal.extract({'to': addr1, 'from': addr2, 'value': 1 })
-    {'to': '0x00000000000000000000000000000001', 'value': 1}
+    {'to': '0x0000000000000000000000000000000000000001', 'value': 1}
     >>> NewWithdrawal.contract_event_name
     'NewWithdrawal'
     """
-    to: EthereumAddr
+    recipient: EthereumAddress = To
     value: Uint256
 
+    def dict(self, *args, **kwargs):
+        return super().dict(by_alias=True, *args, **kwargs)
 
-class OpenedAgreement(EventLogMessage):
+
+class OpenedAgreement(ContractEvent):
     """OpenedAgreement
 
     doctest:
 
-    >>> OpenedAgreement.extract({ 'to': addr1, 'from': addr2, 'value': 1 })
-    {'to': '0x00000000000000000000000000000001', 'from': '0x00000000000000000000000000000002', 'value': 1}
+    >>> pprint(OpenedAgreement.extract({ 'to': addr1, 'from': addr2, 'value': 1 }))
+    {'from': '0x0000000000000000000000000000000000000002',
+     'to': '0x0000000000000000000000000000000000000001',
+     'value': 1}
     >>> OpenedAgreement.contract_event_name
     'OpenedAgreement'
     """
@@ -230,47 +194,21 @@ class OpenedAgreement(EventLogMessage):
         return dict(instance)
 
 
-class CanceledAgreement(EventLogMessage):
+class CanceledAgreement(ContractEvent):
 
     @classmethod
     def extract(_cls, instance):
         return dict(instance)
 
 
-class JoinedAgreement(EventLogMessage):
+class JoinedAgreement(ContractEvent):
 
     @classmethod
     def extract(_cls, instance):
         return dict(instance)
 
 
-class WebsocketFilterEvent(WebsocketMessage, EventLogMessage):
-    @classmethod
-    def collect_boolvectors(cls, event):
-        if 'numArtifacts' in event:
-            for attr, typ in cls.__annotations__.items():
-                if typ == BoolVector and attr in event:
-                    event[attr] = safe_int_to_bool_list(event[attr], event['numArtifacts'])
-        return event
-
-    @classmethod
-    def to_message(cls: Any, data: Any):
-        return WebsocketFilterMessage.parse_obj(dict(
-            event=cls.event_id,
-            block_number=data['blockNumber'],
-            txhash=data['transactionHash'].hex(),
-            data=cls.parse_obj(cls.collect_boolvectors(data['args']))
-        )).dict()
-
-
-class WebsocketFilterMessage(WebsocketMessage):
-    event: str
-    block_number: int
-    txhash: str
-    data: WebsocketFilterEvent
-
-
-class FeesUpdated(WebsocketFilterEvent):
+class FeesUpdated(ContractEvent):
     """FeesUpdated
 
     doctest:
@@ -280,15 +218,17 @@ class FeesUpdated(WebsocketFilterEvent):
     {'block_number': 117,
      'data': {'assertion_fee': 5000000000000000, 'bounty_fee': 5000000000000000},
      'event': 'fee_update',
-     'txhash': '0000000000000000000000000000000b'}
+     'txhash': '000000000000000000000000000000000000000000000000000000000000000b'}
+    >>> FeesUpdated.contract_event_name
+    'FeesUpdated'
     """
-    event_id: ClassVar[str] = 'fee_update'
+    __event__: ClassVar[EventId] = 'fee_update'
 
     bounty_fee: int = MessageField(alias='bountyFee')
     assertion_fee: int = MessageField(alias='assertionFee')
 
 
-class WindowsUpdated(WebsocketFilterEvent):
+class WindowsUpdated(ContractEvent):
     """WindowsUpdated
 
     doctest:
@@ -300,15 +240,15 @@ class WindowsUpdated(WebsocketFilterEvent):
     {'block_number': 117,
      'data': {'arbiter_vote_window': 105, 'assertion_reveal_window': 100},
      'event': 'window_update',
-     'txhash': '0000000000000000000000000000000b'}
+     'txhash': '000000000000000000000000000000000000000000000000000000000000000b'}
     """
-    event_id: ClassVar[str] = 'window_update'
+    __event__: ClassVar[EventId] = 'window_update'
 
     assertion_reveal_window: Uint256 = MessageField(alias='assertionRevealWindow')
     arbiter_vote_window: Uint256 = MessageField(alias='arbiterVoteWindow')
 
 
-class NewBounty(WebsocketFilterEvent):
+class NewBounty(ContractEvent):
     """NewBounty
 
     doctest:
@@ -327,7 +267,7 @@ class NewBounty(WebsocketFilterEvent):
     {'block_number': 117,
      'data': {'amount': '10',
               'artifact_type': 'url',
-              'author': '0x00000000000000000000000000000001',
+              'author': '0x0000000000000000000000000000000000000001',
               'expiration': '118',
               'guid': '00000000-0000-0000-0000-00000000042a',
               'metadata': [{'bounty_id': 69540800813340,
@@ -341,23 +281,19 @@ class NewBounty(WebsocketFilterEvent):
                             'type': 'FILE'}],
               'uri': '912bnadf01295'},
      'event': 'bounty',
-     'txhash': '0000000000000000000000000000000b'}
+     'txhash': '000000000000000000000000000000000000000000000000000000000000000b'}
     """
-    event_id: ClassVar[str] = 'bounty'
-    guid: Guid
-    artifact_type: ArtifactType = Field('FILE', alias='artifactType')
-    author: EthereumAddr
+    __event__: ClassVar[EventId] = 'bounty'
+    guid: EventGUID
+    artifact_type: ArtifactTypeField = MessageField(alias='artifactType')
+    author: EthereumAddress
     amount: str
     uri: str = MessageField(alias='artifactURI')
     expiration: str = MessageField(alias='expirationBlock')
-    metadata: str
-
-    @classmethod
-    def to_message(cls, event) -> WebsocketMessage:
-        return MetadataHandler.fetch(super().to_message(event), validate=BountyMetadata.validate)
+    metadata: ArtifactMetadata[Bounty]
 
 
-class NewAssertion(WebsocketFilterEvent):
+class NewAssertion(ContractEvent):
     """NewAssertion
 
     doctest:
@@ -379,19 +315,19 @@ class NewAssertion(WebsocketFilterEvent):
               'index': 1,
               'mask': [False, False, False, False, False, True]},
      'event': 'assertion',
-     'txhash': '0000000000000000000000000000000b'}
+     'txhash': '000000000000000000000000000000000000000000000000000000000000000b'}
     """
-    event_id: ClassVar[str] = 'assertion'
+    __event__: ClassVar[EventId] = 'assertion'
 
-    bounty_guid: Guid = BountyGuid
-    author: EthereumAddr
+    bounty_guid: EventGUID = BountyGuid
+    author: EthereumAddress
     index: Uint256
     bid: List[str]
     mask: BoolVector
     commitment: str
 
 
-class RevealedAssertion(WebsocketFilterEvent):
+class RevealedAssertion(ContractEvent):
     """RevealedAssertion
 
     doctest:
@@ -418,23 +354,19 @@ class RevealedAssertion(WebsocketFilterEvent):
               'nonce': '8',
               'verdicts': [False, False, False, False, False, False, False, True]},
      'event': 'reveal',
-     'txhash': '0000000000000000000000000000000b'}
+     'txhash': '000000000000000000000000000000000000000000000000000000000000000b'}
     """
-    event_id: ClassVar[str] = 'reveal'
+    __event__: ClassVar[EventId] = 'reveal'
 
-    bounty_guid: Guid = BountyGuid
-    author: EthereumAddr
+    bounty_guid: EventGUID = BountyGuid
+    author: EthereumAddress
     index: Uint256
     nonce: str
     verdicts: BoolVector
-    metadata: Any
-
-    @classmethod
-    def to_message(cls: Any, event: EventData):
-        return MetadataHandler.fetch(super().to_message(event), validate=AssertionMetadata.validate)
+    metadata: ArtifactMetadata[Assertion]
 
 
-class NewVote(WebsocketFilterEvent):
+class NewVote(ContractEvent):
     """NewVote
 
     doctest:
@@ -450,15 +382,15 @@ class NewVote(WebsocketFilterEvent):
               'voter': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
               'votes': [False, False, False, False, False, False, False, True]},
      'event': 'vote',
-     'txhash': '0000000000000000000000000000000b'}
+     'txhash': '000000000000000000000000000000000000000000000000000000000000000b'}
     """
-    event_id: ClassVar[str] = 'vote'
-    bounty_guid: Guid = BountyGuid
-    voter: EthereumAddr
+    __event__: ClassVar[EventId] = 'vote'
+    bounty_guid: EventGUID = BountyGuid
+    voter: EthereumAddress
     votes: BoolVector
 
 
-class QuorumReached(WebsocketFilterEvent):
+class QuorumReached(ContractEvent):
     """QuorumReached
 
     doctest:
@@ -468,13 +400,13 @@ class QuorumReached(WebsocketFilterEvent):
     {'block_number': 117,
      'data': {'bounty_guid': '00000000-0000-0000-0000-0000000040c1'},
      'event': 'quorum',
-     'txhash': '0000000000000000000000000000000b'}
+     'txhash': '000000000000000000000000000000000000000000000000000000000000000b'}
     """
-    event_id: ClassVar[str] = 'quorum'
-    bounty_guid: Guid = BountyGuid
+    __event__: ClassVar[EventId] = 'quorum'
+    bounty_guid: EventGUID = BountyGuid
 
 
-class SettledBounty(WebsocketFilterEvent):
+class SettledBounty(ContractEvent):
     """SettledBounty
 
     doctest:
@@ -487,17 +419,17 @@ class SettledBounty(WebsocketFilterEvent):
     {'block_number': 117,
      'data': {'bounty_guid': '00000000-0000-0000-0000-0000000040c1',
               'payout': 1000,
-              'settler': '0x00000000000000000000000000000001'},
+              'settler': '0x0000000000000000000000000000000000000001'},
      'event': 'settled_bounty',
-     'txhash': '0000000000000000000000000000000b'}
+     'txhash': '000000000000000000000000000000000000000000000000000000000000000b'}
     """
-    event_id: ClassVar[str] = 'settled_bounty'
-    bounty_guid: Guid = BountyGuid
-    settler: EthereumAddr
+    __event__: ClassVar[EventId] = 'settled_bounty'
+    bounty_guid: EventGUID = BountyGuid
+    settler: EthereumAddress
     payout: Uint256
 
 
-class InitializedChannel(WebsocketFilterEvent):
+class InitializedChannel(ContractEvent):
     """InitializedChannel
 
     >>> event = mkevent({
@@ -512,16 +444,16 @@ class InitializedChannel(WebsocketFilterEvent):
               'guid': '00000000-0000-0000-0000-000000000001',
               'multi_signature': '0x789246BB76D18C6C7f8bd8ac8423478795f71bf9'},
      'event': 'initialized_channel',
-     'txhash': '0000000000000000000000000000000b'}
+     'txhash': '000000000000000000000000000000000000000000000000000000000000000b'}
     """
-    event_id: ClassVar[str] = 'initialized_channel'
-    ambassador: EthereumAddr
-    expert: EthereumAddr
-    guid: Guid
-    multi_signature: EthereumAddr = MessageField(alias='msig')
+    __event__: ClassVar[EventId] = 'initialized_channel'
+    ambassador: EthereumAddress
+    expert: EthereumAddress
+    guid: EventGUID
+    multi_signature: EthereumAddress = MessageField(alias='msig')
 
 
-class ClosedAgreement(WebsocketFilterEvent):
+class ClosedAgreement(ContractEvent):
     """ClosedAgreement
 
     doctest:
@@ -534,14 +466,14 @@ class ClosedAgreement(WebsocketFilterEvent):
      'data': {'ambassador': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
               'expert': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c'},
      'event': 'closed_agreement',
-     'txhash': '0000000000000000000000000000000b'}
+     'txhash': '000000000000000000000000000000000000000000000000000000000000000b'}
     """
-    event_id: ClassVar[str] = 'closed_agreement'
-    ambassador: EthereumAddr = MessageField(alias='_ambassador')
-    expert: EthereumAddr = MessageField(alias='_expert')
+    __event__: ClassVar[EventId] = 'closed_agreement'
+    ambassador: EthereumAddress = MessageField(alias='_ambassador')
+    expert: EthereumAddress = MessageField(alias='_expert')
 
 
-class StartedSettle(WebsocketFilterEvent):
+class StartedSettle(ContractEvent):
     """StartedSettle
 
     doctest:
@@ -552,20 +484,20 @@ class StartedSettle(WebsocketFilterEvent):
     ... 'settlementPeriodEnd': 229 })
     >>> decoded_msg(StartedSettle.serialize_message(event))
     {'block_number': 117,
-     'data': {'initiator': '0x00000000000000000000000000000001',
+     'data': {'initiator': '0x0000000000000000000000000000000000000001',
               'nonce': 1688,
               'settle_period_end': 229},
      'event': 'settle_started',
-     'txhash': '0000000000000000000000000000000b'}
+     'txhash': '000000000000000000000000000000000000000000000000000000000000000b'}
 
     """
-    event_id: ClassVar[str] = 'settle_started'
-    initiator: EthereumAddr
+    __event__: ClassVar[EventId] = 'settle_started'
+    initiator: EthereumAddress
     nonce: Uint256 = MessageField(alias='sequence')
     settle_period_end: Uint256 = MessageField(alias='settlementPeriodEnd')
 
 
-class SettleStateChallenged(WebsocketFilterEvent):
+class SettleStateChallenged(ContractEvent):
     """SettleStateChallenged
 
     doctest:
@@ -576,20 +508,20 @@ class SettleStateChallenged(WebsocketFilterEvent):
     ... 'settlementPeriodEnd': 229 })
     >>> decoded_msg(SettleStateChallenged.serialize_message(event))
     {'block_number': 117,
-     'data': {'challenger': '0x00000000000000000000000000000001',
+     'data': {'challenger': '0x0000000000000000000000000000000000000001',
               'nonce': 1688,
               'settle_period_end': 229},
      'event': 'settle_challenged',
-     'txhash': '0000000000000000000000000000000b'}
+     'txhash': '000000000000000000000000000000000000000000000000000000000000000b'}
     """
-    event_id: ClassVar[str] = 'settle_challenged'
+    __event__: ClassVar[EventId] = 'settle_challenged'
 
-    challenger: EthereumAddr
+    challenger: EthereumAddress
     nonce: Uint256 = MessageField(alias='sequence')
     settle_period_end: Uint256 = MessageField(alias='settlementPeriodEnd')
 
 
-class Deprecated(WebsocketFilterEvent):
+class Deprecated(ContractEvent):
     """Deprecated
 
     doctest:
@@ -601,13 +533,13 @@ class Deprecated(WebsocketFilterEvent):
     {'block_number': 117,
      'data': {'rollover': True},
      'event': 'deprecated',
-     'txhash': '0000000000000000000000000000000b'}
+     'txhash': '000000000000000000000000000000000000000000000000000000000000000b'}
     """
-    event_id: ClassVar[str] = 'deprecated'
+    __event__: ClassVar[EventId] = 'deprecated'
     rollover: bool
 
 
-class Undeprecated(WebsocketFilterEvent):
+class Undeprecated(ContractEvent):
     """Undeprecated
 
     doctest:
@@ -619,12 +551,12 @@ class Undeprecated(WebsocketFilterEvent):
     {'block_number': 117,
      'data': {},
      'event': 'undeprecated',
-     'txhash': '0000000000000000000000000000000b'}
+     'txhash': '000000000000000000000000000000000000000000000000000000000000000b'}
     """
-    event_id: ClassVar[str] = 'undeprecated'
+    __event__: ClassVar[EventId] = 'undeprecated'
 
 
-class LatestEvent(WebsocketFilterEvent):
+class LatestEvent(ContractEvent):
     """LatestEvent
 
     doctest:
@@ -641,13 +573,13 @@ class LatestEvent(WebsocketFilterEvent):
     >>> decoded_msg(LA.serialize_message(event))
     {'data': {'number': 220}, 'event': 'block'}
     """
-    event_id: ClassVar[str] = 'block'
+    __event__: ClassVar[EventId] = 'block'
     contract_event_name: ClassVar = 'latest'
     _chain: ClassVar[Any]
 
     @classmethod
     def to_message(cls, event):
-        return {'event': cls.event_id, 'data': {'number': cls._chain.blockNumber}}
+        return {'event': cls.__event__, 'data': {'number': cls._chain.blockNumber}}
 
     @classmethod
     def make(cls, chain):

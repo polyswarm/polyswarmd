@@ -1,10 +1,9 @@
 from collections import UserList
 from contextlib import contextmanager
-from curses.ascii import EOT as END_OF_TRANSMISSION
 import statistics
 from string import ascii_lowercase
 import time
-from typing import ClassVar, Generator, Iterator, List, Mapping
+from typing import ClassVar, Generator, Iterator
 import unittest.mock
 import uuid
 
@@ -20,7 +19,8 @@ from polyswarmd.websockets.filter import (
     FilterManager,
     FilterWrapper,
 )
-from polyswarmd.websockets.messages import WebsocketMessage
+from polyswarmd.websockets.messages import WebsocketSerializable
+from polyswarmd.websockets.types import EventId
 
 BEGIN = time.time()
 
@@ -70,10 +70,10 @@ def rpc(monkeypatch):
     return patch
 
 
-class NOPMessage(WebsocketMessage):
+class NOPMessage(WebsocketSerializable):
     """Stub for a polyswarmd.websocket.message object"""
     contract_event_name: ClassVar[str] = 'NOP_CONTRACT'
-    event: ClassVar[str] = 'NOP_EVENT'
+    __event__: ClassVar[EventId] = 'NOP_EVENT'
 
 
 class MockFilter(ContractFilter):
@@ -134,7 +134,7 @@ class enrich(UserList):
         prev = {}
         for msg in map(ujson.loads, messages):
             # ensure we got an 'event' tag which should be included with all WebsocketMessage
-            assert msg['event'] == NOPMessage.event
+            assert msg['event'] == NOPMessage.__event__
             emsg = msg['data']
             emsg[TX_TS] = emsg.get(TX_TS, -1)
             emsg[TXDIFF] = emsg[TX_TS] - prev.get(TX_TS, emsg[TX_TS])
