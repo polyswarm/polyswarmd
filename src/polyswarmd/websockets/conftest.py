@@ -1,4 +1,4 @@
-from collections import namedtuple
+from collections import UserDict, namedtuple
 import json
 from pprint import pprint
 
@@ -57,7 +57,7 @@ def mock_md_fetch(monkeypatch):
     monkeypatch.setattr(messages.MetadataHandler, "_substitute_metadata", mock_sub)
 
 
-class mkevent:
+class mkevent(UserDict):
     DEFAULT_BLOCK = 117
     ALTERNATE_BLOCK = 220
 
@@ -74,15 +74,13 @@ class mkevent:
         }
         for i, (attr, default) in enumerate(event_default.items()):
             if len(args) > i:
-                setattr(self, attr, args[i])
-            elif attr in kwargs:
-                setattr(self, attr, kwargs[attr])
-            else:
-                setattr(self, attr, default)
+                event_default[attr] = args[i]
+        event_default.update(kwargs)
+        self.data = event_default
 
-    def __getitem__(self, k):
+    def __getattr__(self, k):
         if (type(k) == str):
-            return self.__getattribute__(k)
+            return self.data[k]
 
 
 @pytest.fixture(autouse=True)

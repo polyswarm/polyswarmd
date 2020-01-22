@@ -26,7 +26,7 @@ class ContractFilter:
         ...
 
 
-FormatClass = Type[messages.WebsocketFilterMessage]
+FormatClass = Type[messages.WebsocketMessage]
 Message = bytes
 FilterInstaller = Callable[[str], ContractFilter]
 

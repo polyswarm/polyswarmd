@@ -1,72 +1,65 @@
+import abc
 from typing import (
     Any,
     Callable,
     ClassVar,
     Dict,
     Generic,
+    List,
     Mapping,
     Optional,
     Type,
+    TypeVar,
     cast,
 )
+import uuid
 
+from pydantic import BaseModel, Field, constr
 from requests_futures.sessions import FuturesSession
 import ujson
 
-from polyswarmartifact import ArtifactType
+from polyswarmartifact import ArtifactType as _ArtifactType
 from polyswarmartifact.schema import Assertion as AssertionMetadata
 from polyswarmartifact.schema import Bounty as BountyMetadata
-
-from .json_schema import PSJSONSchema, SchemaDef
-from .message_types import (
-    ClosedAgreementMessageData,
-    D,
-    DeprecatedMessageData,
-    E,
-    EventData,
-    FeesUpdatedMessageData,
-    InitializedChannelMessageData,
-    LatestEventMessageData,
-    NewAssertionMessageData,
-    NewBountyMessageData,
-    NewDepositMessageData,
-    NewVoteMessageData,
-    NewWithdrawalMessageData,
-    QuorumReachedMessageData,
-    RevealedAssertionMessageData,
-    SettledBountyMessageData,
-    SettleStateChallengedMessageData,
-    StartedSettleMessageData,
-    TransferMessageData,
-    UndeprecatedMessageData,
-    WebsocketEventMessage,
-    WindowsUpdatedMessageData,
-)
+from polyswarmd.utils import safe_int_to_bool_list
 
 
-class WebsocketMessage(Generic[D]):
+class EventData(Mapping):
+    """Event data returned from web3 filter requests"""
+    args: Dict[str, Any]
+    event: str
+    logIndex: int
+    transactionIndex: int
+    transactionHash: bytes
+    address: str
+    blockHash: bytes
+    blockNumber: int
+
+
+class WebsocketMessage(BaseModel):
     "Represent a message that can be handled by polyswarm-client"
-    # This is the identifier used when building a websocket event identifier.
-    event: ClassVar[str]
-
     @classmethod
     def serialize_message(cls: Any, data: Any) -> bytes:
         return ujson.dumps(cls.to_message(data)).encode('ascii')
 
     @classmethod
-    def to_message(cls: Any, data: Any) -> WebsocketEventMessage[D]:
-        return cast(WebsocketEventMessage, {'event': cls.event, 'data': data})
+    def to_message(cls: Any, data: Any):
+        raise NotImplementedError
 
 
-class Connected(WebsocketMessage[str]):
-    event: ClassVar[str] = 'connected'
+class Connected(WebsocketMessage):
+    event_id: ClassVar[str] = 'connected'
+    start_time: str
+
+    @classmethod
+    def to_message(cls: Any, data: Any):
+        return cls.parse_obj(data).dict()
 
 
-class EventLogMessage(Generic[E]):
+class EventLogMessage(BaseModel):
     "Extract `EventData` based on schema"
 
-    schema: ClassVar[PSJSONSchema]
-    contract_event_name: ClassVar[str]
+    contract_event_name: ClassVar
 
     # The use of metaclasses complicates type-checking and inheritance, so to set a dynamic
     # class-property and type-checking annotations, we set it inside __init_subclass__.
@@ -76,45 +69,9 @@ class EventLogMessage(Generic[E]):
         super().__init_subclass__()
 
     @classmethod
-    def extract(cls: Any, instance: Mapping) -> E:
+    def extract(cls: Any, instance: Mapping):
         "Extract the fields indicated in schema from the event log message"
-        return cls.schema.extract(instance)
-
-
-# Commonly used schema properties
-uint256: SchemaDef = {'type': 'integer'}
-guid: SchemaDef = {'type': 'string', 'format': 'uuid'}
-bounty_guid: SchemaDef = cast(SchemaDef, {**guid, 'srckey': 'bountyGuid'})
-ethereum_address: SchemaDef = {'format': 'ethaddr', 'type': 'string'}
-
-
-def _int_to_bool_list(i):
-    s = format(i, 'b')
-    return [x == '1' for x in s[::-1]]
-
-
-def safe_int_to_bool_list(num, max):
-    if int(num) == 0:
-        return [False] * int(max)
-    else:
-        converted = _int_to_bool_list(num)
-        return converted + [False] * (max - len(converted))
-
-
-def _get_boolvector(k: str, e: EventData):
-    """Safely Convert in to "bool list"
-
-    >>> _get_boolvector('test', {'test': 128, 'numArtifacts': 9})
-    [False, False, False, False, False, False, False, True, False]
-    >>> _get_boolvector('test', {'test': 15, 'numArtifacts': 4})
-    [True, True, True, True]
-    >>> _get_boolvector('test', {'test': 127, 'numArtifacts': 8})
-    [True, True, True, True, True, True, True, False]
-    """
-    return safe_int_to_bool_list(e[k], e['numArtifacts'])
-
-
-boolvector: SchemaDef = {'type': 'array', 'items': 'boolean', 'srckey': _get_boolvector}
+        return cls.parse_obj(instance).dict()
 
 
 class MetadataHandler:
@@ -147,8 +104,8 @@ class MetadataHandler:
         cls._substitute_metadata = _substitute_metadata_impl
 
     @classmethod
-    def fetch(cls, msg: WebsocketEventMessage[D],
-              validate=AssertionMetadata.validate) -> WebsocketEventMessage[D]:
+    def fetch(cls, msg: WebsocketMessage,
+              validate=AssertionMetadata.validate) -> WebsocketMessage:
         """Fetch metadata with URI from `msg', validate it and merge the result"""
         data = msg.get('data')
         if not data:
@@ -165,7 +122,49 @@ class MetadataHandler:
         return cls._substitute_metadata(uri, validate)
 
 
-class Transfer(EventLogMessage[TransferMessageData]):
+def MessageField(*args, **kwargs):
+    return Field(kwargs.get('default'), *args, **kwargs)
+
+
+class Guid(str):
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v):
+        return cls(str(uuid.UUID(int=int(v))))
+
+
+class ArtifactType(str):
+    """The type for `ArtifactType`"""
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v):
+        if isinstance(v, int):
+            return cls(_ArtifactType.to_string(_ArtifactType(v)))
+        elif isinstance(v, str):
+            return cls(v)
+        else:
+            raise ValueError(f"Could not build an ArtifactType from value provided: {v}")
+
+
+EthereumAddr = constr(min_length=34, max_length=42)
+Uint256 = int
+BoolVector = List[bool]
+BountyGuid = MessageField(alias='bountyGuid')
+
+# 'from' is a reserved word in python, so it can't be used as an attribute of a class until this is
+# changed, we just serialize the `_from` field to it's expeted value at serialization-time
+From = MessageField(alias='from')
+
+
+class Transfer(EventLogMessage):
     """Transfer
 
     doctest:
@@ -175,18 +174,16 @@ class Transfer(EventLogMessage[TransferMessageData]):
      'to': '0x00000000000000000000000000000001',
      'value': '1'}
     """
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({
-        'properties': {
-            'to': ethereum_address,
-            'from': ethereum_address,
-            'value': {
-                'type': 'string'
-            }
-        }
-    })
+
+    to: EthereumAddr
+    value: str
+    from_: EthereumAddr = From
+
+    def dict(self, *args, **kwargs):
+        return super().dict(by_alias=True, *args, **kwargs)
 
 
-class NewDeposit(EventLogMessage[NewDepositMessageData]):
+class NewDeposit(EventLogMessage):
     """NewDeposit
 
     doctest:
@@ -196,15 +193,14 @@ class NewDeposit(EventLogMessage[NewDepositMessageData]):
     >>> NewDeposit.contract_event_name
     'NewDeposit'
     """
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({
-        'properties': {
-            'value': uint256,
-            'from': ethereum_address,
-        }
-    })
+    value: Uint256
+    from_: EthereumAddr = From
+
+    def dict(self, *args, **kwargs):
+        return super().dict(by_alias=True, *args, **kwargs)
 
 
-class NewWithdrawal(EventLogMessage[NewWithdrawalMessageData]):
+class NewWithdrawal(EventLogMessage):
     """NewWithdrawal
 
     doctest:
@@ -214,15 +210,11 @@ class NewWithdrawal(EventLogMessage[NewWithdrawalMessageData]):
     >>> NewWithdrawal.contract_event_name
     'NewWithdrawal'
     """
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({
-        'properties': {
-            'to': ethereum_address,
-            'value': uint256,
-        }
-    })
+    to: EthereumAddr
+    value: Uint256
 
 
-class OpenedAgreement(EventLogMessage[Dict]):
+class OpenedAgreement(EventLogMessage):
     """OpenedAgreement
 
     doctest:
@@ -238,42 +230,47 @@ class OpenedAgreement(EventLogMessage[Dict]):
         return dict(instance)
 
 
-class CanceledAgreement(EventLogMessage[Dict]):
+class CanceledAgreement(EventLogMessage):
 
     @classmethod
     def extract(_cls, instance):
         return dict(instance)
 
 
-class JoinedAgreement(EventLogMessage[Dict]):
+class JoinedAgreement(EventLogMessage):
 
     @classmethod
     def extract(_cls, instance):
         return dict(instance)
 
 
-class WebsocketFilterMessage(WebsocketMessage[D], EventLogMessage[D]):
-    """Websocket message interface for etherem event entries. """
-    event: ClassVar[str]
-    schema: ClassVar[PSJSONSchema]
-    contract_event_name: ClassVar[str]
+class WebsocketFilterEvent(WebsocketMessage, EventLogMessage):
+    @classmethod
+    def collect_boolvectors(cls, event):
+        if 'numArtifacts' in event:
+            for attr, typ in cls.__annotations__.items():
+                if typ == BoolVector and attr in event:
+                    event[attr] = safe_int_to_bool_list(event[attr], event['numArtifacts'])
+        return event
 
     @classmethod
-    def to_message(cls, event: EventData) -> WebsocketEventMessage[D]:
-        return cast(
-            WebsocketEventMessage[D], {
-                'event': cls.event,
-                'data': cls.extract(event.args),
-                'block_number': event['blockNumber'],
-                'txhash': event['transactionHash'].hex()
-            }
-        )
-
-    def __repr__(self):
-        return f'<{self.contract_event_name} name={self.event}>'
+    def to_message(cls: Any, data: Any):
+        return WebsocketFilterMessage.parse_obj(dict(
+            event=cls.event_id,
+            block_number=data['blockNumber'],
+            txhash=data['transactionHash'].hex(),
+            data=cls.parse_obj(cls.collect_boolvectors(data['args']))
+        )).dict()
 
 
-class FeesUpdated(WebsocketFilterMessage[FeesUpdatedMessageData]):
+class WebsocketFilterMessage(WebsocketMessage):
+    event: str
+    block_number: int
+    txhash: str
+    data: WebsocketFilterEvent
+
+
+class FeesUpdated(WebsocketFilterEvent):
     """FeesUpdated
 
     doctest:
@@ -285,20 +282,13 @@ class FeesUpdated(WebsocketFilterMessage[FeesUpdatedMessageData]):
      'event': 'fee_update',
      'txhash': '0000000000000000000000000000000b'}
     """
-    event: ClassVar[str] = 'fee_update'
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({
-        'properties': {
-            'bounty_fee': {
-                **uint256, 'srckey': 'bountyFee'
-            },
-            'assertion_fee': {
-                **uint256, 'srckey': 'assertionFee'
-            }
-        },
-    })
+    event_id: ClassVar[str] = 'fee_update'
+
+    bounty_fee: int = MessageField(alias='bountyFee')
+    assertion_fee: int = MessageField(alias='assertionFee')
 
 
-class WindowsUpdated(WebsocketFilterMessage[WindowsUpdatedMessageData]):
+class WindowsUpdated(WebsocketFilterEvent):
     """WindowsUpdated
 
     doctest:
@@ -312,20 +302,13 @@ class WindowsUpdated(WebsocketFilterMessage[WindowsUpdatedMessageData]):
      'event': 'window_update',
      'txhash': '0000000000000000000000000000000b'}
     """
-    event: ClassVar[str] = 'window_update'
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({
-        'properties': {
-            'assertion_reveal_window': {
-                **uint256, 'srckey': 'assertionRevealWindow'
-            },
-            'arbiter_vote_window': {
-                **uint256, 'srckey': 'arbiterVoteWindow'
-            }
-        }
-    })
+    event_id: ClassVar[str] = 'window_update'
+
+    assertion_reveal_window: Uint256 = MessageField(alias='assertionRevealWindow')
+    arbiter_vote_window: Uint256 = MessageField(alias='arbiterVoteWindow')
 
 
-class NewBounty(WebsocketFilterMessage[NewBountyMessageData]):
+class NewBounty(WebsocketFilterEvent):
     """NewBounty
 
     doctest:
@@ -360,38 +343,21 @@ class NewBounty(WebsocketFilterMessage[NewBountyMessageData]):
      'event': 'bounty',
      'txhash': '0000000000000000000000000000000b'}
     """
-    event: ClassVar[str] = 'bounty'
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({
-        'properties': {
-            'guid': guid,
-            'artifact_type': {
-                'type': 'string',
-                'enum': [name.lower() for name, value in ArtifactType.__members__.items()],
-                'srckey': lambda k, e: ArtifactType.to_string(ArtifactType(e['artifactType']))
-            },
-            'author': ethereum_address,
-            'amount': {
-                'type': 'string',
-            },
-            'uri': {
-                'srckey': 'artifactURI'
-            },
-            'expiration': {
-                'srckey': 'expirationBlock',
-                'type': 'string',
-            },
-            'metadata': {
-                'type': 'string'
-            }
-        }
-    })
+    event_id: ClassVar[str] = 'bounty'
+    guid: Guid
+    artifact_type: ArtifactType = Field('FILE', alias='artifactType')
+    author: EthereumAddr
+    amount: str
+    uri: str = MessageField(alias='artifactURI')
+    expiration: str = MessageField(alias='expirationBlock')
+    metadata: str
 
     @classmethod
-    def to_message(cls, event) -> WebsocketEventMessage[NewBountyMessageData]:
+    def to_message(cls, event) -> WebsocketMessage:
         return MetadataHandler.fetch(super().to_message(event), validate=BountyMetadata.validate)
 
 
-class NewAssertion(WebsocketFilterMessage[NewAssertionMessageData]):
+class NewAssertion(WebsocketFilterEvent):
     """NewAssertion
 
     doctest:
@@ -415,25 +381,17 @@ class NewAssertion(WebsocketFilterMessage[NewAssertionMessageData]):
      'event': 'assertion',
      'txhash': '0000000000000000000000000000000b'}
     """
-    event: ClassVar[str] = 'assertion'
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({
-        'properties': {
-            'bounty_guid': bounty_guid,
-            'author': ethereum_address,
-            'index': uint256,
-            'bid': {
-                'type': 'array',
-                'items': 'string',
-            },
-            'mask': boolvector,
-            'commitment': {
-                'type': 'string',
-            },
-        },
-    })
+    event_id: ClassVar[str] = 'assertion'
+
+    bounty_guid: Guid = BountyGuid
+    author: EthereumAddr
+    index: Uint256
+    bid: List[str]
+    mask: BoolVector
+    commitment: str
 
 
-class RevealedAssertion(WebsocketFilterMessage[RevealedAssertionMessageData]):
+class RevealedAssertion(WebsocketFilterEvent):
     """RevealedAssertion
 
     doctest:
@@ -462,27 +420,21 @@ class RevealedAssertion(WebsocketFilterMessage[RevealedAssertionMessageData]):
      'event': 'reveal',
      'txhash': '0000000000000000000000000000000b'}
     """
-    event: ClassVar[str] = 'reveal'
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({
-        'properties': {
-            'bounty_guid': bounty_guid,
-            'author': ethereum_address,
-            'index': uint256,
-            'nonce': {
-                'type': 'string',
-            },
-            'verdicts': boolvector,
-            'metadata': {}
-        }
-    })
+    event_id: ClassVar[str] = 'reveal'
+
+    bounty_guid: Guid = BountyGuid
+    author: EthereumAddr
+    index: Uint256
+    nonce: str
+    verdicts: BoolVector
+    metadata: Any
 
     @classmethod
-    def to_message(cls: Any,
-                   event: EventData) -> WebsocketEventMessage[RevealedAssertionMessageData]:
+    def to_message(cls: Any, event: EventData):
         return MetadataHandler.fetch(super().to_message(event), validate=AssertionMetadata.validate)
 
 
-class NewVote(WebsocketFilterMessage[NewVoteMessageData]):
+class NewVote(WebsocketFilterEvent):
     """NewVote
 
     doctest:
@@ -500,17 +452,13 @@ class NewVote(WebsocketFilterMessage[NewVoteMessageData]):
      'event': 'vote',
      'txhash': '0000000000000000000000000000000b'}
     """
-    event: ClassVar[str] = 'vote'
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({
-        'properties': {
-            'bounty_guid': bounty_guid,
-            'voter': ethereum_address,
-            'votes': boolvector
-        }
-    })
+    event_id: ClassVar[str] = 'vote'
+    bounty_guid: Guid = BountyGuid
+    voter: EthereumAddr
+    votes: BoolVector
 
 
-class QuorumReached(WebsocketFilterMessage[QuorumReachedMessageData]):
+class QuorumReached(WebsocketFilterEvent):
     """QuorumReached
 
     doctest:
@@ -522,11 +470,11 @@ class QuorumReached(WebsocketFilterMessage[QuorumReachedMessageData]):
      'event': 'quorum',
      'txhash': '0000000000000000000000000000000b'}
     """
-    event: ClassVar[str] = 'quorum'
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({'properties': {'bounty_guid': bounty_guid}})
+    event_id: ClassVar[str] = 'quorum'
+    bounty_guid: Guid = BountyGuid
 
 
-class SettledBounty(WebsocketFilterMessage[SettledBountyMessageData]):
+class SettledBounty(WebsocketFilterEvent):
     """SettledBounty
 
     doctest:
@@ -542,19 +490,14 @@ class SettledBounty(WebsocketFilterMessage[SettledBountyMessageData]):
               'settler': '0x00000000000000000000000000000001'},
      'event': 'settled_bounty',
      'txhash': '0000000000000000000000000000000b'}
-
     """
-    event: ClassVar[str] = 'settled_bounty'
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({
-        'properties': {
-            'bounty_guid': bounty_guid,
-            'settler': ethereum_address,
-            'payout': uint256
-        }
-    })
+    event_id: ClassVar[str] = 'settled_bounty'
+    bounty_guid: Guid = BountyGuid
+    settler: EthereumAddr
+    payout: Uint256
 
 
-class InitializedChannel(WebsocketFilterMessage[InitializedChannelMessageData]):
+class InitializedChannel(WebsocketFilterEvent):
     """InitializedChannel
 
     >>> event = mkevent({
@@ -571,21 +514,14 @@ class InitializedChannel(WebsocketFilterMessage[InitializedChannelMessageData]):
      'event': 'initialized_channel',
      'txhash': '0000000000000000000000000000000b'}
     """
-    event: ClassVar[str] = 'initialized_channel'
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({
-        'properties': {
-            'ambassador': ethereum_address,
-            'expert': ethereum_address,
-            'guid': guid,
-            'multi_signature': {
-                **ethereum_address,
-                'srckey': 'msig',
-            }
-        }
-    })
+    event_id: ClassVar[str] = 'initialized_channel'
+    ambassador: EthereumAddr
+    expert: EthereumAddr
+    guid: Guid
+    multi_signature: EthereumAddr = MessageField(alias='msig')
 
 
-class ClosedAgreement(WebsocketFilterMessage[ClosedAgreementMessageData]):
+class ClosedAgreement(WebsocketFilterEvent):
     """ClosedAgreement
 
     doctest:
@@ -600,21 +536,12 @@ class ClosedAgreement(WebsocketFilterMessage[ClosedAgreementMessageData]):
      'event': 'closed_agreement',
      'txhash': '0000000000000000000000000000000b'}
     """
-    event: ClassVar[str] = 'closed_agreement'
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({
-        'properties': {
-            'ambassador': {
-                **ethereum_address, 'srckey': '_ambassador'
-            },
-            'expert': {
-                'srckey': '_expert',
-                **ethereum_address
-            }
-        }
-    })
+    event_id: ClassVar[str] = 'closed_agreement'
+    ambassador: EthereumAddr = MessageField(alias='_ambassador')
+    expert: EthereumAddr = MessageField(alias='_expert')
 
 
-class StartedSettle(WebsocketFilterMessage[StartedSettleMessageData]):
+class StartedSettle(WebsocketFilterEvent):
     """StartedSettle
 
     doctest:
@@ -632,23 +559,13 @@ class StartedSettle(WebsocketFilterMessage[StartedSettleMessageData]):
      'txhash': '0000000000000000000000000000000b'}
 
     """
-    event: ClassVar[str] = 'settle_started'
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({
-        'properties': {
-            'initiator': ethereum_address,
-            'nonce': {
-                'srckey': 'sequence',
-                **uint256
-            },
-            'settle_period_end': {
-                'srckey': 'settlementPeriodEnd',
-                **uint256
-            }
-        }
-    })
+    event_id: ClassVar[str] = 'settle_started'
+    initiator: EthereumAddr
+    nonce: Uint256 = MessageField(alias='sequence')
+    settle_period_end: Uint256 = MessageField(alias='settlementPeriodEnd')
 
 
-class SettleStateChallenged(WebsocketFilterMessage[SettleStateChallengedMessageData]):
+class SettleStateChallenged(WebsocketFilterEvent):
     """SettleStateChallenged
 
     doctest:
@@ -665,23 +582,14 @@ class SettleStateChallenged(WebsocketFilterMessage[SettleStateChallengedMessageD
      'event': 'settle_challenged',
      'txhash': '0000000000000000000000000000000b'}
     """
-    event: ClassVar[str] = 'settle_challenged'
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({
-        'properties': {
-            'challenger': ethereum_address,
-            'nonce': {
-                'srckey': 'sequence',
-                **uint256
-            },
-            'settle_period_end': {
-                'srckey': 'settlementPeriodEnd',
-                **uint256
-            }
-        }
-    })
+    event_id: ClassVar[str] = 'settle_challenged'
+
+    challenger: EthereumAddr
+    nonce: Uint256 = MessageField(alias='sequence')
+    settle_period_end: Uint256 = MessageField(alias='settlementPeriodEnd')
 
 
-class Deprecated(WebsocketFilterMessage[DeprecatedMessageData]):
+class Deprecated(WebsocketFilterEvent):
     """Deprecated
 
     doctest:
@@ -695,11 +603,11 @@ class Deprecated(WebsocketFilterMessage[DeprecatedMessageData]):
      'event': 'deprecated',
      'txhash': '0000000000000000000000000000000b'}
     """
-    event: ClassVar[str] = 'deprecated'
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({'properties': {'rollover': {'type': 'boolean'}}})
+    event_id: ClassVar[str] = 'deprecated'
+    rollover: bool
 
 
-class Undeprecated(WebsocketFilterMessage[UndeprecatedMessageData]):
+class Undeprecated(WebsocketFilterEvent):
     """Undeprecated
 
     doctest:
@@ -713,11 +621,10 @@ class Undeprecated(WebsocketFilterMessage[UndeprecatedMessageData]):
      'event': 'undeprecated',
      'txhash': '0000000000000000000000000000000b'}
     """
-    event: ClassVar[str] = 'undeprecated'
-    schema: ClassVar[PSJSONSchema] = PSJSONSchema({'properties': {}})
+    event_id: ClassVar[str] = 'undeprecated'
 
 
-class LatestEvent(WebsocketFilterMessage[LatestEventMessageData]):
+class LatestEvent(WebsocketFilterEvent):
     """LatestEvent
 
     doctest:
@@ -734,13 +641,13 @@ class LatestEvent(WebsocketFilterMessage[LatestEventMessageData]):
     >>> decoded_msg(LA.serialize_message(event))
     {'data': {'number': 220}, 'event': 'block'}
     """
-    event: ClassVar[str] = 'block'
-    contract_event_name: ClassVar[str] = 'latest'
+    event_id: ClassVar[str] = 'block'
+    contract_event_name: ClassVar = 'latest'
     _chain: ClassVar[Any]
 
     @classmethod
     def to_message(cls, event):
-        return {'event': cls.event, 'data': {'number': cls._chain.blockNumber}}
+        return {'event': cls.event_id, 'data': {'number': cls._chain.blockNumber}}
 
     @classmethod
     def make(cls, chain):
