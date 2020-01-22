@@ -4,7 +4,7 @@
 
 ## Introduction
 
-`polyswarmd` is a convenience daemon that provides a simple REST API for interacting with the PolySwarm marketplace. Specifically, `polyswarmd` handles interaction with Ethereum and IPFS nodes on clients' behalf.
+`polyswarmd` is a convenience daemon that provides a simple RPC API for interacting with the PolySwarm marketplace. Specifically, `polyswarmd` handles interaction with Ethereum and IPFS nodes on clients' behalf.
 
 
 ## Usage
