@@ -229,12 +229,14 @@ class QuorumReached(ContractEvent):
 
 
 class SettledBounty(ContractEvent):
+    __event__: ClassVar[EventId] = 'settled_bounty'
     bounty_guid: EventGUID = BountyGuid
     settler: EthereumAddress
     payout: Uint256
 
 
 class InitializedChannel(ContractEvent):
+    __event__: ClassVar[EventId] = 'initialized_channel'
     ambassador: EthereumAddress
     expert: EthereumAddress
     guid: EventGUID

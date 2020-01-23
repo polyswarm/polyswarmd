@@ -36,10 +36,25 @@ From = MessageField(alias='from')
 To = MessageField(alias='to')
 
 
-# allow +2 for '0x', although we should be getting HexBytes anyway
-class TXID(ConstrainedStr):
-    min_length = 64
-    max_length = 66
+def valid_hex(hx, length=None):
+    values = hx[2:] if hx.startswith('0x') else hx
+    if (length and len(values) != length) or any(ch not in hexdigits for ch in values):
+        l_indicate = f'{length}-bit' if length else ''
+        raise ValueError("Invalid " + l_indicate + " hex string", hx)
+    return hx
+
+
+class TXID(str):
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v):
+        if hasattr(v, 'hex'):
+            v = v.hex()
+        return cls(valid_hex(v))
+
 
 
 class EventData(Mapping):
@@ -95,14 +110,7 @@ class EthereumAddress(str):
 
     @classmethod
     def validate_address(cls, v):
-        hdigits = v
-        if v.startswith('0x'):
-            hdigits = v[2:]
-        else:
-            v = '0x' + v
-        if len(hdigits) != 40 or any(ch not in hexdigits for ch in hdigits):
-            raise ValueError("Expected an 40-bit hex value")
-        return cls(v)
+        return cls(valid_hex(v, length=40))
 
 
 class ArtifactMetadata(Dict, Generic[V]):
