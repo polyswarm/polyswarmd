@@ -137,12 +137,13 @@ def init_websockets(app):
         for evt in filter_events:
             filter_manager.register(offer_msig.eventFilter, evt)
 
-        with filter_manager.fetch() as results:
-            for messages in results:
+        def callback(messages):
+            for msg in messages:
                 if ws.closed:
                     raise RuntimeError("WebSocket is closed")
-                for msg in messages:
-                    return ws.send(msg)
+                return ws.send(msg)
+
+        filter_manager.pipe_events(callback)
 
     # for receiving messages about offers that might need to be signed
     @sockets.route('/messages/<uuid:guid>')

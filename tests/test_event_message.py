@@ -61,10 +61,15 @@ def rpc(monkeypatch):
         RPC = EthereumRpc(chain)
         RPC.register = unittest.mock.Mock(wraps=RPC.register)
         RPC.unregister = unittest.mock.Mock(wraps=RPC.unregister)
-        RPC.poll = unittest.mock.Mock(wraps=RPC.poll)
-        RPC.filter_manager.setup_event_filters = unittest.mock.Mock(
-            FilterManager.setup_event_filters
-        )
+
+        def _setup():
+            if RPC.filter_manager is not None:
+                return
+            manager = FilterManager()
+            manager.pipe_events(RPC.broadcast)
+            RPC.filter_manager = manager
+
+        RPC.setup_filter_manager = _setup
         return RPC
 
     return patch
@@ -165,9 +170,10 @@ class TestWebsockets:
         RPC.register(ws)
         for ft in filters:
             RPC.filter_manager.register(ft, NOPMessage, backoff=ft.backoff)
+        RPC.filter_manager.pipe_events(RPC.broadcast)
         yield RPC
         RPC.unregister(ws)
-        for mock in [RPC.poll, RPC.register, RPC.unregister, RPC.filter_manager.setup_event_filters]:
+        for mock in [RPC.register, RPC.unregister]:
             mock.assert_called_once()
         assert len(RPC.filter_manager.pool) == 0
         assert len(RPC.websockets) == 0

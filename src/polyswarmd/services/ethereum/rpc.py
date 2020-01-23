@@ -1,8 +1,7 @@
-from typing import Iterator, List, Optional
+from typing import Any, Iterator, List, Optional
 
 from gevent.lock import BoundedSemaphore
 
-from polyswarmd.config.contract import Chain
 from polyswarmd.utils import logging
 from polyswarmd.views.event_message import WebSocket
 from polyswarmd.websockets import messages
@@ -18,7 +17,7 @@ class EthereumRpc:
     filter_manager: Optional[FilterManager]
     websockets: Optional[List[WebSocket]]
     websockets_lock: BoundedSemaphore
-    chain: Chain
+    chain: Any
 
     def __init__(self, chain):
         self.chain = chain

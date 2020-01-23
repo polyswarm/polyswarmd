@@ -13,7 +13,6 @@ from typing import (
 
 import gevent
 from gevent.pool import Group
-from gevent.queue import Queue
 from requests.exceptions import ConnectionError
 
 from . import messages
@@ -88,6 +87,9 @@ class FilterWrapper:
         else:
             return self.MIN_WAIT
 
+    def get_new_entries(self) -> List:
+        return list(self.filter.get_new_entries())
+
     def spawn_poll_loop(self, callback: Callable[[Iterator[MessageT]], Any]):
         """Spawn a greenlet which polls the filter's contract events, passing results to `callback'"""
         ctr: int = 0  # number of loops since the last non-empty response
@@ -98,7 +100,7 @@ class FilterWrapper:
             # XXX spawn_later prevents easily killing the pool. Use `wait` here.
             gevent.sleep(wait)
             try:
-                result = self.filter.get_new_entries()
+                result = self.get_new_entries()
             # LookupError generally occurs when our schema doesn't match the message
             except LookupError:
                 logger.exception("LookupError inside spawn_poll_loop")
@@ -119,7 +121,7 @@ class FilterWrapper:
             # Reset the ctr if we received a non-empty response or we shouldn't backoff
             if len(result) != 0:
                 ctr = 0
-                callback(map(self.formatter.serialize_message, result))
+                callback((self.formatter.serialize_message(m) for m in result))
 
             wait = self.compute_wait(ctr)
             logger.debug("%s wait=%f", self.filter, wait)
@@ -139,12 +141,6 @@ class FilterManager:
         wrapper = FilterWrapper(filter_installer, fmt_cls, backoff)
         self.wrappers.append(wrapper)
         logger.debug('Registered new filter: %s', wrapper)
-
-    def fetch(self):
-        """Return a queue of currently managed contract events"""
-        queue = Queue()
-        self.pipe_events(queue.put_nowait)
-        yield from queue
 
     def pipe_events(self, broadcast_fn: Callable[[Iterator[MessageT]], Any]):
         """Return a queue of currently managed contract events"""
