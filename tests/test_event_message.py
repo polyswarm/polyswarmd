@@ -2,9 +2,9 @@ from collections import UserList
 from contextlib import contextmanager
 from curses.ascii import EOT as END_OF_TRANSMISSION
 import statistics
+from string import ascii_lowercase
 import time
 from typing import ClassVar, Generator, Iterator, List, Mapping
-from string import ascii_lowercase
 import unittest.mock
 import uuid
 

@@ -1,5 +1,5 @@
 from signal import SIGQUIT
-from typing import AnyStr, List, Optional, SupportsBytes, Union
+from typing import AnyStr, Iterable, List, Optional, SupportsBytes, Union
 
 import gevent
 from gevent.lock import BoundedSemaphore
@@ -16,13 +16,13 @@ class EthereumRpc:
     """
     This class periodically polls several geth filters, and multicasts the results across any open WebSockets
     """
-    filter_manager: FilterManager
+    filter_manager: Optional[FilterManager]
     websockets: Optional[List[WebSocket]]
     websockets_lock: BoundedSemaphore
 
     def __init__(self, chain):
         self.chain = chain
-        self.filter_manager = FilterManager()
+        self.filter_manager = None
         self.websockets = None
         self.websockets_lock = BoundedSemaphore(1)
         self.chain = chain
@@ -30,49 +30,19 @@ class EthereumRpc:
     def __repr__(self):
         return f"<EthereumRPC Chain={self.chain}>"
 
-    def broadcast(self, message: Union[AnyStr, SupportsBytes]):
+    def broadcast(self, messages: Iterable[Union[AnyStr, SupportsBytes]]):
         """
         Send a message to all connected WebSockets
         :param message: dict to be converted to json and sent
         """
-        # XXX This can be replaced with a broadcast inside the WebsocketHandlerApplication
-        logger.debug("I have %s websockets on %s", len(self.websockets), repr(self))
         with self.websockets_lock:
-            if len(self.websockets) == 0:
-                raise WebsocketConnectionAbortedError
             for ws in self.websockets:
                 try:
-                    ws.send(message)
+                    for msg in messages:
+                        ws.send(msg)
                 except Exception:
                     logger.exception('Error adding message to the queue')
                     continue
-
-    # noinspection PyBroadException
-    def poll(self):
-        """
-        Continually poll all Ethereum filters as long as there are WebSockets listening
-        """
-        # Start the pool
-        try:
-            for filter_events in self.filter_manager.fetch():
-                for msg in filter_events:
-                    self.broadcast(msg)
-        except WebsocketConnectionAbortedError:
-            logger.exception("Shutting down poll()")
-            self.websockets = None
-        except gevent.GreenletExit:
-            logger.exception(
-                'Exiting poll() Greenlet with %d connected clients websockets', len(self.websockets)
-            )
-            # if the greenlet is killed, we need to destroy the websocket connections (if any exist)
-            self.websockets = None
-        except Exception:
-            logger.exception(
-                'Exception in filter checks with %d connected websockets', len(self.websockets)
-            )
-            # Creates a new greenlet with all new filters and let's this one die.
-            greenlet = gevent.spawn(self.poll)
-            gevent.signal(SIGQUIT, greenlet.kill)
 
     def register(self, ws: WebSocket):
         """
@@ -85,11 +55,49 @@ class EthereumRpc:
             if self.websockets is None:
                 self.websockets = [ws]
                 logger.debug('First WebSocket registered, starting greenlet')
-                self.filter_manager.setup_event_filters(self.chain)
-                greenlet = gevent.spawn(self.poll)
-                gevent.signal(SIGQUIT, greenlet.kill)
+                self.filter_manager.setup_filter_manager(self.chain)
             else:
                 self.websockets.append(ws)
+
+    def setup_filter_manager(self):
+        if self.filter_manager:
+            logger.info("this FilterManager has already been initialized")
+            return
+
+        self.filter_manager = FilterManager()
+        chain = self.chain
+        bounty_contract = chain.bounty_registry.contract
+
+        # Setup Latest (although this could pass `w3.eth.filter` directly)
+        self.filter_manager.register(
+            chain.w3.eth.filter, messages.LatestEvent.make(chain.w3.eth), backoff=False
+        )
+        # messages.NewBounty shouldn't wait or back-off from new bounties.
+        self.filter_manager.register(bounty_contract.eventFilter, messages.NewBounty, backoff=False)
+
+        filter_events: List[FormatClass] = [
+            messages.FeesUpdated,
+            messages.WindowsUpdated,
+            messages.NewAssertion,
+            messages.NewVote,
+            messages.QuorumReached,
+            messages.SettledBounty,
+            messages.RevealedAssertion,
+            messages.Deprecated,
+            messages.Undeprecated,
+        ]
+
+        for cls in filter_events:
+            self.filter_manager.register(bounty_contract.eventFilter, cls)
+
+        offer_registry = chain.offer_registry
+        if offer_registry and offer_registry.contract:
+            self.filter_manager.register(
+                offer_registry.contract.eventFilter, messages.InitializedChannel
+            )
+
+        # Calls `self.broadcast` with the results of each filter manager
+        self.filter_manager.pipe_events(self.broadcast)
 
     def unregister(self, ws: WebSocket):
         """
