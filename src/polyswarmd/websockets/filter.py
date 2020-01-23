@@ -150,6 +150,10 @@ class FilterManager:
             self.pool.spawn(wrapper.spawn_poll_loop, queue.put_nowait)
         yield from queue
 
+    def flush(self):
+        for wrapper in self.wrappers:
+            wrapper.get_new_entries()
+
     def setup_event_filters(self, chain: Any):
         """Setup the most common event filters"""
         if len(self.wrappers) != 0:
