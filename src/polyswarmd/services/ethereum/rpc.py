@@ -16,13 +16,11 @@ class EthereumRpc:
     """
     This class periodically polls several geth filters, and multicasts the results across any open WebSockets
     """
-    filter_manager: FilterManager
     websockets: Optional[List[WebSocket]]
     websockets_lock: BoundedSemaphore
 
     def __init__(self, chain):
         self.chain = chain
-        self.filter_manager = FilterManager()
         self.websockets = None
         self.websockets_lock = BoundedSemaphore(1)
         self.chain = chain
@@ -52,20 +50,24 @@ class EthereumRpc:
         """
         Continually poll all Ethereum filters as long as there are WebSockets listening
         """
+        filter_manager = FilterManager()
+        filter_manager.setup_event_filters(self.chain)
         # Start the pool
         try:
-            for filter_events in self.filter_manager.fetch():
+            for filter_events in filter_manager.fetch():
                 for msg in filter_events:
                     self.broadcast(msg)
         except WebsocketConnectionAbortedError:
             logger.exception("Shutting down poll()")
-            self.websockets = None
+            with self.websockets_lock:
+                self.websockets = None
         except gevent.GreenletExit:
-            logger.exception(
-                'Exiting poll() Greenlet with %d connected clients websockets', len(self.websockets)
-            )
             # if the greenlet is killed, we need to destroy the websocket connections (if any exist)
-            self.websockets = None
+            with self.websockets_lock:
+                logger.exception(
+                    'Exiting poll() Greenlet with %d connected clients websockets', len(self.websockets)
+                )
+                self.websockets = None
         except Exception:
             logger.exception(
                 'Exception in filter checks with %d connected websockets', len(self.websockets)
@@ -85,7 +87,6 @@ class EthereumRpc:
             if self.websockets is None:
                 self.websockets = [ws]
                 logger.debug('First WebSocket registered, starting greenlet')
-                self.filter_manager.setup_event_filters(self.chain)
                 greenlet = gevent.spawn(self.poll)
                 gevent.signal(SIGQUIT, greenlet.kill)
             else:
