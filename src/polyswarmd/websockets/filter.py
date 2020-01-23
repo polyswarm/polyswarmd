@@ -31,16 +31,6 @@ Message = bytes
 FilterInstaller = Callable[[str], ContractFilter]
 
 
-class FilterManagerResetWarning(RuntimeWarning):
-
-    def __init__(self, wrappers: Iterable['FilterWrapper']):
-        message = (
-            "Attempted to initialize a FilterManager with existing filters: "
-            ', '.join(map(str, (hasattr(fw, 'filter') and fw.filter.filter_id for fw in wrappers)))
-        )
-        super().__init__(message)
-
-
 class FilterWrapper:
     """A utility class which wraps a contract filter with websocket-messaging features"""
     filter: ContractFilter
@@ -153,7 +143,8 @@ class FilterManager:
     def setup_event_filters(self, chain: Any):
         """Setup the most common event filters"""
         if len(self.wrappers) != 0:
-            raise FilterManagerResetWarning(self.wrappers)
+            logger.warning("Attempted to initialize a FilterManager with existing filters: ", self.wrappers)
+            return
 
         bounty_contract = chain.bounty_registry.contract
 
