@@ -122,7 +122,7 @@ class FilterManager:
     """Manages access to filtered Ethereum events."""
 
     def __init__(self):
-        self.wrappers = set()
+        self.wrappers = []
         self.pool = Group()
 
     def register(
@@ -130,7 +130,7 @@ class FilterManager:
     ):
         """Add a new filter, with an optional associated WebsocketMessage-serializer class"""
         wrapper = FilterWrapper(filter_installer, fmt_cls, backoff)
-        self.wrappers.add(wrapper)
+        self.wrappers.append(wrapper)
         logger.debug('Registered new filter: %s', wrapper)
 
     def flush(self):
