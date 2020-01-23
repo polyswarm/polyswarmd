@@ -1,13 +1,12 @@
-from signal import SIGQUIT
-from typing import AnyStr, Iterable, List, Optional, SupportsBytes, Union
+from typing import Iterator, List, Optional
 
-import gevent
 from gevent.lock import BoundedSemaphore
 
-from polyswarmd.exceptions import WebsocketConnectionAbortedError
+from polyswarmd.config.contract import Chain
 from polyswarmd.utils import logging
 from polyswarmd.views.event_message import WebSocket
-from polyswarmd.websockets.filter import FilterManager
+from polyswarmd.websockets import messages
+from polyswarmd.websockets.filter import FilterManager, FormatClass, MessageT
 
 logger = logging.getLogger(__name__)
 
@@ -19,18 +18,18 @@ class EthereumRpc:
     filter_manager: Optional[FilterManager]
     websockets: Optional[List[WebSocket]]
     websockets_lock: BoundedSemaphore
+    chain: Chain
 
     def __init__(self, chain):
         self.chain = chain
         self.filter_manager = None
         self.websockets = None
         self.websockets_lock = BoundedSemaphore(1)
-        self.chain = chain
 
     def __repr__(self):
         return f"<EthereumRPC Chain={self.chain}>"
 
-    def broadcast(self, messages: Iterable[Union[AnyStr, SupportsBytes]]):
+    def broadcast(self, messages: Iterator[MessageT]):
         """
         Send a message to all connected WebSockets
         :param message: dict to be converted to json and sent
@@ -54,26 +53,26 @@ class EthereumRpc:
             logger.debug('Registering WebSocket %s', id(ws))
             if self.websockets is None:
                 self.websockets = [ws]
-                logger.debug('First WebSocket registered, starting greenlet')
-                self.filter_manager.setup_filter_manager(self.chain)
+                logger.debug('First WebSocket registered')
+                self.setup_filter_manager()
             else:
                 self.websockets.append(ws)
 
     def setup_filter_manager(self):
-        if self.filter_manager:
+        if self.filter_manager is not None:
             logger.info("this FilterManager has already been initialized")
             return
 
-        self.filter_manager = FilterManager()
-        chain = self.chain
-        bounty_contract = chain.bounty_registry.contract
+        manager = FilterManager()
 
         # Setup Latest (although this could pass `w3.eth.filter` directly)
-        self.filter_manager.register(
-            chain.w3.eth.filter, messages.LatestEvent.make(chain.w3.eth), backoff=False
+        manager.register(
+            self.chain.w3.eth.filter, messages.LatestEvent.make(self.chain.w3.eth), backoff=False
         )
+
         # messages.NewBounty shouldn't wait or back-off from new bounties.
-        self.filter_manager.register(bounty_contract.eventFilter, messages.NewBounty, backoff=False)
+        bounty_contract = self.chain.bounty_registry.contract
+        manager.register(bounty_contract.eventFilter, messages.NewBounty, backoff=False)
 
         filter_events: List[FormatClass] = [
             messages.FeesUpdated,
@@ -88,16 +87,15 @@ class EthereumRpc:
         ]
 
         for cls in filter_events:
-            self.filter_manager.register(bounty_contract.eventFilter, cls)
+            manager.register(bounty_contract.eventFilter, cls)
 
-        offer_registry = chain.offer_registry
+        offer_registry = self.chain.offer_registry
         if offer_registry and offer_registry.contract:
-            self.filter_manager.register(
-                offer_registry.contract.eventFilter, messages.InitializedChannel
-            )
+            manager.register(offer_registry.contract.eventFilter, messages.InitializedChannel)
 
         # Calls `self.broadcast` with the results of each filter manager
-        self.filter_manager.pipe_events(self.broadcast)
+        manager.pipe_events(self.broadcast)
+        self.filter_manager = manager
 
     def unregister(self, ws: WebSocket):
         """

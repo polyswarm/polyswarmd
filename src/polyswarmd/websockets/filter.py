@@ -1,6 +1,15 @@
 import logging
 from random import gauss
-from typing import Any, Callable, Iterable, List, NoReturn, Type
+from typing import (
+    Any,
+    AnyStr,
+    Callable,
+    Iterator,
+    List,
+    SupportsBytes,
+    Type,
+    Union,
+)
 
 import gevent
 from gevent.pool import Group
@@ -10,6 +19,26 @@ from requests.exceptions import ConnectionError
 from . import messages
 
 logger = logging.getLogger(__name__)
+
+FormatClass = Type[messages.WebsocketFilterMessage]
+MessageT = Union[AnyStr, SupportsBytes, bytes]
+
+
+class ContractFilter:
+    callbacks: List[Callable[..., Any]]
+    stopped: bool
+    poll_interval: float
+    filter_id: int
+    web3: Any
+
+    def get_new_entries(self) -> List[messages.EventData]:
+        ...
+
+    def get_all_entries(self) -> List[messages.EventData]:
+        ...
+
+
+FilterInstaller = Callable[[str], ContractFilter]
 
 
 class FilterWrapper:
@@ -59,10 +88,7 @@ class FilterWrapper:
         else:
             return self.MIN_WAIT
 
-    def get_new_entries(self) -> List[Message]:
-        return self.filter.get_new_entries()
-
-    def spawn_poll_loop(self, callback: Callable[[Iterable[Message]], NoReturn]):
+    def spawn_poll_loop(self, callback: Callable[[Iterator[MessageT]], Any]):
         """Spawn a greenlet which polls the filter's contract events, passing results to `callback'"""
         ctr: int = 0  # number of loops since the last non-empty response
         wait: float = 0.0  # The amount of time this loop will wait.
@@ -72,7 +98,7 @@ class FilterWrapper:
             # XXX spawn_later prevents easily killing the pool. Use `wait` here.
             gevent.sleep(wait)
             try:
-                result = self.get_new_entries()
+                result = self.filter.get_new_entries()
             # LookupError generally occurs when our schema doesn't match the message
             except LookupError:
                 logger.exception("LookupError inside spawn_poll_loop")
@@ -117,30 +143,10 @@ class FilterManager:
     def fetch(self):
         """Return a queue of currently managed contract events"""
         queue = Queue()
-        for wrapper in self.wrappers:
-            self.pool.spawn(wrapper.spawn_poll_loop, queue.put_nowait)
+        self.pipe_events(queue.put_nowait)
         yield from queue
 
-    def pipe_events(self, broadcast_fn):
+    def pipe_events(self, broadcast_fn: Callable[[Iterator[MessageT]], Any]):
         """Return a queue of currently managed contract events"""
         for wrapper in self.wrappers:
             self.pool.spawn(wrapper.spawn_poll_loop, broadcast_fn)
-
-
-class ContractFilter:
-    callbacks: List[Callable[..., Any]]
-    stopped: bool
-    poll_interval: float
-    filter_id: int
-    web3: Any
-
-    def get_new_entries(self) -> List[messages.EventData]:
-        ...
-
-    def get_all_entries(self) -> List[messages.EventData]:
-        ...
-
-
-FormatClass = Type[messages.WebsocketFilterMessage]
-Message = bytes
-FilterInstaller = Callable[[str], ContractFilter]
