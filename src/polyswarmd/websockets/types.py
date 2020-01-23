@@ -13,7 +13,7 @@ from typing import (
 )
 import uuid
 
-from pydantic import Field, PositiveInt, constr
+from pydantic import ConstrainedStr, Field, PositiveInt
 from pydantic.validators import str_validator
 
 from polyswarmartifact import ArtifactType as _ArtifactType
@@ -29,13 +29,17 @@ EventId = str
 Uint256 = PositiveInt
 # Result of `safe_int_to_bool_list`
 BoolVector = List[bool]
-# allow +2 for '0x', although we should be getting HexBytes anyway
-TXID = constr(min_length=64, max_length=66)
 
 MessageField = functools.partial(Field, None)
 BountyGuid = MessageField(alias='bountyGuid')
 From = MessageField(alias='from')
 To = MessageField(alias='to')
+
+
+# allow +2 for '0x', although we should be getting HexBytes anyway
+class TXID(ConstrainedStr):
+    min_length = 64
+    max_length = 66
 
 
 class EventData(Mapping):

@@ -47,15 +47,18 @@ class FilterWrapper:
     filter_installer = Callable[[], ContractFilter]
     formatter: FormatClass
     backoff: bool
-    MIN_WAIT: float = 0.5
-    MAX_WAIT: float = 4.0
-    JITTER: float = 0.1
+    MIN_WAIT: float
+    MAX_WAIT: float
+    JITTER: float
 
     def __init__(self, filter_installer: FilterInstaller, formatter: FormatClass, backoff: bool):
         self.formatter = formatter
         self.backoff = backoff
         self._filter_installer = filter_installer
         self.filter = self.create_filter()
+        self.MIN_WAIT = 0.5
+        self.MAX_WAIT = 4.0
+        self.JITTER = 0.1
 
     def create_filter(self) -> ContractFilter:
         """Return a new filter
@@ -65,21 +68,7 @@ class FilterWrapper:
         return installer(self.formatter.contract_event_name)
 
     def compute_wait(self, ctr: int) -> float:
-        """Compute the amount of wait time from a counter of (sequential) empty replies
-
-        >>> FilterWrapper.JITTER = 0.0
-        >>> tv = (0, 1, 3, 6, 10, 100)
-        >>> backoff = FilterWrapper(identity, fake_formatter, backoff=True)
-        >>> wait_times = list(map(backoff.compute_wait, tv))
-        >>> wait_times
-        [0.5, 0.5, 1.0, 4.0, 4.0, 4.0]
-        >>> no_backoff = FilterWrapper(identity, fake_formatter, backoff=False)
-        >>> list(map(no_backoff.compute_wait, tv))
-        [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
-        >>> FilterWrapper.JITTER = 0.1
-        >>> all(n != j and approx((n, j)) for n, j in zip(wait_times, map(backoff.compute_wait, tv)))
-        True
-        """
+        """Compute the amount of wait time from a counter of (sequential) empty replies"""
         if self.backoff:
             # backoff 'exponentially'
             exp = (1 << max(0, ctr - 2)) - 1

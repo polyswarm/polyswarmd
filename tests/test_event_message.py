@@ -22,6 +22,8 @@ from polyswarmd.websockets.filter import (
 from polyswarmd.websockets.messages import WebsocketSerializable
 from polyswarmd.websockets.types import EventId
 
+from .utils import identity
+
 BEGIN = time.time()
 
 
@@ -245,10 +247,28 @@ class TestWebsockets:
         # we should be adding a random factor to each `compute_wait` output
         assert len(sleeps) > len(rounded)
         # We should see each of the wait periods (rounded to the nearest 0.5) at least once
-        assert len(rounded) - 2 * (int(FilterWrapper.MAX_WAIT) - int(FilterWrapper.MIN_WAIT)) <= 1
+        assert len(rounded) - 2*4 <= 1
 
         # verify that despite the backoff, sources with a higher rate churn out more events
         by_src = enriched.by_source()
         for i in range(len(filters) - 1):
             f, s = map(lambda idx: filters[idx].filter_id, (i, i + 1))
             assert len(by_src[f]) > len(by_src[s])
+
+
+def test_FilterWrapper_compute_wait():
+    tv = (0, 1, 3, 6, 10, 100)
+    backoff = FilterWrapper(identity, NOPMessage, backoff=True)
+    backoff.JITTER = 0
+
+    wait_times = list(map(backoff.compute_wait, tv))
+    assert wait_times == [0.5, 0.5, 1.0, 4.0, 4.0, 4.0]
+
+    no_backoff = FilterWrapper(identity, NOPMessage, backoff=False)
+    no_backoff.JITTER = 0
+    assert list(map(no_backoff.compute_wait, tv)) == [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+
+    backoff.JITTER = 0.1
+    for n, j in zip(wait_times, map(backoff.compute_wait, tv)):
+        assert n != j
+        assert pytest.approx((n, j))

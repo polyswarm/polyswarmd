@@ -5,7 +5,6 @@ from typing import (
     Generic,
     List,
     Mapping,
-    Optional,
     Type,
     TypeVar,
     cast,
@@ -19,6 +18,7 @@ import ujson
 from polyswarmartifact.schema import Assertion, Bounty
 from polyswarmd.utils import safe_int_to_bool_list
 from polyswarmd.websockets.types import (
+    TXID,
     ArtifactMetadata,
     ArtifactTypeField,
     BoolVector,
@@ -27,7 +27,6 @@ from polyswarmd.websockets.types import (
     EventData,
     EventGUID,
     EventId,
-    TXID,
     From,
     MessageField,
     To,

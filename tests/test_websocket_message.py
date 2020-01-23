@@ -51,18 +51,18 @@ def log_index():
 
 
 @pytest.fixture
-def transactionIndex():
+def transaction_index():
     1276
 
 
 @pytest.fixture
 def txhash_b():
-    return HexBytes(11).to_bytes(32, byteorder='big')
+    return HexBytes(11)
 
 
 @pytest.fixture
 def block_hash():
-    return (90909090).to_bytes(32, byteorder='big')
+    return HexBytes(90909090)
 
 
 @pytest.fixture
