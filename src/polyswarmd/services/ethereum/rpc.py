@@ -65,7 +65,8 @@ class EthereumRpc:
             # if the greenlet is killed, we need to destroy the websocket connections (if any exist)
             with self.websockets_lock:
                 logger.exception(
-                    'Exiting poll() Greenlet with %d connected clients websockets', len(self.websockets)
+                    'Exiting poll() Greenlet with %d connected clients websockets',
+                    len(self.websockets)
                 )
                 self.websockets.clear()
         except Exception:

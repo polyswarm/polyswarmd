@@ -147,7 +147,8 @@ class MetadataHandler:
         cls._substitute_metadata = _substitute_metadata_impl
 
     @classmethod
-    def fetch(cls, msg: WebsocketEventMessage[D],
+    def fetch(cls,
+              msg: WebsocketEventMessage[D],
               validate=AssertionMetadata.validate) -> WebsocketEventMessage[D]:
         """Fetch metadata with URI from `msg', validate it and merge the result"""
         data = msg.get('data')
