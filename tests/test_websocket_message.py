@@ -11,35 +11,13 @@ import ujson
 from web3.datastructures import AttributeDict
 
 from polyswarmd.websockets import types
-from polyswarmd.websockets.messages import (
-    ClosedAgreement,
-    ContractEvent,
-    Deprecated,
-    FeesUpdated,
-    InitializedChannel,
-    LatestEvent,
-    NewAssertion,
-    NewBounty,
-    NewDeposit,
-    NewVote,
-    NewWithdrawal,
-    OpenedAgreement,
-    QuorumReached,
-    RevealedAssertion,
-    SettledBounty,
-    SettleStateChallenged,
-    StartedSettle,
-    Transfer,
-    Undeprecated,
-    WebsocketMessage,
-    WindowsUpdated,
-)
+from polyswarmd.websockets.messages import LatestEvent
 
 from .fixtures.messages import (
+    assertion_artifact_uri,
     assertion_metadata,
     block_hash,
     bounty_artifact_uri,
-    assertion_artifact_uri,
     bounty_metadata,
     expected_contract_event_messages,
     expected_extractions,
@@ -50,7 +28,6 @@ from .fixtures.messages import (
 )
 
 FakeChain = namedtuple('FakeChain', ['blockNumber'])
-FakeFormatter = namedtuple('FakeFormatter', ['contract_event_name'])
 
 
 @pytest.fixture
@@ -132,7 +109,7 @@ def test_messages_LatestEvent(mkevent, decoded_msg, block_number):
 
 @pytest.mark.parametrize('extraction', expected_extractions)
 def test_extraction(extraction, mkevent, decoded_msg, mock_md_fetch, block_number):
-    cls, data, expected = extraction[:3]
+    cls, data, expected, *_ = extraction
     assert cls.contract_event_name == cls.__name__
     assert cls.extract(data) == expected
 

@@ -13,7 +13,7 @@ from typing import (
 )
 import uuid
 
-from pydantic import ConstrainedStr, Field, PositiveInt
+from pydantic import Field, PositiveInt
 from pydantic.validators import str_validator
 
 from polyswarmartifact import ArtifactType as _ArtifactType
@@ -45,6 +45,7 @@ def valid_hex(hx, length=None):
 
 
 class TXID(str):
+
     @classmethod
     def __get_validators__(cls):
         yield cls.validate
@@ -54,7 +55,6 @@ class TXID(str):
         if hasattr(v, 'hex'):
             v = v.hex()
         return cls(valid_hex(v))
-
 
 
 class EventData(Mapping):

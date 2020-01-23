@@ -3,7 +3,6 @@ import pytest
 
 from polyswarmd.websockets.messages import (
     ClosedAgreement,
-    ContractEvent,
     Deprecated,
     FeesUpdated,
     InitializedChannel,
@@ -21,7 +20,6 @@ from polyswarmd.websockets.messages import (
     StartedSettle,
     Transfer,
     Undeprecated,
-    WebsocketMessage,
     WindowsUpdated,
 )
 
@@ -46,31 +44,31 @@ addr2 = "0x0000000000000000000000000000000000000002"
 bounty_fee = 500000000001
 assertion_fee = 500000000002
 
-base_receipt = {'to': addr1, 'from': addr2, 'value': 1}
+transfer_receipt = {'to': addr1, 'from': addr2, 'value': 1}
 
 nonce = 1752
 
 bounty_metadata = {
-                'malware_family': 'EICAR',
-                'scanner': {
-                    'environment': {
-                        'architecture': 'x86_64',
-                        'operating_system': 'Linux',
-                    }
-                }
-            }
+    'malware_family': 'EICAR',
+    'scanner': {
+        'environment': {
+            'architecture': 'x86_64',
+            'operating_system': 'Linux',
+        }
+    }
+}
 
 assertion_metadata = {
-                    "md5": "44d88612fea8a8f36de82e1278abb02f",
-                    "sha1": "3395856ce81f2b7382dee72602f798b642f14140",
-                    "size": 68,
-                    "type": "FILE",
-                    "sha256": "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f",
-                    "filename": "eicar_true",
-                    "mimetype": "text/plain",
-                    "bounty_id": 69540800813340,
-                    "extended_type": "EICAR virus test files",
-                }
+    "md5": "44d88612fea8a8f36de82e1278abb02f",
+    "sha1": "3395856ce81f2b7382dee72602f798b642f14140",
+    "size": 68,
+    "type": "FILE",
+    "sha256": "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f",
+    "filename": "eicar_true",
+    "mimetype": "text/plain",
+    "bounty_id": 69540800813340,
+    "extended_type": "EICAR virus test files",
+}
 
 bounty_artifact_uri = 'http://s3.amazon.com/s3/bounty_uri'
 assertion_artifact_uri = 'http://s3.amazon.com/s3/assertion_uri'
@@ -279,16 +277,21 @@ _msg_fixtures = [
         },
         'window_update',
     ),
-    (NewDeposit, base_receipt, {
+    (NewDeposit, transfer_receipt, {
         'value': 1,
         'from': addr2
     }),
-    (NewWithdrawal, base_receipt, {
+    (NewWithdrawal, transfer_receipt, {
         'value': 1,
         'to': addr1
     }),
-    (OpenedAgreement, base_receipt, {
+    (OpenedAgreement, transfer_receipt, {
         'value': 1,
+        'from': addr2,
+        'to': addr1,
+    }),
+    (Transfer, transfer_receipt, {
+        'value': str(1),
         'from': addr2,
         'to': addr1,
     }),
