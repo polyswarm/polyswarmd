@@ -24,30 +24,18 @@ from polyswarmd.websockets.messages import (
 )
 
 ws_event = 'NOP'
-
 log_index = 19845
-
 transaction_index = 1276
-
 txhash_b = HexBytes(11)
-
 txhash_bv = txhash_b.hex()
-
 block_hash = HexBytes(90909090)
-
 block_hash_v = block_hash.hex()
-
 addr1 = "0x0000000000000000000000000000000000000001"
-
 addr2 = "0x0000000000000000000000000000000000000002"
-
 bounty_fee = 500000000001
 assertion_fee = 500000000002
-
 transfer_receipt = {'to': addr1, 'from': addr2, 'value': 1}
-
 nonce = 1752
-
 bounty_metadata = {
     'malware_family': 'EICAR',
     'scanner': {
@@ -57,7 +45,6 @@ bounty_metadata = {
         }
     }
 }
-
 assertion_metadata = {
     "md5": "44d88612fea8a8f36de82e1278abb02f",
     "sha1": "3395856ce81f2b7382dee72602f798b642f14140",
@@ -73,16 +60,20 @@ assertion_metadata = {
 bounty_artifact_uri = 'http://s3.amazon.com/s3/bounty_uri'
 assertion_artifact_uri = 'http://s3.amazon.com/s3/assertion_uri'
 
+ambassador = "0xF2E246BB76DF876Cef8b38ae84130F4F55De395b"
+expert_addr = "0xDF9246BB76DF876Cef8bf8af8493074755feb58c"
+multisig_addr = "0x789246BB76D18C6C7f8bd8ac8423478795f71bf9"
+
 _msg_fixtures = [
     (
         ClosedAgreement,
         {
-            '_ambassador': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
-            '_expert': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
+            '_ambassador': ambassador,
+            '_expert': expert_addr,
         },
         {
-            'ambassador': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
-            'expert': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
+            'ambassador': ambassador,
+            'expert': expert_addr,
         },
         'closed_agreement',
     ),
@@ -111,16 +102,16 @@ _msg_fixtures = [
     (
         InitializedChannel,
         {
-            'ambassador': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
-            'expert': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
+            'ambassador': ambassador,
+            'expert': expert_addr,
             'guid': 1,
-            'msig': '0x789246BB76D18C6C7f8bd8ac8423478795f71bf9',
+            'msig': multisig_addr,
         },
         {
-            'ambassador': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
-            'expert': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
+            'ambassador': ambassador,
+            'expert': expert_addr,
             'guid': '00000000-0000-0000-0000-000000000001',
-            'multi_signature': '0x789246BB76D18C6C7f8bd8ac8423478795f71bf9',
+            'multi_signature': multisig_addr,
         },
         'initialized_channel',
     ),
@@ -128,7 +119,7 @@ _msg_fixtures = [
         NewAssertion,
         {
             'bountyGuid': 1,
-            'author': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
+            'author': ambassador,
             'index': 1,
             'bid': [1, 2, 3],
             'mask': 32,
@@ -136,7 +127,7 @@ _msg_fixtures = [
             'numArtifacts': 4,
         },
         {
-            'author': '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b',
+            'author': ambassador,
             'bid': ['1', '2', '3'],
             'bounty_guid': '00000000-0000-0000-0000-000000000001',
             'commitment': '100',
@@ -152,9 +143,9 @@ _msg_fixtures = [
             'artifactType': 1,
             'author': addr1,
             'amount': 10,
-            'artifactURI': '912bnadf01295',
+            'artifactURI': assertion_artifact_uri,
             'expirationBlock': 118,
-            'metadata': assertion_artifact_uri,
+            'metadata': '',
         },
         {
             'amount': '10',
@@ -163,7 +154,7 @@ _msg_fixtures = [
             'expiration': '118',
             'guid': '00000000-0000-0000-0000-00000000042a',
             'metadata': [assertion_metadata],
-            'uri': '912bnadf01295',
+            'uri': assertion_artifact_uri,
         },
         'bounty',
     ),
@@ -171,13 +162,13 @@ _msg_fixtures = [
         NewVote,
         {
             'bountyGuid': 2,
-            'voter': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
+            'voter': expert_addr,
             'votes': 128,
             'numArtifacts': 4,
         },
         {
             'bounty_guid': '00000000-0000-0000-0000-000000000002',
-            'voter': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
+            'voter': expert_addr,
             'votes': [False, False, False, False, False, False, False, True],
         },
         'vote',
@@ -196,15 +187,16 @@ _msg_fixtures = [
         RevealedAssertion,
         {
             'bountyGuid': 2,
-            'author': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
+            'author': expert_addr,
             'index': 10,
             'verdicts': 128,
             'nonce': nonce,
             'numArtifacts': 4,
-            'metadata': bounty_artifact_uri,
+            'artifactURI': bounty_artifact_uri,
+            'metadata': '',
         },
         {
-            'author': '0xDF9246BB76DF876Cef8bf8af8493074755feb58c',
+            'author': expert_addr,
             'bounty_guid': '00000000-0000-0000-0000-000000000002',
             'index': 10,
             'metadata': [bounty_metadata],
@@ -260,7 +252,7 @@ _msg_fixtures = [
         {
             'a': 1,
             'hello': 'world',
-            'should_not_be_here': True
+            'should_not_show_up': True
         },
         {},
         'undeprecated',
