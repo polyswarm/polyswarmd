@@ -5,6 +5,7 @@ from typing import (
     Generic,
     List,
     Mapping,
+    Optional,
     Type,
     TypeVar,
     cast,
@@ -191,7 +192,7 @@ class NewBounty(ContractEvent):
     amount: str
     uri: str = MessageField(alias='artifactURI')
     expiration: str = MessageField(alias='expirationBlock')
-    metadata: ArtifactMetadata[Bounty]
+    metadata: Optional[ArtifactMetadata[Bounty]]
 
 
 class NewAssertion(ContractEvent):

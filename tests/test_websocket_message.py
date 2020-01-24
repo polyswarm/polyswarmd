@@ -5,6 +5,7 @@ Feel free to make it better
 """
 from collections import namedtuple
 import json
+from typing import Any, Mapping, Optional, Tuple, Type, Union
 
 import pytest
 import ujson
@@ -14,20 +15,38 @@ from polyswarmd.websockets import types
 from polyswarmd.websockets.messages import LatestEvent
 
 from .fixtures.messages import (
-    assertion_artifact_uri,
-    assertion_metadata,
     block_hash,
     bounty_artifact_uri,
     bounty_metadata,
-    expected_contract_event_messages,
-    expected_extractions,
     log_index,
+    reveal_artifact_uri,
+    reveal_metadata,
+    serializations,
     transaction_index,
     txhash_b,
     txhash_bv,
 )
 
 FakeChain = namedtuple('FakeChain', ['blockNumber'])
+
+
+def decoded_msg(msg):
+    return json.loads(msg.decode('ascii'))
+
+
+def to_pytest_param(
+    fx: Tuple[Union[Type, Tuple[Type, str]], Mapping[str, Any], Mapping[str, Any], Optional[str]]
+):
+    head, *tail = fx
+    # handle (Class, 'test_name')
+    if isinstance(head, tuple):
+        cls, name = head
+        fixture = (cls, *tail)
+    # otherwise we just use the tested class's name
+    else:
+        name = head.__name__
+        fixture = fx
+    return pytest.param(fixture, id=name)
 
 
 @pytest.fixture
@@ -48,15 +67,6 @@ def mkevent(block_number, token_address):
     return to_mkevent
 
 
-@pytest.fixture
-def decoded_msg():
-
-    def _impl(msg):
-        return json.loads(msg.decode('ascii'))
-
-    return _impl
-
-
 @pytest.fixture(autouse=True)
 def mock_md_fetch(monkeypatch):
     """Mock out the metadata-fetching implementation
@@ -71,8 +81,9 @@ def mock_md_fetch(monkeypatch):
         # actually encounter.
         fake_uris = {
             bounty_artifact_uri: ujson.dumps([bounty_metadata]),
-            assertion_artifact_uri: ujson.dumps([assertion_metadata])
+            reveal_artifact_uri: ujson.dumps([reveal_metadata])
         }
+        content = ''
         if uri in fake_uris:
             content = json.loads(fake_uris[uri])
 
@@ -86,7 +97,7 @@ def mock_md_fetch(monkeypatch):
     monkeypatch.setattr(types.ArtifactMetadata, "substitute", mock_sub)
 
 
-def test_messages_LatestEvent(mkevent, decoded_msg, block_number):
+def test_messages_LatestEvent(mkevent, block_number):
     LE = LatestEvent.make(FakeChain(block_number))
     LA = LatestEvent.make(FakeChain(block_number + 1))
     event = mkevent({'a': 1, 'hello': 'world', 'should_not_be_here': True})
@@ -107,15 +118,15 @@ def test_messages_LatestEvent(mkevent, decoded_msg, block_number):
     }
 
 
-@pytest.mark.parametrize('extraction', expected_extractions)
-def test_extraction(extraction, mkevent, decoded_msg, mock_md_fetch, block_number):
+@pytest.mark.parametrize('extraction', map(to_pytest_param, serializations))
+def test_extraction(extraction, mkevent, mock_md_fetch, block_number):
     cls, data, expected, *_ = extraction
     assert cls.contract_event_name == cls.__name__
     assert cls.extract(data) == expected
 
 
-@pytest.mark.parametrize('emsg', expected_contract_event_messages)
-def test_serialization(emsg, mkevent, decoded_msg, mock_md_fetch, block_number):
+@pytest.mark.parametrize('emsg', map(to_pytest_param, filter(lambda l: len(l) > 3, serializations)))
+def test_serialization(emsg, mkevent, mock_md_fetch, block_number):
     cls, data, expected, event = emsg
     assert cls.contract_event_name == cls.__name__
     assert decoded_msg(cls.serialize_message(mkevent(data))) == {

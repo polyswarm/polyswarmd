@@ -1,6 +1,9 @@
+import uuid
+
 from hexbytes import HexBytes
 import pytest
 
+import polyswarmd.utils
 from polyswarmd.websockets.messages import (
     ClosedAgreement,
     Deprecated,
@@ -30,13 +33,13 @@ txhash_b = HexBytes(11)
 txhash_bv = txhash_b.hex()
 block_hash = HexBytes(90909090)
 block_hash_v = block_hash.hex()
-addr1 = "0x0000000000000000000000000000000000000001"
-addr2 = "0x0000000000000000000000000000000000000002"
+ethaddr_1 = "0x4F10166CaFD7856ea946124927D4478fDD18d979"
+ethaddr_2 = "0x34E583cf9C1789c3141538EeC77D9F0B8F7E89f2"
 bounty_fee = 500000000001
 assertion_fee = 500000000002
-transfer_receipt = {'to': addr1, 'from': addr2, 'value': 1}
+transfer_receipt = {'to': ethaddr_1, 'from': ethaddr_2, 'value': 1}
 nonce = 1752
-bounty_metadata = {
+reveal_metadata = {
     'malware_family': 'EICAR',
     'scanner': {
         'environment': {
@@ -45,7 +48,7 @@ bounty_metadata = {
         }
     }
 }
-assertion_metadata = {
+bounty_metadata = {
     "md5": "44d88612fea8a8f36de82e1278abb02f",
     "sha1": "3395856ce81f2b7382dee72602f798b642f14140",
     "size": 68,
@@ -58,13 +61,24 @@ assertion_metadata = {
 }
 
 bounty_artifact_uri = 'http://s3.amazon.com/s3/bounty_uri'
-assertion_artifact_uri = 'http://s3.amazon.com/s3/assertion_uri'
+reveal_artifact_uri = 'http://s3.amazon.com/s3/reveal_uri'
 
+arbiter_addr = "0xF870491ea0F53F67846Eecb57855284D8270284D"
 ambassador = "0xF2E246BB76DF876Cef8b38ae84130F4F55De395b"
 expert_addr = "0xDF9246BB76DF876Cef8bf8af8493074755feb58c"
 multisig_addr = "0x789246BB76D18C6C7f8bd8ac8423478795f71bf9"
 
-_msg_fixtures = [
+bx = 128
+num_artifacts = 7
+bx_to_boollist = polyswarmd.utils.safe_int_to_bool_list(bx, num_artifacts)
+
+guidint = 16577
+guidstr = str(uuid.UUID(int=guidint))
+
+bguidint = 751207
+bguidstr = str(uuid.UUID(int=bguidint))
+
+serializations = [
     (
         ClosedAgreement,
         {
@@ -104,13 +118,13 @@ _msg_fixtures = [
         {
             'ambassador': ambassador,
             'expert': expert_addr,
-            'guid': 1,
+            'guid': guidint,
             'msig': multisig_addr,
         },
         {
             'ambassador': ambassador,
             'expert': expert_addr,
-            'guid': '00000000-0000-0000-0000-000000000001',
+            'guid': guidstr,
             'multi_signature': multisig_addr,
         },
         'initialized_channel',
@@ -118,102 +132,124 @@ _msg_fixtures = [
     (
         NewAssertion,
         {
-            'bountyGuid': 1,
+            'bountyGuid': bguidint,
             'author': ambassador,
             'index': 1,
             'bid': [1, 2, 3],
-            'mask': 32,
+            'mask': bx,
             'commitment': 100,
-            'numArtifacts': 4,
+            'numArtifacts': num_artifacts,
         },
         {
             'author': ambassador,
             'bid': ['1', '2', '3'],
-            'bounty_guid': '00000000-0000-0000-0000-000000000001',
+            'bounty_guid': bguidstr,
             'commitment': '100',
             'index': 1,
-            'mask': [False, False, False, False, False, True],
+            'mask': bx_to_boollist,
         },
         'assertion',
     ),
     (
         NewBounty,
         {
-            'guid': 1066,
+            'guid': guidint,
             'artifactType': 1,
-            'author': addr1,
+            'author': ethaddr_1,
             'amount': 10,
-            'artifactURI': assertion_artifact_uri,
+            'artifactURI': bounty_artifact_uri,
             'expirationBlock': 118,
-            'metadata': '',
+            'metadata': bounty_artifact_uri,
         },
         {
             'amount': '10',
             'artifact_type': 'url',
-            'author': addr1,
+            'author': ethaddr_1,
             'expiration': '118',
-            'guid': '00000000-0000-0000-0000-00000000042a',
-            'metadata': [assertion_metadata],
-            'uri': assertion_artifact_uri,
+            'guid': guidstr,
+            'metadata': [bounty_metadata],
+            'uri': bounty_artifact_uri,
+        },
+        'bounty',
+    ),
+    (
+        (NewBounty, 'NewBounty_no_metadata'),
+        {
+            'guid': guidint,
+            'artifactType': 1,
+            'author': ethaddr_1,
+            'amount': 10,
+            'artifactURI': bounty_artifact_uri,
+            'expirationBlock': 118,
+            'metadata': None,
+        },
+        {
+            'amount': '10',
+            'artifact_type': 'url',
+            'author': ethaddr_1,
+            'expiration': '118',
+            'guid': guidstr,
+            'metadata': None,
+            'uri': bounty_artifact_uri,
         },
         'bounty',
     ),
     (
         NewVote,
         {
-            'bountyGuid': 2,
+            'bountyGuid': bguidint,
             'voter': expert_addr,
-            'votes': 128,
-            'numArtifacts': 4,
+            'votes': bx,
+            'numArtifacts': num_artifacts,
         },
         {
-            'bounty_guid': '00000000-0000-0000-0000-000000000002',
+            'bounty_guid': bguidstr,
             'voter': expert_addr,
-            'votes': [False, False, False, False, False, False, False, True],
+            'votes': bx_to_boollist,
         },
         'vote',
     ),
     (
         QuorumReached,
         {
-            'bountyGuid': 16577,
+            'bountyGuid': bguidint,
         },
         {
-            'bounty_guid': '00000000-0000-0000-0000-0000000040c1',
+            'bounty_guid': bguidstr,
         },
         'quorum',
     ),
     (
         RevealedAssertion,
         {
-            'bountyGuid': 2,
+            'bountyGuid': bguidint,
             'author': expert_addr,
             'index': 10,
-            'verdicts': 128,
+            'verdicts': bx,
             'nonce': nonce,
-            'numArtifacts': 4,
-            'artifactURI': bounty_artifact_uri,
-            'metadata': '',
+            'numArtifacts': num_artifacts,
+            'artifactURI': reveal_artifact_uri,
+            'metadata': reveal_artifact_uri,
         },
         {
             'author': expert_addr,
-            'bounty_guid': '00000000-0000-0000-0000-000000000002',
+            'bounty_guid': bguidstr,
             'index': 10,
-            'metadata': [bounty_metadata],
+            'metadata': [reveal_metadata],
             'nonce': str(nonce),
-            'verdicts': [False, False, False, False, False, False, False, True],
+            'verdicts': bx_to_boollist,
         },
         'reveal',
     ),
     (
         SettleStateChallenged,
         {
-            'challenger': addr1,
+            'challenger': ethaddr_1,
             'sequence': nonce,
             'settlementPeriodEnd': 229,
         },
         {
-            'challenger': addr1,
+            'challenger': ethaddr_1,
             'nonce': nonce,
             'settle_period_end': 229,
         },
@@ -222,26 +258,26 @@ _msg_fixtures = [
     (
         SettledBounty,
         {
-            'bountyGuid': 16577,
-            'settler': addr1,
+            'bountyGuid': bguidint,
+            'settler': ethaddr_1,
             'payout': 1000,
         },
         {
-            'bounty_guid': '00000000-0000-0000-0000-0000000040c1',
+            'bounty_guid': bguidstr,
             'payout': 1000,
-            'settler': addr1,
+            'settler': ethaddr_1,
         },
         'settled_bounty',
     ),
     (
         StartedSettle,
         {
-            'initiator': addr1,
+            'initiator': ethaddr_1,
             'sequence': nonce,
             'settlementPeriodEnd': 229,
         },
         {
-            'initiator': addr1,
+            'initiator': ethaddr_1,
             'nonce': nonce,
             'settle_period_end': 229,
         },
@@ -271,25 +307,20 @@ _msg_fixtures = [
     ),
     (NewDeposit, transfer_receipt, {
         'value': 1,
-        'from': addr2
+        'from': ethaddr_2
     }),
     (NewWithdrawal, transfer_receipt, {
         'value': 1,
-        'to': addr1
+        'to': ethaddr_1
     }),
     (OpenedAgreement, transfer_receipt, {
         'value': 1,
-        'from': addr2,
-        'to': addr1,
+        'from': ethaddr_2,
+        'to': ethaddr_1,
     }),
     (Transfer, transfer_receipt, {
         'value': str(1),
-        'from': addr2,
-        'to': addr1,
+        'from': ethaddr_2,
+        'to': ethaddr_1,
     }),
 ]
-
-expected_contract_event_messages = [
-    pytest.param(f, id=f[0].__name__) for f in _msg_fixtures if len(f) > 3
-]
-expected_extractions = [pytest.param(f, id=f[0].__name__) for f in _msg_fixtures]

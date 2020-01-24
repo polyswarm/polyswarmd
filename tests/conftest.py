@@ -95,9 +95,14 @@ def gas_limit():
     return 94040201
 
 
+_CURRENT_BLOCK = 1
+
+
 @pytest.fixture
-def block_number(token_address):
-    return 5197
+def block_number():
+    global _CURRENT_BLOCK
+    _CURRENT_BLOCK += 1
+    return _CURRENT_BLOCK
 
 
 @pytest.fixture
