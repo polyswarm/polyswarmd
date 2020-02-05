@@ -320,7 +320,7 @@ def get_bounties_guid(guid):
         metadata = None
     bounty['metadata'] = metadata
     if not config.artifact.client.check_uri(bounty['uri']):
-        return failure(f'Invalid {config.artifact_client.name} URI', 400)
+        return failure(f'Invalid {config.artifact.client.name} URI', 400)
     if bounty['author'] == ZERO_ADDRESS:
         return failure('Bounty not found', 404)
 
