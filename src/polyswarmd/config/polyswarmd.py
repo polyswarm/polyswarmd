@@ -10,7 +10,6 @@ from typing import Dict, Optional
 from polyswarmdconfig import Artifact, Auth, Config, Consul, Redis
 from polyswarmd.config.contract import Chain, ConsulChain, FileChain
 from polyswarmd.config.status import Status
-from polyswarmd.exceptions import MissingConfigValueError
 from polyswarmd.services.artifact import ArtifactServices
 from polyswarmd.services.auth import AuthService
 from polyswarmd.services.ethereum import EthereumService
@@ -36,9 +35,9 @@ class Eth(Config):
 
     def __post_init__(self):
         if self.consul is not None and self.directory is not None:
-            raise ValueError('Cannot have both filename and consul values')
+            raise ValueError('Cannot have both directory and consul values')
         elif self.consul is None and self.directory is None:
-            raise MissingConfigValueError('Must specify either consul or filename')
+            raise MissingConfigValueError('Must specify either consul or directory')
 
     def get_chains(self, community: str) -> Dict[str, Chain]:
         if self.consul is not None:
@@ -81,13 +80,13 @@ class PolySwarmd(Config):
     artifact: Artifact
     community: str
     auth: Optional[Auth] = None
-    eth: Eth = Eth()
-    profiler: Profiler = Profiler()
-    redis: Redis = Redis()
-    websocket: Websocket = Websocket()
     chains: Dict[str, Chain] = dataclasses.field(init=False)
+    eth: Eth = dataclasses.field(default_factory=Eth)
+    profiler: Profiler = dataclasses.field(default_factory=Profiler)
+    redis: Redis = dataclasses.field(default_factory=Redis)
     status: Status = dataclasses.field(init=False)
     session: FuturesSession = dataclasses.field(init=False, default_factory=FuturesSession)
+    websocket: Websocket = dataclasses.field(default_factory=Websocket)
 
     @staticmethod
     def auto():
