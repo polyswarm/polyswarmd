@@ -160,7 +160,8 @@ class ConsulChain(Chain):
     def from_consul(cls, consul_client, name: str, community_key: str):
         chain = cls.fetch_config(consul_client, name, community_key)
         chain['contracts'] = cls.fetch_contracts(consul_client, community_key)
-        return cls(name, chain)
+        chain['name'] = name
+        return cls.from_dict(chain)
 
     @classmethod
     def fetch_config(cls, consul_client, name: str, key: str) -> Dict[str, Any]:
@@ -247,7 +248,8 @@ class FileChain(Chain):
     def from_config_file(cls, name, filename):
         chain = cls.load_chain_details(filename)
         chain['contracts'] = cls.load_contracts(filename)
-        return cls(name, chain)
+        chain['name'] = name
+        return cls.from_dict(chain)
 
     @classmethod
     def load_chain_details(cls, filename: str) -> Dict[str, Any]:
