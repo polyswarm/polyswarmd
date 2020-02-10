@@ -7,7 +7,7 @@ import yaml
 from requests_futures.sessions import FuturesSession
 from typing import Dict, Optional
 
-import polyswarmdconfig
+from polyswarmdconfig import Artifact, Auth, Config, Consul, Redis
 from polyswarmd.config.contract import Chain, ConsulChain, FileChain
 from polyswarmd.config.status import Status
 from polyswarmd.exceptions import MissingConfigValueError
@@ -29,9 +29,9 @@ DEFAULT_FALLBACK_SIZE = 10 * 1024 * 1024
 
 
 @dataclasses.dataclass
-class Eth(polyswarmdconfig.Config):
+class Eth(Config):
     trace_transactions: bool = True
-    consul: Optional[polyswarmdconfig.Consul] = None
+    consul: Optional[Consul] = None
     directory: Optional[str] = None
 
     def __post_init__(self):
@@ -55,7 +55,7 @@ class Eth(polyswarmdconfig.Config):
 
 
 @dataclasses.dataclass
-class Profiler(polyswarmdconfig.Config):
+class Profiler(Config):
     enabled: bool = False
     db_uri: Optional[str] = None
 
@@ -65,7 +65,7 @@ class Profiler(polyswarmdconfig.Config):
 
 
 @dataclasses.dataclass
-class Websocket(polyswarmdconfig.Config):
+class Websocket(Config):
     enabled: bool = True
 
     def __post_init__(self):
@@ -77,15 +77,15 @@ class Websocket(polyswarmdconfig.Config):
 
 
 @dataclasses.dataclass
-class PolySwarmd(polyswarmdconfig.Config):
-    artifact: polyswarmdconfig.Artifact
+class PolySwarmd(Config):
+    artifact: Artifact
     community: str
-    eth: Eth
-    profiler: Profiler
-    redis: polyswarmdconfig.Redis
-    websocket: Websocket
+    auth: Optional[Auth] = None
+    eth: Eth = Eth()
+    profiler: Profiler = Profiler()
+    redis: Redis = Redis()
+    websocket: Websocket = Websocket()
     chains: Dict[str, Chain] = dataclasses.field(init=False)
-    auth: Optional[polyswarmdconfig.Auth] = None
     status: Status = dataclasses.field(init=False)
     session: FuturesSession = dataclasses.field(init=False, default_factory=FuturesSession)
 
@@ -111,10 +111,10 @@ class PolySwarmd(polyswarmdconfig.Config):
             return PolySwarmd.from_dict_and_environment(yaml.safe_load(f))
 
     def __post_init__(self):
-        self.load_chains()
+        self.setup_chains()
         self.setup_status()
 
-    def load_chains(self):
+    def setup_chains(self):
         self.chains = self.eth.get_chains(self.community)
 
     def setup_status(self):
