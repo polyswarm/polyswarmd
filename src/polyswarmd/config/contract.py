@@ -129,7 +129,7 @@ class Chain(Config):
         config.update(contracts)
         config['w3'] = w3
 
-        return super(Config, cls).populate(config)
+        return super(Chain, cls).populate(config)
 
     @classmethod
     def setup_web3(cls, eth_uri: str):
