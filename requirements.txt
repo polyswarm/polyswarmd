@@ -8,7 +8,7 @@ Flask-Sockets==0.2.1
 gevent==1.4.0
 gevent-websocket==0.10.1
 git+https://github.com/polyswarm/flask-profiler.git@profile-stats#egg=flask_profiler
-git+https://github.com/polyswarm/polyswarmd-config.git@ab7509747ab0662a26747067900e0bf7e10c40c6#egg=polyswarmd_config
+git+https://github.com/polyswarm/polyswarmd-config.git@3d54ece0ddabbd8623299d765f0c0ed014ec120a#egg=polyswarmd_config
 gunicorn==19.9.0
 ipfshttpclient==0.4.12
 polyswarm-artifact>=1.3.2
