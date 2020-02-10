@@ -79,7 +79,7 @@ class Websocket(Config):
 class PolySwarmd(Config):
     artifact: Artifact
     community: str
-    auth: Optional[Auth] = None
+    auth: Auth = dataclasses.field(default_factory=Auth)
     chains: Dict[str, Chain] = dataclasses.field(init=False)
     eth: Eth = dataclasses.field(default_factory=Eth)
     profiler: Profiler = dataclasses.field(default_factory=Profiler)
