@@ -12,7 +12,7 @@ from web3.exceptions import MismatchedABI
 from web3.middleware import geth_poa_middleware
 
 from polyswarmdconfig.config import Config
-from polyswarmd.exceptions import MissingConfigValueError
+from polyswarmdconfig.exceptions import MissingConfigValueError
 from polyswarmd.services.ethereum.rpc import EthereumRpc
 from polyswarmd.utils import IN_TESTENV, camel_case_to_snake_case
 
