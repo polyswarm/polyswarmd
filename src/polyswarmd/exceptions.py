@@ -9,9 +9,3 @@ class WebsocketConnectionAbortedError(Exception):
 
     def __init__(self, message=None):
         self.message = message
-
-
-class MissingConfigValueError(PolyswarmdException):
-
-    def __init__(self, key):
-        super().__init__(f'Missing {key} from config file')

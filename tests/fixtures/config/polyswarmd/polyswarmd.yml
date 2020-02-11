@@ -5,8 +5,6 @@ artifact:
   library:
     module: polyswarmd.services.artifact.ipfs
     class_name: IpfsServiceClient
-    args:
-      - http://localhost:5001
 community: gamma
 eth:
   trace_transactions: true

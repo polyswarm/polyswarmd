@@ -1,17 +1,18 @@
+import dataclasses
 import json
 import logging
 import os
 import time
-from typing import Any, Dict, List, Set, Tuple
+import yaml
 
 from consul import Timeout
+from typing import Any, Dict, List, Set, Tuple
 from web3 import HTTPProvider, Web3
 from web3.exceptions import MismatchedABI
 from web3.middleware import geth_poa_middleware
-import yaml
 
-from polyswarmd.config.config import Config
-from polyswarmd.exceptions import MissingConfigValueError
+from polyswarmdconfig.config import Config
+from polyswarmdconfig.exceptions import MissingConfigValueError
 from polyswarmd.services.ethereum.rpc import EthereumRpc
 from polyswarmd.utils import IN_TESTENV, camel_case_to_snake_case
 
@@ -30,7 +31,6 @@ SUPPORTED_CONTRACT_VERSIONS = {
 
 
 class Contract(object):
-
     def __init__(self, w3, name, abi, address=None):
         self.name = name
         self.w3 = w3
@@ -95,11 +95,11 @@ class Contract(object):
         return Contract(w3, name, abi, address)
 
 
+@dataclasses.dataclass
 class Chain(Config):
     name: str
     eth_uri: str
     chain_id: int
-    free: bool
     w3: Web3
     nectar_token: Contract
     bounty_registry: Contract
@@ -107,50 +107,47 @@ class Chain(Config):
     arbiter_staking: Contract
     offer_registry: Contract
     offer_multi_sig: Contract
-    rpc: EthereumRpc
+    free: bool = False
+    rpc: EthereumRpc = dataclasses.field(init=False)
 
-    def __init__(self, name: str, config: Dict[str, Any]):
-        self.name = name
-        super().__init__(config)
-        self.load()
-
-    def populate(self):
-        self.eth_uri = self.config.get('eth_uri')
-        if self.eth_uri is None:
-            raise MissingConfigValueError('Missing eth_uri')
-
-        self.setup_web3(self.eth_uri)
-        contract_abis = self.config.get('contracts')
-        del self.config['contracts']
-        contracts = self.create_contract_dicts(contract_abis, self.config)
-        self.config.update(contracts)
-        super().populate()
-
-    def finish(self):
-        if not hasattr(self, 'free'):
-            self.free = False
-
-        if not hasattr(self, 'chain_id'):
-            raise MissingConfigValueError('Missing chain_id')
-
+    def __post_init__(self):
         self.setup_rpc()
-
-    def setup_web3(self, eth_uri: str):
-        self.w3 = Web3(HTTPProvider(eth_uri))
-        self.w3.middleware_stack.inject(geth_poa_middleware, layer=0)
 
     def setup_rpc(self):
         self.rpc = EthereumRpc(self)
 
-    def create_contract_dicts(self, contracts: Dict[str, Any],
+    @classmethod
+    def populate(cls, config: Dict[str, Any]) -> Dict[str, Any]:
+        eth_uri = config.get('eth_uri')
+        if eth_uri is None:
+            raise MissingConfigValueError('Missing eth_uri')
+
+        w3 = cls.setup_web3(eth_uri)
+        contract_abis = config.get('contracts')
+        del config['contracts']
+        contracts = cls.create_contract_dicts(w3, contract_abis, config)
+        config.update(contracts)
+        config['w3'] = w3
+
+        return super(Chain, cls).populate(config)
+
+    @classmethod
+    def setup_web3(cls, eth_uri: str):
+        w3 = Web3(HTTPProvider(eth_uri))
+        w3.middleware_stack.inject(geth_poa_middleware, layer=0)
+        return w3
+
+    @classmethod
+    def create_contract_dicts(cls, w3: Web3, contracts: Dict[str, Any],
                               config: Dict[str, Any]) -> Dict[str, Contract]:
         return {
-            camel_case_to_snake_case(name): self.create_contract(name, abi, config)
+            camel_case_to_snake_case(name): cls.create_contract(w3, name, abi, config)
             for name, abi in contracts.items()
         }
 
-    def create_contract(self, name, abi, config: Dict[str, Any]) -> Contract:
-        return Contract.from_json(self.w3, name, abi, config)
+    @classmethod
+    def create_contract(cls, w3: Web3, name: str, abi: Dict[str, Any], config: Dict[str, Any]) -> Contract:
+        return Contract.from_json(w3, name, abi, config)
 
     @staticmethod
     def does_include_all_contracts(contracts: Dict[str, Any]) -> bool:
@@ -163,7 +160,8 @@ class ConsulChain(Chain):
     def from_consul(cls, consul_client, name: str, community_key: str):
         chain = cls.fetch_config(consul_client, name, community_key)
         chain['contracts'] = cls.fetch_contracts(consul_client, community_key)
-        return cls(name, chain)
+        chain['name'] = name
+        return cls.from_dict(chain)
 
     @classmethod
     def fetch_config(cls, consul_client, name: str, key: str) -> Dict[str, Any]:
@@ -250,7 +248,8 @@ class FileChain(Chain):
     def from_config_file(cls, name, filename):
         chain = cls.load_chain_details(filename)
         chain['contracts'] = cls.load_contracts(filename)
-        return cls(name, chain)
+        chain['name'] = name
+        return cls.from_dict(chain)
 
     @classmethod
     def load_chain_details(cls, filename: str) -> Dict[str, Any]:

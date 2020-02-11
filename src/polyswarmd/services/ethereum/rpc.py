@@ -28,7 +28,7 @@ class EthereumRpc:
         self.chain = chain
 
     def __repr__(self):
-        return f"<EthereumRPC Chain={self.chain}>"
+        return f"<EthereumRPC Chain={self.chain.name}>"
 
     def broadcast(self, message: Union[AnyStr, SupportsBytes]):
         """

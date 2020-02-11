@@ -1,25 +1,17 @@
-import importlib
+import dataclasses
 import logging
 import os
-import sys
-from typing import Any, Dict, List, Optional, Tuple, Type
-from urllib.parse import urlparse
-
-from consul import Consul as ConsulClient
-from redis import Redis as RedisClient
-from requests_futures.sessions import FuturesSession
+import warnings
 import yaml
 
-from polyswarmd.config.config import Config
+from requests_futures.sessions import FuturesSession
+from typing import Dict, Optional
+
+from polyswarmdconfig import Artifact, Auth, Config, Consul, Redis
 from polyswarmd.config.contract import Chain, ConsulChain, FileChain
 from polyswarmd.config.status import Status
-from polyswarmd.exceptions import MissingConfigValueError
-from polyswarmd.services.artifact import (
-    AbstractArtifactServiceClient,
-    ArtifactServices,
-)
+from polyswarmd.services.artifact import ArtifactServices
 from polyswarmd.services.auth import AuthService
-from polyswarmd.services.consul import ConsulService
 from polyswarmd.services.ethereum import EthereumService
 from polyswarmd.utils.utils import IN_TESTENV
 
@@ -35,120 +27,17 @@ if IN_TESTENV:
 DEFAULT_FALLBACK_SIZE = 10 * 1024 * 1024
 
 
-class ClassModuleLoader:
-    module_name: str
-    class_name: str
-
-    def __init__(self, module_name: str, class_name: str):
-        self.module_name = module_name
-        self.class_name = class_name
-
-    def load(self):
-        client_module = importlib.import_module(self.module_name)
-        return getattr(client_module, self.class_name)
-
-
-class Library(Config):
-    module: str
-    class_name: str
-    args: List[Any]
-    client: AbstractArtifactServiceClient
-
-    def finish(self):
-        if not hasattr(self, 'module'):
-            MissingConfigValueError('No module specified for artifact service client')
-
-        if not hasattr(self, 'class_name'):
-            MissingConfigValueError('No class name specified for artifact service client')
-
-        if not hasattr(self, 'args'):
-            self.args = []
-
-        self.client = ClassModuleLoader(self.module, self.class_name).load()(*self.args)
-
-
-class Artifact(Config):
-    library: Library
-    limit: int
-    fallback_max_size: int
-    max_size: int
-
-    def finish(self):
-        if not hasattr(self, 'limit'):
-            self.limit = 256
-
-        if self.limit < 1 or self.limit > 256:
-            raise ValueError(
-                'Artifact limit must be greater than 0 and cannot exceed contract limit of 256'
-            )
-
-        if not hasattr(self, 'max_size'):
-            self.max_size = DEFAULT_FALLBACK_SIZE
-
-        if not hasattr(self, 'fallback_max_size'):
-            self.fallback_max_size = DEFAULT_FALLBACK_SIZE
-
-        if self.fallback_max_size < 1:
-            raise ValueError('Fall back max artifact size must be above 0')
-
-        if not hasattr(self, 'library'):
-            MissingConfigValueError('Failed to load artifact services client')
-
-    @property
-    def client(self):
-        return self.library.client
-
-
-class Auth(Config):
-    uri: Optional[str]
-
-    def finish(self):
-        if not hasattr(self, 'uri'):
-            self.uri = None
-
-    @property
-    def require_api_key(self):
-        return self.uri is not None
-
-
-class Consul(Config):
-    uri: str
-    token: Optional[str]
-    client: ConsulClient
-
-    def finish(self):
-        if not hasattr(self, 'uri'):
-            raise MissingConfigValueError('Missing consul uri')
-
-        if not hasattr(self, 'token'):
-            self.token = None
-
-        ConsulService(self.uri, FuturesSession()).wait_until_live()
-        u = urlparse(self.uri)
-        self.client = ConsulClient(host=u.hostname, port=u.port, scheme=u.scheme, token=self.token)
-
-
+@dataclasses.dataclass
 class Eth(Config):
-    trace_transactions: bool
-    consul: Optional[Consul]
-    directory: Optional[str]
+    trace_transactions: bool = True
+    consul: Optional[Consul] = None
+    directory: Optional[str] = None
 
-    def finish(self):
-        if not hasattr(self, 'trace_transactions') or self.trace_transactions is None:
-            self.trace_transactions = True
-
-        self.trace_transactions = bool(self.trace_transactions)
-
-        if not hasattr(self, 'consul'):
-            self.consul = None
-
-        if not hasattr(self, 'directory'):
-            self.directory = None
-
+    def __post_init__(self):
         if self.consul is not None and self.directory is not None:
-            raise ValueError('Cannot have both filename and consul values')
+            raise ValueError('Cannot have both directory and consul values')
         elif self.consul is None and self.directory is None:
-            raise MissingConfigValueError('Must specify either consul or filename')
+            raise MissingConfigValueError('Must specify either consul or directory')
 
     def get_chains(self, community: str) -> Dict[str, Chain]:
         if self.consul is not None:
@@ -164,65 +53,40 @@ class Eth(Config):
             }
 
 
+@dataclasses.dataclass
 class Profiler(Config):
-    enabled: bool
-    db_uri: Optional[str]
+    enabled: bool = False
+    db_uri: Optional[str] = None
 
-    def finish(self):
-        if not hasattr(self, 'enabled'):
-            self.enabled = False
-            self.db_uri = None
-
-        if not hasattr(self, 'db_uri'):
-            self.db_uri = None
-
+    def __post_init__(self):
         if self.enabled and self.db_uri is None:
             raise ValueError('Profiler enabled, but no db uri set')
 
 
+@dataclasses.dataclass
 class Websocket(Config):
-    enabled: bool
+    enabled: bool = True
 
-    def finish(self):
-        if not hasattr(self, 'enabled') or self.enabled is None:
-            if os.environ.get('DISABLE_WEBSOCKETS'):
-                self.enabled = False
-                logger.warning(
-                    '"DISABLE_WEBSOCKETS" environment variable is deprecated, please use WEBSOCKER_ENABLED'
-                )
-            else:
-                self.enabled = True
+    def __post_init__(self):
+        if self.enabled and os.environ.get('DISABLE_WEBSOCKETS'):
+            self.enabled = False
+            warnings.warn(
+                '"DISABLE_WEBSOCKETS" environment variable is deprecated, please use POLYSWARMD_WEBSOCKET_ENABLED',
+                DeprecationWarning)
 
 
-class Redis(Config):
-    client: Optional[RedisClient]
-    uri: Optional[str]
-
-    def finish(self):
-        self.client = None
-
-        if not hasattr(self, 'uri'):
-            self.uri = None
-
-        if self.uri:
-            self.client = RedisClient.from_url(self.uri)
-
-
+@dataclasses.dataclass
 class PolySwarmd(Config):
-    session: FuturesSession
-    status: Status
     artifact: Artifact
-    auth: Auth
-    chains: Dict[str, Chain]
     community: str
-    eth: Eth
-    profiler: Profiler
-    redis: Redis
-    websocket: Websocket
-
-    def __init__(self, config: Dict[str, Any]):
-        self.session = FuturesSession()
-        super().__init__(config, module=sys.modules[__name__])
+    auth: Auth = dataclasses.field(default_factory=Auth)
+    chains: Dict[str, Chain] = dataclasses.field(init=False)
+    eth: Eth = dataclasses.field(default_factory=Eth)
+    profiler: Profiler = dataclasses.field(default_factory=Profiler)
+    redis: Redis = dataclasses.field(default_factory=Redis)
+    status: Status = dataclasses.field(init=False)
+    session: FuturesSession = dataclasses.field(init=False, default_factory=FuturesSession)
+    websocket: Websocket = dataclasses.field(default_factory=Websocket)
 
     @staticmethod
     def auto():
@@ -231,45 +95,25 @@ class PolySwarmd(Config):
     @staticmethod
     def from_config_file_search():
         # Expect config in the environment
-        polyswarmd = PolySwarmd({})
         for location in CONFIG_LOCATIONS:
             location = os.path.abspath(os.path.expanduser(location))
             filename = os.path.join(location, 'polyswarmd.yml')
             if os.path.isfile(filename):
-                polyswarmd = PolySwarmd.create_from_file(filename)
+                return PolySwarmd.create_from_file(filename)
 
-        polyswarmd.overlay_and_load()
-        return polyswarmd
+        else:
+            return PolySwarmd.from_dict_and_environment({})
 
     @staticmethod
     def create_from_file(path):
         with open(path, 'r') as f:
-            return PolySwarmd(yaml.safe_load(f))
+            return PolySwarmd.from_dict_and_environment(yaml.safe_load(f))
 
-    def finish(self):
-        self.check_community()
-        self.fill_default_sub_configs()
-        self.load_chains()
+    def __post_init__(self):
+        self.setup_chains()
         self.setup_status()
 
-    def check_community(self):
-        if not hasattr(self, 'community'):
-            raise MissingConfigValueError('Missing community')
-
-    def fill_default_sub_configs(self):
-        sub_configs: List[Tuple[str, Type[Config]]] = [('artifact', Artifact), ('auth', Auth),
-                                                       ('eth', Eth), ('profiler', Profiler),
-                                                       ('redis', Redis), ('websocket', Websocket)]
-        for attribute, sub_config in sub_configs:
-            self.create_default_sub_config_if_missing(attribute, sub_config)
-
-    def create_default_sub_config_if_missing(self, attribute: str, sub_config: Type[Config]):
-        if not hasattr(self, attribute):
-            sub_config_inst: Config = sub_config({})
-            setattr(self, attribute, sub_config_inst)
-            sub_config_inst.load()
-
-    def load_chains(self):
+    def setup_chains(self):
         self.chains = self.eth.get_chains(self.community)
 
     def setup_status(self):
