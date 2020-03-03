@@ -17,8 +17,6 @@ from flask_caching import Cache
 
 from polyswarmd.config.polyswarmd import PolySwarmd, DEFAULT_FALLBACK_SIZE
 
-from polyswarmd.utils.logger import init_logging  # noqa
-
 from polyswarmd.utils.profiler import setup_profiler
 from polyswarmd.utils.response import success, failure, install_error_handlers
 
@@ -42,14 +40,14 @@ app.config['THREADPOOL'] = ThreadPoolExecutor()
 
 install_error_handlers(app)
 
-from polyswarmd.views.eth import misc
-from polyswarmd.views.artifacts import artifacts
-from polyswarmd.views.balances import balances
-from polyswarmd.views.bounties import bounties
-from polyswarmd.views.relay import relay
-from polyswarmd.views.offers import offers
-from polyswarmd.views.staking import staking
-from polyswarmd.views.event_message import init_websockets
+from polyswarmd.views.v1.eth import misc
+from polyswarmd.views.v1.artifacts import artifacts
+from polyswarmd.views.v1.balances import balances
+from polyswarmd.views.v1.bounties import bounties
+from polyswarmd.views.v1.relay import relay
+from polyswarmd.views.v1.offers import offers
+from polyswarmd.views.v1.staking import staking
+from polyswarmd.views.v1.event_message import init_websockets
 
 app.register_blueprint(misc, url_prefix='/')
 app.register_blueprint(artifacts, url_prefix='/artifacts')
@@ -58,6 +56,13 @@ app.register_blueprint(bounties, url_prefix='/bounties')
 app.register_blueprint(relay, url_prefix='/relay')
 app.register_blueprint(offers, url_prefix='/offers')
 app.register_blueprint(staking, url_prefix='/staking')
+app.register_blueprint(misc, url_prefix='/v1')
+app.register_blueprint(artifacts, url_prefix='/v1/artifacts')
+app.register_blueprint(balances, url_prefix='/v1/balances')
+app.register_blueprint(bounties, url_prefix='/v1/bounties')
+app.register_blueprint(relay, url_prefix='/v1/relay')
+app.register_blueprint(offers, url_prefix='/v1/offers')
+app.register_blueprint(staking, url_prefix='/v1/staking')
 
 if app.config['POLYSWARMD'].websocket.enabled:
     init_websockets(app)

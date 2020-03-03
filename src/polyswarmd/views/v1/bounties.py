@@ -25,8 +25,8 @@ from polyswarmd.utils import (
 from polyswarmd.utils.bloom import FILTER_BITS, BloomFilter
 from polyswarmd.utils.decorators.chains import chain
 from polyswarmd.utils.response import failure, success
-from polyswarmd.views import eth
-from polyswarmd.views.eth import ZERO_ADDRESS, build_transaction
+from polyswarmd.views.v1 import eth
+from polyswarmd.views.v1.eth import ZERO_ADDRESS, build_transaction
 
 MAX_PAGES_PER_REQUEST = 3
 

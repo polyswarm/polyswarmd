@@ -1,9 +1,8 @@
 from collections import UserList
 from contextlib import contextmanager
-from curses.ascii import EOT as END_OF_TRANSMISSION
 import statistics
 import time
-from typing import ClassVar, Generator, Iterator, List, Mapping
+from typing import ClassVar, Generator, Iterator
 from string import ascii_lowercase
 import unittest.mock
 import uuid
@@ -14,7 +13,7 @@ import pytest
 import ujson
 
 from polyswarmd.services.ethereum.rpc import EthereumRpc
-from polyswarmd.views.event_message import WebSocket
+from polyswarmd.views.v1.event_message import WebSocket
 from polyswarmd.websockets.filter import (
     ContractFilter,
     FilterManager,

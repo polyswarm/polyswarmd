@@ -39,7 +39,7 @@ class Contract(object):
         self._contract = None
 
     def bind(self, address=None, persistent=False):
-        from polyswarmd.views.eth import ZERO_ADDRESS
+        from polyswarmd.views.v1.eth import ZERO_ADDRESS
         address = address or self.address
         if not address:
             raise ValueError('No address provided to bind to')

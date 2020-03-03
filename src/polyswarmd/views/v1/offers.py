@@ -14,7 +14,7 @@ from polyswarmd.utils import (
 )
 from polyswarmd.utils.decorators.chains import chain
 from polyswarmd.utils.response import failure, success
-from polyswarmd.views.eth import build_transaction
+from polyswarmd.views.v1.eth import build_transaction
 
 logger = logging.getLogger(__name__)
 offers: Blueprint = Blueprint('offers', __name__)

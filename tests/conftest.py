@@ -86,7 +86,7 @@ def token_address():
 
 @pytest.fixture
 def TX_SIG_HASH():
-    from polyswarmd.views.eth import TRANSFER_SIGNATURE_HASH as TX_SIG_HASH
+    from polyswarmd.views.v1.eth import TRANSFER_SIGNATURE_HASH as TX_SIG_HASH
     return TX_SIG_HASH
 
 
