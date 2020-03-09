@@ -7,9 +7,9 @@ from eth_abi import decode_abi
 from eth_abi.exceptions import InsufficientDataBytes
 from hexbytes import HexBytes
 from typing import List, Tuple, Any, Type, Dict
-from web3._utils.events import get_event_data
 from web3.exceptions import MismatchedABI
 from web3.module import Module
+from web3.utils.events import get_event_data
 
 from polyswarmd.app import cache
 from polyswarmd.websockets import messages
