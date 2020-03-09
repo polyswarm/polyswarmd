@@ -1,4 +1,20 @@
+import gevent
+import logging
+import rlp
+
+from eth.vm.forks.constantinople.transactions import ConstantinopleTransaction
+from eth_abi import decode_abi
+from eth_abi.exceptions import InsufficientDataBytes
+from hexbytes import HexBytes
+from typing import List, Tuple, Any, Type, Dict
+from web3._utils.events import get_event_data
+from web3.exceptions import MismatchedABI
 from web3.module import Module
+
+from polyswarmd.app import cache
+from polyswarmd.websockets import messages
+
+logger = logging.getLogger(__name__)
 
 MAX_GAS_LIMIT = 50000000
 GAS_MULTIPLIER = 1.5
@@ -47,6 +63,7 @@ class Debug(Module):
 
 
 def get_gas_limit():
+    from flask import g, current_app as app
     gas_limit = MAX_GAS_LIMIT
     if app.config['CHECK_BLOCK_LIMIT']:
         gas_limit = g.chain.w3.eth.getBlock('latest').gasLimit
@@ -58,6 +75,7 @@ def get_gas_limit():
 
 
 def build_transaction(call, nonce):
+    from flask import g
     # Only a problem for fresh chains
     gas_limit = get_gas_limit()
     options = {
@@ -80,8 +98,10 @@ def build_transaction(call, nonce):
 
     return call.buildTransaction(options)
 
+
 @cache.memoize(1)
 def get_txpool():
+    from flask import g
     return g.chain.w3.txpool.inspect
 
 
@@ -93,6 +113,7 @@ def is_withdrawal(tx):
     """
     Take a transaction and return True if that transaction is a withdrawal
     """
+    from flask import g, current_app as app
     data = tx.data[4:]
     to = g.chain.w3.toChecksumAddress(tx.to.hex())
     sender = g.chain.w3.toChecksumAddress(tx.sender.hex())
@@ -118,6 +139,7 @@ def is_withdrawal(tx):
 
 
 def events_from_transaction(txhash, chain):
+    from flask import g, current_app as app
     config = app.config['POLYSWARMD']
     trace_transactions = config.eth.trace_transactions
     if trace_transactions:
