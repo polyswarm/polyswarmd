@@ -13,7 +13,7 @@ import pytest
 import ujson
 
 from polyswarmd.services.ethereum.rpc import EthereumRpc
-from polyswarmd.views.v1.event_message import WebSocket
+from polyswarmd.utils.events import WebSocket
 from polyswarmd.websockets.filter import (
     ContractFilter,
     FilterManager,

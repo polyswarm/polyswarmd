@@ -13,8 +13,8 @@ from polyswarmd.utils import (
     validate_ws_url,
 )
 from polyswarmd.utils.decorators.chains import chain
+from polyswarmd.utils.eth import build_transaction
 from polyswarmd.utils.response import failure, success
-from polyswarmd.views.v1.eth import build_transaction
 
 logger = logging.getLogger(__name__)
 offers: Blueprint = Blueprint('offers', __name__)

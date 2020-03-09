@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 from typing import List
 import uuid
 
@@ -14,19 +13,18 @@ from polyswarmartifact.schema import Bounty as BountyMetadata
 from polyswarmd.app import app, cache
 from polyswarmd.services.artifact.exceptions import ArtifactException
 from polyswarmd.utils import (
-    assertion_to_dict,
     bloom_to_dict,
     bool_list_to_int,
     bounty_to_dict,
-    cache_contract_view,
-    sha3,
     vote_to_dict,
-)
-from polyswarmd.utils.bloom import FILTER_BITS, BloomFilter
+    cache_contract_view,
+    assertion_to_dict)
+from polyswarmd.utils import eth
+from polyswarmd.utils.bloom import calculate_bloom
+from polyswarmd.utils.bounties import substitute_metadata, calculate_commitment
 from polyswarmd.utils.decorators.chains import chain
+from polyswarmd.utils.eth import build_transaction, ZERO_ADDRESS
 from polyswarmd.utils.response import failure, success
-from polyswarmd.views.v1 import eth
-from polyswarmd.views.v1.eth import ZERO_ADDRESS, build_transaction
 
 MAX_PAGES_PER_REQUEST = 3
 
@@ -34,38 +32,9 @@ logger = logging.getLogger(__name__)
 bounties: Blueprint = Blueprint('bounties', __name__)
 
 
-def calculate_bloom(artifacts):
-    bf = BloomFilter()
-    for _, h, _ in artifacts:
-        bf.add(h.encode('utf-8'))
-
-    v = int(bf)
-    ret: List[int] = []
-    d = (1 << 256)
-    for _ in range(FILTER_BITS // 256):
-        ret.insert(0, v % d)
-        v //= d
-
-    return ret
-
-
-def int_to_bytes(i):
-    h = hex(i)[2:]
-    return bytes.fromhex('0' * (64 - len(h)) + h)
-
-
-def int_from_bytes(b):
-    return int.from_bytes(b, byteorder='big')
-
-
-def calculate_commitment(account, verdicts):
-    nonce = os.urandom(32)
-    account = int(account, 16)
-    commitment = sha3(int_to_bytes(verdicts ^ int_from_bytes(sha3(nonce)) ^ account))
-    return int_from_bytes(nonce), int_from_bytes(commitment)
-
-
 def get_assertion(guid, index, num_artifacts):
+    from flask import current_app as app, g
+
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
     assertion = assertion_to_dict(
@@ -118,41 +87,6 @@ def get_page_size(redis=None):
     )
     logger.debug(f'Got page size of {page_size}. Was it cached? {cached}')
     return int(page_size)
-
-
-# noinspection PyBroadException
-@cache.memoize(30)
-def substitute_metadata(
-    uri, artifact_client, session, validate=AssertionMetadata.validate, redis=None
-):
-    """
-    Download metadata from artifact service and validate it against the schema.
-
-    :param uri: Potential artifact service uri string (or metadata string)
-    :param artifact_client: Artifact Client for accessing artifacts stored on a service
-    :param session: Requests session for ipfs request
-    :param validate: Function that takes a loaded json blob and returns true if it matches the schema
-    :param redis: Redis connection object
-    :return: Metadata from artifact service, or original metadata
-    """
-    try:
-        if artifact_client.check_uri(uri):
-            content = json.loads(
-                artifact_client.get_artifact(uri, session=session, redis=redis).decode('utf-8')
-            )
-        else:
-            content = json.loads(uri)
-
-        if validate(content):
-            return content
-
-    except json.JSONDecodeError:
-        # Expected when people provide incorrect metadata. Not stack worthy
-        logger.warning('Metadata retrieved from IPFS does not match schema')
-    except Exception:
-        logger.exception(f'Error getting metadata from {artifact_client.name}')
-
-    return uri
 
 
 @bounties.route('', methods=['GET'])

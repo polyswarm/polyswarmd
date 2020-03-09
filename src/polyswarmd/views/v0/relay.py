@@ -4,8 +4,8 @@ import fastjsonschema
 from flask import Blueprint, g, request
 
 from polyswarmd.utils.decorators.chains import chain
+from polyswarmd.utils.eth import build_transaction
 from polyswarmd.utils.response import failure, success
-from polyswarmd.views.v1.eth import build_transaction
 
 logger = logging.getLogger(__name__)
 relay: Blueprint = Blueprint('relay', __name__)

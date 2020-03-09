@@ -6,7 +6,7 @@ from gevent.lock import BoundedSemaphore
 
 from polyswarmd.exceptions import WebsocketConnectionAbortedError
 from polyswarmd.utils import logging
-from polyswarmd.views.v1.event_message import WebSocket
+from polyswarmd.utils.events import WebSocket
 from polyswarmd.websockets.filter import FilterManager
 
 logger = logging.getLogger(__name__)

@@ -4,12 +4,29 @@ import logging
 import numbers
 import operator
 
+from typing import List
+
 from polyswarmd.utils import sha3
 
 logger = logging.getLogger(__name__)
 
 FILTER_BITS = 8 * 256
 HASH_FUNCS = 8
+
+
+def calculate_bloom(artifacts):
+    bf = BloomFilter()
+    for _, h, _ in artifacts:
+        bf.add(h.encode('utf-8'))
+
+    v = int(bf)
+    ret: List[int] = []
+    d = (1 << 256)
+    for _ in range(FILTER_BITS // 256):
+        ret.insert(0, v % d)
+        v //= d
+
+    return ret
 
 
 def get_chunks_for_bloom(value_hash):
