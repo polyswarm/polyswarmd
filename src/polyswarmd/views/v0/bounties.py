@@ -17,8 +17,8 @@ from polyswarmd.utils import (
     bool_list_to_int,
     bounty_to_dict,
     vote_to_dict,
-    cache_contract_view,
-    assertion_to_dict)
+    assertion_to_dict,
+    cache_contract_view,)
 from polyswarmd.utils import eth
 from polyswarmd.utils.bloom import calculate_bloom
 from polyswarmd.utils.bounties import substitute_metadata, calculate_commitment
