@@ -19,6 +19,20 @@ logger = logging.getLogger(__name__)
 artifacts: Blueprint = Blueprint('artifacts', __name__)
 
 
+@artifacts.route('/status/', methods=['GET'])
+def get_artifacts_status():
+    config = app.config['POLYSWARMD']
+    session = app.config['REQUESTS_SESSION']
+
+    try:
+        return success(config.artifact.client.status(session))
+
+    except HTTPError as e:
+        return failure(e.response.content, e.response.status_code)
+    except ArtifactException as e:
+        return failure(e.message, 500)
+
+
 @artifacts.route('/', methods=['POST'])
 def post_artifacts():
     config = app.config['POLYSWARMD']
