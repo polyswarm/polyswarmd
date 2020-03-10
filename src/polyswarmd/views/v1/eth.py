@@ -14,10 +14,10 @@ from polyswarmd.utils.response import failure, success
 
 logger = logging.getLogger(__name__)
 
-misc: Blueprint = Blueprint('misc_v1', __name__)
+eth: Blueprint = Blueprint('eth_v1', __name__)
 
 
-@misc.route('/syncing/', methods=['GET'])
+@eth.route('/syncing/', methods=['GET'])
 @chain
 def get_syncing():
     if not g.chain.w3.eth.syncing:
@@ -26,7 +26,7 @@ def get_syncing():
     return success(dict(g.chain.w3.eth.syncing))
 
 
-@misc.route('/nonce/', methods=['GET'])
+@eth.route('/nonce/', methods=['GET'])
 @chain
 def get_nonce():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -36,7 +36,7 @@ def get_nonce():
         return success(g.chain.w3.eth.getTransactionCount(account, 'pending'))
 
 
-@misc.route('/pending/', methods=['GET'])
+@eth.route('/pending/', methods=['GET'])
 @chain
 def get_pending_nonces():
     tx_pool = get_txpool()
@@ -69,7 +69,7 @@ _get_transactions_schema_validator = fastjsonschema.compile({
 })
 
 
-@misc.route('/transactions/', methods=['GET'])
+@eth.route('/transactions/', methods=['GET'])
 @chain
 def get_transactions():
     body = request.get_json()
@@ -107,7 +107,7 @@ _post_transactions_schema = fastjsonschema.compile({
 })
 
 
-@misc.route('/transactions/', methods=['POST'])
+@eth.route('/transactions/', methods=['POST'])
 @chain
 def post_transactions():
     threadpool_executor = app.config['THREADPOOL']
