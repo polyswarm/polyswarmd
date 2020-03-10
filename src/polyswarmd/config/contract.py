@@ -15,6 +15,7 @@ from polyswarmdconfig.config import Config
 from polyswarmdconfig.exceptions import MissingConfigValueError
 from polyswarmd.services.ethereum.rpc import EthereumRpc
 from polyswarmd.utils import IN_TESTENV, camel_case_to_snake_case
+from polyswarmd.utils.eth import ZERO_ADDRESS
 
 logger = logging.getLogger(__name__)
 EXPECTED_CONTRACTS = [
