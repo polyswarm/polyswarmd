@@ -18,7 +18,7 @@ from flask_caching import Cache
 from polyswarmd.config.polyswarmd import PolySwarmd, DEFAULT_FALLBACK_SIZE
 
 from polyswarmd.utils.profiler import setup_profiler
-from polyswarmd.utils.response import success, failure, install_error_handlers
+from polyswarmd.utils.response import failure, install_error_handlers
 
 logger = logging.getLogger(__name__)
 cache: Cache = Cache(config={"CACHE_TYPE": "simple", "CACHE_DEFAULT_TIMEOUT": 30})

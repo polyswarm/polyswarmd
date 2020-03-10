@@ -59,3 +59,44 @@ def substitute_metadata(
         logger.exception(f'Error getting metadata from {artifact_client.name}')
 
     return uri
+
+
+@cache.memoize(1)
+def get_txpool():
+    from flask import g
+    return g.chain.w3.txpool.inspect
+
+
+@cache.memoize(1)
+def bounty_fee(bounty_registry):
+    return bounty_registry.functions.bountyFee().call()
+
+
+@cache.memoize(1)
+def assertion_fee(bounty_registry):
+    return bounty_registry.functions.assertionFee().call()
+
+
+@cache.memoize(1)
+def bounty_amount_min(bounty_registry):
+    return bounty_registry.functions.BOUNTY_AMOUNT_MINIMUM().call()
+
+
+@cache.memoize(1)
+def assertion_bid_min(bounty_registry):
+    return bounty_registry.functions.ASSERTION_BID_ARTIFACT_MINIMUM().call()
+
+
+@cache.memoize(1)
+def assertion_bid_max(bounty_registry):
+    return bounty_registry.functions.ASSERTION_BID_ARTIFACT_MAXIMUM().call()
+
+
+@cache.memoize(1)
+def staking_total_max(arbiter_staking):
+    return arbiter_staking.functions.MAXIMUM_STAKE().call()
+
+
+@cache.memoize(1)
+def staking_total_min(arbiter_staking):
+    return arbiter_staking.functions.MINIMUM_STAKE().call()

@@ -8,8 +8,9 @@ from flask import g, request
 from hexbytes import HexBytes
 from typing import Any, Dict, List
 
+from polyswarmd.utils.bounties import get_txpool
 from polyswarmd.utils.decorators.chains import chain
-from polyswarmd.utils.eth import get_txpool, events_from_transaction, decode_all, is_withdrawal, ZERO_ADDRESS
+from polyswarmd.utils.eth import events_from_transaction, decode_all, is_withdrawal, ZERO_ADDRESS
 from polyswarmd.utils.response import failure, success
 
 logger = logging.getLogger(__name__)

@@ -19,7 +19,7 @@ from polyswarmd.utils import (
     vote_to_dict,
     assertion_to_dict,
     cache_contract_view,)
-from polyswarmd.utils import eth
+from polyswarmd.utils import bounties
 from polyswarmd.utils.bloom import calculate_bloom
 from polyswarmd.utils.bounties import substitute_metadata, calculate_commitment
 from polyswarmd.utils.decorators.chains import chain
@@ -174,7 +174,7 @@ def post_bounties():
         logger.exception('Failed to ls given artifact uri')
         return failure(f'Failed to check artifact uri', 500)
 
-    if amount < eth.bounty_amount_min(g.chain.bounty_registry.contract) * len(arts):
+    if amount < bounties.bounty_amount_min(g.chain.bounty_registry.contract) * len(arts):
         return failure('Invalid bounty amount', 400)
 
     if metadata and not config.artifact.client.check_uri(metadata):
@@ -183,7 +183,7 @@ def post_bounties():
     num_artifacts = len(arts)
     bloom = calculate_bloom(arts)
 
-    approve_amount = amount + eth.bounty_fee(g.chain.bounty_registry.contract)
+    approve_amount = amount + bounties.bounty_fee(g.chain.bounty_registry.contract)
 
     transactions = [
         build_transaction(
@@ -412,12 +412,12 @@ def post_bounties_guid_assertions(guid):
     if not bid or len(bid) != verdict_count:
         return failure('bid_portions must be equal in length to the number of true mask values', 400)
 
-    max_bid = eth.assertion_bid_max(g.chain.bounty_registry.contract)
-    min_bid = eth.assertion_bid_min(g.chain.bounty_registry.contract)
+    max_bid = bounties.assertion_bid_max(g.chain.bounty_registry.contract)
+    min_bid = bounties.assertion_bid_min(g.chain.bounty_registry.contract)
     if any((b for b in bid if max_bid < b < min_bid)):
         return failure('Invalid assertion bid', 400)
 
-    approve_amount = sum(bid) + eth.assertion_fee(g.chain.bounty_registry.contract)
+    approve_amount = sum(bid) + bounties.assertion_fee(g.chain.bounty_registry.contract)
 
     nonce = None
     if commitment is None:
