@@ -10,7 +10,7 @@ from polyswarmd.utils.response import failure, success
 
 
 logger = logging.getLogger(__name__)
-staking: Blueprint = Blueprint('staking', __name__)
+staking: Blueprint = Blueprint('staking_v1', __name__)
 
 
 @staking.route('/parameters/', methods=['GET'])

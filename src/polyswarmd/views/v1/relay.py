@@ -8,7 +8,7 @@ from polyswarmd.utils.eth import build_transaction
 from polyswarmd.utils.response import failure, success
 
 logger = logging.getLogger(__name__)
-relay: Blueprint = Blueprint('relay', __name__)
+relay: Blueprint = Blueprint('relay_v1', __name__)
 
 
 @relay.route('/deposit/', methods=['POST'])

@@ -16,7 +16,7 @@ from polyswarmd.utils.artifacts import check_size
 from polyswarmd.utils.response import failure, success
 
 logger = logging.getLogger(__name__)
-artifacts: Blueprint = Blueprint('artifacts', __name__)
+artifacts: Blueprint = Blueprint('artifacts_v1', __name__)
 
 
 @artifacts.route('/status/', methods=['GET'])

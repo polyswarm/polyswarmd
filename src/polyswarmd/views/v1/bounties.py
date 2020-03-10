@@ -29,7 +29,7 @@ from polyswarmd.utils.response import failure, success
 MAX_PAGES_PER_REQUEST = 3
 
 logger = logging.getLogger(__name__)
-bounties: Blueprint = Blueprint('bounties', __name__)
+bounties: Blueprint = Blueprint('bounties_v1', __name__)
 
 
 def get_assertion(guid, index, num_artifacts):

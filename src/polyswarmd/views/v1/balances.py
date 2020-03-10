@@ -6,7 +6,7 @@ from polyswarmd.utils.decorators.chains import chain
 from polyswarmd.utils.response import failure, success
 
 logger = logging.getLogger(__name__)
-balances: Blueprint = Blueprint('balances', __name__)
+balances: Blueprint = Blueprint('balances_v1', __name__)
 
 
 @balances.route('/<address>/eth/', methods=['GET'])

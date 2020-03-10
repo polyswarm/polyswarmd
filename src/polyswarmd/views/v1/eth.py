@@ -14,7 +14,7 @@ from polyswarmd.utils.response import failure, success
 
 logger = logging.getLogger(__name__)
 
-misc: Blueprint = Blueprint('misc', __name__)
+misc: Blueprint = Blueprint('misc_v1', __name__)
 
 
 @misc.route('/syncing/', methods=['GET'])
