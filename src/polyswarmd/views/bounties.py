@@ -1,3 +1,4 @@
+import enum
 import json
 import logging
 import os
@@ -32,6 +33,14 @@ MAX_PAGES_PER_REQUEST = 3
 
 logger = logging.getLogger(__name__)
 bounties: Blueprint = Blueprint('bounties', __name__)
+
+
+class BountyRound(enum.Enum):
+    ACTIVE = 0
+    REVEALING = 1
+    VOTING = 2
+    QUORUM_REACHED = 3
+    SETTLED = 4
 
 
 def calculate_bloom(artifacts):
@@ -343,6 +352,13 @@ _post_bounties_guid_vote_schema = fastjsonschema.compile({
     },
     'required': ['votes', 'valid_bloom'],
 })
+
+
+@bounties.route('/<uuid:guid>/round')
+@chain
+def get_round(guid):
+    round_ = g.chain.bounty_registry.contract.functions.getCurrentRound(guid.int).call()
+    return success({'round': BountyRound(round_).name.lower()})
 
 
 @bounties.route('/<uuid:guid>/vote', methods=['POST'])
