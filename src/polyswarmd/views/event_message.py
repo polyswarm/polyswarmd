@@ -90,6 +90,7 @@ def init_websockets(app):
     message_sockets: Dict[uuid.UUID, List[WebSocketApplication]] = dict()
 
     @sockets.route('/events')
+    @sockets.route('/events/')
     @chain(account_required=False)
     def events(ws):
         rpc = g.chain.rpc
@@ -121,6 +122,7 @@ def init_websockets(app):
         rpc.unregister(wrapper)
 
     @sockets.route('/events/<uuid:guid>')
+    @sockets.route('/events/<uuid:guid>/')
     @chain(chain_name='home', account_required=False)
     def channel_events(ws, guid):
         offer_channel = channel_to_dict(
