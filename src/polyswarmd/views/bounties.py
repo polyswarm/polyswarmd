@@ -389,9 +389,8 @@ def post_bounties_guid_settle(guid):
 def post_assertion_metadata():
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
-    body = request.get_json()
+    loaded_body = request.get_json()
 
-    loaded_body = json.loads(body)
     try:
         if not AssertionMetadata.validate(loaded_body, silent=True) and \
                 not BountyMetadata.validate(loaded_body, silent=True):
@@ -401,7 +400,7 @@ def post_assertion_metadata():
         return failure('Invalid Assertion metadata', 400)
 
     try:
-        uri = config.artifact.client.add_artifact(body, session, redis=config.redis.client)
+        uri = config.artifact.client.add_artifact(json.dumps(loaded_body), session, redis=config.redis.client)
         response = success(uri)
     except HTTPError as e:
         response = failure(e.response.content, e.response.status_code)
