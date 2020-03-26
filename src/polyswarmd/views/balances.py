@@ -10,6 +10,7 @@ balances: Blueprint = Blueprint('balances', __name__)
 
 
 @balances.route('/<address>/eth', methods=['GET'])
+@balances.route('/<address>/eth/', methods=['GET'])
 @chain(account_required=False)
 def get_balance_address_eth(address):
     if not g.chain.w3.isAddress(address):
@@ -25,6 +26,7 @@ def get_balance_address_eth(address):
 
 
 @balances.route('/<address>/staking/total', methods=['GET'])
+@balances.route('/<address>/staking/total/', methods=['GET'])
 @chain(account_required=False)
 def get_balance_total_stake(address):
     if not g.chain.w3.isAddress(address):
@@ -39,6 +41,7 @@ def get_balance_total_stake(address):
 
 
 @balances.route('/<address>/staking/withdrawable', methods=['GET'])
+@balances.route('/<address>/staking/withdrawable/', methods=['GET'])
 @chain(account_required=False)
 def get_balance_withdrawable_stake(address):
     if not g.chain.w3.isAddress(address):
@@ -54,6 +57,7 @@ def get_balance_withdrawable_stake(address):
 
 
 @balances.route('/<address>/nct', methods=['GET'])
+@balances.route('/<address>/nct/', methods=['GET'])
 @chain(account_required=False)
 def get_balance_address_nct(address):
     if not g.chain.w3.isAddress(address):

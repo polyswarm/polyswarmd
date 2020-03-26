@@ -115,8 +115,8 @@ def post_artifacts():
     return response
 
 
-@artifacts.route('/<identifier>/', methods=['GET'])
 @artifacts.route('/<identifier>', methods=['GET'])
+@artifacts.route('/<identifier>/', methods=['GET'])
 def get_artifacts_identifier(identifier):
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
@@ -139,8 +139,8 @@ def get_artifacts_identifier(identifier):
     return response
 
 
-@artifacts.route('/<identifier>/<int:id_>/', methods=['GET'])
 @artifacts.route('/<identifier>/<int:id_>', methods=['GET'])
+@artifacts.route('/<identifier>/<int:id_>/', methods=['GET'])
 def get_artifacts_identifier_id(identifier, id_):
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
@@ -162,8 +162,8 @@ def get_artifacts_identifier_id(identifier, id_):
     return response
 
 
-@artifacts.route('/<identifier>/<int:id_>/stat/', methods=['GET'])
 @artifacts.route('/<identifier>/<int:id_>/stat', methods=['GET'])
+@artifacts.route('/<identifier>/<int:id_>/stat/', methods=['GET'])
 def get_artifacts_identifier_id_stat(identifier, id_):
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']

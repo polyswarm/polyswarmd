@@ -148,6 +148,7 @@ def init_websockets(app):
 
     # for receiving messages about offers that might need to be signed
     @sockets.route('/messages/<uuid:guid>')
+    @sockets.route('/messages/<uuid:guid>/')
     @chain(chain_name='home', account_required=False)
     def messages(ws, guid):
 
