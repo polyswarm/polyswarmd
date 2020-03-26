@@ -389,7 +389,8 @@ def post_bounties_guid_settle(guid):
 def post_assertion_metadata():
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
-    loaded_body = request.get_json()
+    body = request.get_json()
+    loaded_body = json.loads(body) if isinstance(body, str) else body
 
     try:
         if not AssertionMetadata.validate(loaded_body, silent=True) and \
