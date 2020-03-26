@@ -617,8 +617,8 @@ def get_bounties_guid_assertions_id(guid, id_):
 
 
 @bounties.route('/<uuid:guid>/votes', methods=['GET'])
-@chain
 @bounties.route('/<uuid:guid>/votes/', methods=['GET'])
+@chain
 def get_bounties_guid_votes(guid):
     bounty = bounty_to_dict(
         g.chain.bounty_registry.contract.functions.bountiesByGuid(guid.int).call()
