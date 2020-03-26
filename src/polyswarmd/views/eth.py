@@ -71,8 +71,8 @@ class Debug(Module):
         return error.decode('utf-8')
 
 
-@misc.route('/syncing', methods=['GET'])
 @misc.route('/syncing/', methods=['GET'])
+@misc.route('/syncing', methods=['GET'])
 @chain
 def get_syncing():
     if not g.chain.w3.eth.syncing:
@@ -81,8 +81,8 @@ def get_syncing():
     return success(dict(g.chain.w3.eth.syncing))
 
 
-@misc.route('/nonce', methods=['GET'])
 @misc.route('/nonce/', methods=['GET'])
+@misc.route('/nonce', methods=['GET'])
 @chain
 def get_nonce():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -92,8 +92,8 @@ def get_nonce():
         return success(g.chain.w3.eth.getTransactionCount(account, 'pending'))
 
 
-@misc.route('/pending', methods=['GET'])
 @misc.route('/pending/', methods=['GET'])
+@misc.route('/pending', methods=['GET'])
 @chain
 def get_pending_nonces():
     tx_pool = get_txpool()
@@ -126,8 +126,8 @@ _get_transactions_schema_validator = fastjsonschema.compile({
 })
 
 
-@misc.route('/transactions', methods=['GET'])
 @misc.route('/transactions/', methods=['GET'])
+@misc.route('/transactions', methods=['GET'])
 @chain
 def get_transactions():
     body = request.get_json()
@@ -165,8 +165,8 @@ _post_transactions_schema = fastjsonschema.compile({
 })
 
 
-@misc.route('/transactions', methods=['POST'])
 @misc.route('/transactions/', methods=['POST'])
+@misc.route('/transactions', methods=['POST'])
 @chain
 def post_transactions():
     threadpool_executor = app.config['THREADPOOL']
