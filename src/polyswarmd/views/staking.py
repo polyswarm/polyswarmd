@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 staking: Blueprint = Blueprint('staking', __name__)
 
 
-@staking.route('/parameters/', methods=['GET'])
+@staking.route('/parameters', methods=['GET'])
 @chain
 def get_staking_parameters():
     minimum_stake = g.chain.arbiter_staking.contract.functions.MINIMUM_STAKE().call()
@@ -43,7 +43,7 @@ _post_arbiter_staking_deposit_schema = fastjsonschema.compile({
 })
 
 
-@staking.route('/deposit/', methods=['POST'])
+@staking.route('/deposit', methods=['POST'])
 @chain
 def post_arbiter_staking_deposit():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -90,7 +90,7 @@ _post_arbiter_staking_withdrawal_schema = fastjsonschema.compile({
 })
 
 
-@staking.route('/withdraw/', methods=['POST'])
+@staking.route('/withdraw', methods=['POST'])
 @chain
 def post_arbiter_staking_withdrawal():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
