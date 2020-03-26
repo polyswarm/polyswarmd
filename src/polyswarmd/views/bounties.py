@@ -156,7 +156,6 @@ def substitute_metadata(
 
 
 @bounties.route('/', methods=['GET'])
-@bounties.route('', methods=['GET'])
 @chain
 def get_bounties():
     config = app.config['POLYSWARMD']
@@ -213,7 +212,6 @@ _post_bounties_schema = fastjsonschema.compile({
 
 
 @bounties.route('/', methods=['POST'])
-@bounties.route('', methods=['POST'])
 @chain
 def post_bounties():
     config = app.config['POLYSWARMD']
@@ -271,7 +269,6 @@ def post_bounties():
 
 
 @bounties.route('/parameters/', methods=['GET'])
-@bounties.route('/parameters', methods=['GET'])
 @cache.memoize(1)
 @chain
 def get_bounty_parameters():
@@ -303,7 +300,6 @@ def get_bounty_parameters():
 
 
 @bounties.route('/<uuid:guid>/', methods=['GET'])
-@bounties.route('/<uuid:guid>', methods=['GET'])
 @chain
 def get_bounties_guid(guid):
     config = app.config['POLYSWARMD']
@@ -350,7 +346,6 @@ _post_bounties_guid_vote_schema = fastjsonschema.compile({
 
 
 @bounties.route('/<uuid:guid>/vote/', methods=['POST'])
-@bounties.route('/<uuid:guid>/vote', methods=['POST'])
 @chain
 def post_bounties_guid_vote(guid):
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -375,7 +370,6 @@ def post_bounties_guid_vote(guid):
 
 
 @bounties.route('/<uuid:guid>/settle/', methods=['POST'])
-@bounties.route('/<uuid:guid>/settle', methods=['POST'])
 @chain
 def post_bounties_guid_settle(guid):
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -392,7 +386,6 @@ def post_bounties_guid_settle(guid):
 
 # noinspection PyBroadException
 @bounties.route('/metadata/', methods=['POST'])
-@bounties.route('/metadata', methods=['POST'])
 def post_assertion_metadata():
     config = app.config['POLYSWARMD']
     session = app.config['REQUESTS_SESSION']
@@ -460,7 +453,6 @@ _post_bounties_guid_assertions_schema = fastjsonschema.compile({
 
 
 @bounties.route('/<uuid:guid>/assertions/', methods=['POST'])
-@bounties.route('/<uuid:guid>/assertions', methods=['POST'])
 @chain
 def post_bounties_guid_assertions(guid):
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -546,7 +538,6 @@ _post_bounties_guid_assertions_id_reveal_schema = fastjsonschema.compile({
 
 
 @bounties.route('/<uuid:guid>/assertions/<int:id_>/reveal/', methods=['POST'])
-@bounties.route('/<uuid:guid>/assertions/<int:id_>/reveal', methods=['POST'])
 @chain
 def post_bounties_guid_assertions_id_reveal(guid, id_):
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -573,7 +564,6 @@ def post_bounties_guid_assertions_id_reveal(guid, id_):
 
 
 @bounties.route('/<uuid:guid>/assertions/', methods=['GET'])
-@bounties.route('/<uuid:guid>/assertions', methods=['GET'])
 @chain
 def get_bounties_guid_assertions(guid):
     bounty = bounty_to_dict(
@@ -600,7 +590,6 @@ def get_bounties_guid_assertions(guid):
 
 
 @bounties.route('/<uuid:guid>/assertions/<int:id_>/', methods=['GET'])
-@bounties.route('/<uuid:guid>/assertions/<int:id_>', methods=['GET'])
 @chain
 def get_bounties_guid_assertions_id(guid, id_):
     bounty = bounty_to_dict(
@@ -617,7 +606,6 @@ def get_bounties_guid_assertions_id(guid, id_):
 
 
 @bounties.route('/<uuid:guid>/votes/', methods=['GET'])
-@bounties.route('/<uuid:guid>/votes', methods=['GET'])
 @chain
 def get_bounties_guid_votes(guid):
     bounty = bounty_to_dict(
@@ -644,7 +632,6 @@ def get_bounties_guid_votes(guid):
 
 
 @bounties.route('/<uuid:guid>/votes/<int:id_>/', methods=['GET'])
-@bounties.route('/<uuid:guid>/votes/<int:id_>', methods=['GET'])
 @chain
 def get_bounties_guid_votes_id(guid, id_):
     bounty = bounty_to_dict(
@@ -664,7 +651,6 @@ def get_bounties_guid_votes_id(guid, id_):
 
 
 @bounties.route('/<uuid:guid>/bloom/', methods=['GET'])
-@bounties.route('/<uuid:guid>/bloom', methods=['GET'])
 @cache.memoize(30)
 @chain
 def get_bounties_guid_bloom(guid):

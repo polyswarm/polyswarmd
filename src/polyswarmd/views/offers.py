@@ -40,7 +40,6 @@ _post_create_offer_channel_schema = fastjsonschema.compile({
 
 
 @offers.route('/', methods=['POST'])
-@offers.route('', methods=['POST'])
 @chain(chain_name='home')
 def post_create_offer_channel():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -83,7 +82,6 @@ _post_uri_schema = fastjsonschema.compile({
 
 
 @offers.route('/<uuid:guid>/uri/', methods=['POST'])
-@offers.route('/<uuid:guid>/uri', methods=['POST'])
 @chain(chain_name='home')
 def post_uri(guid):
     offer_channel = channel_to_dict(
@@ -138,7 +136,6 @@ _post_open_schema = fastjsonschema.compile({
 
 
 @offers.route('/<uuid:guid>/open/', methods=['POST'])
-@offers.route('/<uuid:guid>/open', methods=['POST'])
 @chain(chain_name='home')
 def post_open(guid):
     offer_channel = channel_to_dict(
@@ -179,7 +176,6 @@ def post_open(guid):
 
 
 @offers.route('/<uuid:guid>/cancel/', methods=['POST'])
-@offers.route('/<uuid:guid>/cancel', methods=['POST'])
 @chain(chain_name='home')
 def post_cancel(guid):
     offer_channel = channel_to_dict(
@@ -222,7 +218,6 @@ _post_join_schema = fastjsonschema.compile({
 
 
 @offers.route('/<uuid:guid>/join/', methods=['POST'])
-@offers.route('/<uuid:guid>/join', methods=['POST'])
 @chain(chain_name='home')
 def post_join(guid):
     offer_channel = channel_to_dict(
@@ -283,7 +278,6 @@ _post_close_schema = fastjsonschema.compile({
 
 
 @offers.route('/<uuid:guid>/close/', methods=['POST'])
-@offers.route('/<uuid:guid>/close', methods=['POST'])
 @chain(chain_name='home')
 def post_close(guid):
     offer_channel = channel_to_dict(
@@ -342,7 +336,6 @@ _post_close_challenged_schema = fastjsonschema.compile({
 
 # for closing a challenged state with a timeout
 @offers.route('/<uuid:guid>/closeChallenged/', methods=['POST'])
-@offers.route('/<uuid:guid>/closeChallenged', methods=['POST'])
 @chain(chain_name='home')
 def post_close_challenged(guid):
     offer_channel = channel_to_dict(
@@ -402,7 +395,6 @@ _post_settle_schema = fastjsonschema.compile({
 
 
 @offers.route('/<uuid:guid>/settle/', methods=['POST'])
-@offers.route('/<uuid:guid>/settle', methods=['POST'])
 @chain(chain_name='home')
 def post_settle(guid):
     offer_channel = channel_to_dict(
@@ -521,7 +513,6 @@ _create_state_schema = fastjsonschema.compile({
 
 
 @offers.route('/state/', methods=['POST'])
-@offers.route('/state', methods=['POST'])
 @chain(chain_name='home')
 def create_state():
     body = request.get_json()
@@ -568,7 +559,6 @@ _post_challange_schema = fastjsonschema.compile({
 
 
 @offers.route('/<uuid:guid>/challenge/', methods=['POST'])
-@offers.route('/<uuid:guid>/challenge', methods=['POST'])
 @chain(chain_name='home')
 def post_challange(guid):
     offer_channel = channel_to_dict(
@@ -599,7 +589,6 @@ def post_challange(guid):
 
 
 @offers.route('/<uuid:guid>/', methods=['GET'])
-@offers.route('/<uuid:guid>', methods=['GET'])
 @chain(chain_name='home')
 def get_channel_address(guid):
     offer_channel = g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
@@ -607,7 +596,6 @@ def get_channel_address(guid):
 
 
 @offers.route('/<uuid:guid>/settlementPeriod/', methods=['GET'])
-@offers.route('/<uuid:guid>/settlementPeriod', methods=['GET'])
 @chain(chain_name='home')
 def get_settlement_period(guid):
     offer_channel = g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
@@ -621,7 +609,6 @@ def get_settlement_period(guid):
 
 
 @offers.route('/<uuid:guid>/websocket/', methods=['GET'])
-@offers.route('/<uuid:guid>/websocket', methods=['GET'])
 @chain(chain_name='home')
 def get_websocket(guid):
     offer_channel = g.chain.offer_registry.contract.functions.guidToChannel(guid.int).call()
@@ -640,7 +627,6 @@ def get_websocket(guid):
 
 
 @offers.route('/pending/', methods=['GET'])
-@offers.route('/pending', methods=['GET'])
 @chain(chain_name='home')
 def get_pending():
     offers_pending = []
@@ -660,7 +646,6 @@ def get_pending():
 
 
 @offers.route('/opened/', methods=['GET'])
-@offers.route('/opened', methods=['GET'])
 @chain(chain_name='home')
 def get_opened():
     offers_opened = []
@@ -680,7 +665,6 @@ def get_opened():
 
 
 @offers.route('/closed/', methods=['GET'])
-@offers.route('/closed', methods=['GET'])
 @chain(chain_name='home')
 def get_closed():
     offers_closed = []
@@ -700,7 +684,6 @@ def get_closed():
 
 
 @offers.route('/myoffers/', methods=['GET'])
-@offers.route('/myoffers', methods=['GET'])
 @chain(chain_name='home')
 def get_myoffers():
     account = g.chain.w3.toChecksumAddress(g.eth_address)

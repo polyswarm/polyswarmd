@@ -12,7 +12,6 @@ relay: Blueprint = Blueprint('relay', __name__)
 
 
 @relay.route('/deposit/', methods=['POST'])
-@relay.route('/deposit', methods=['POST'])
 @chain(chain_name='home')
 def deposit_funds():
     # Move funds from home to side
@@ -20,7 +19,6 @@ def deposit_funds():
 
 
 @relay.route('/withdrawal/', methods=['POST'])
-@relay.route('/withdrawal', methods=['POST'])
 @chain(chain_name='side')
 def withdraw_funds():
     # Move funds from side to home
@@ -28,7 +26,6 @@ def withdraw_funds():
 
 
 @relay.route('/fees/', methods=['GET'])
-@relay.route('/fees', methods=['GET'])
 @chain
 def fees():
     return success({'fees': g.chain.erc20_relay.contract.functions.fees().call()})

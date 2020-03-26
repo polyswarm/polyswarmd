@@ -27,6 +27,7 @@ cache: Cache = Cache(config={"CACHE_TYPE": "simple", "CACHE_DEFAULT_TIMEOUT": 30
 
 # Set up our app object
 app = Flask(__name__)
+app.url_map.strict_slashes = False
 _config = PolySwarmd.auto()
 app.config['POLYSWARMD'] = _config
 # Setting this value works even when Content-Length is omitted, we must have it
