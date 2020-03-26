@@ -121,6 +121,7 @@ def init_websockets(app):
 
         rpc.unregister(wrapper)
 
+    # for receiving messages about offers that might need to be signed
     @sockets.route('/events/<uuid:guid>/')
     @sockets.route('/events/<uuid:guid>')
     @chain(chain_name='home', account_required=False)
