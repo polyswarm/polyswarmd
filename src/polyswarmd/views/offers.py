@@ -39,7 +39,7 @@ _post_create_offer_channel_schema = fastjsonschema.compile({
 })
 
 
-@offers.route('', methods=['POST'])
+@offers.route('/', methods=['POST'])
 @chain(chain_name='home')
 def post_create_offer_channel():
     account = g.chain.w3.toChecksumAddress(g.eth_address)
@@ -626,7 +626,7 @@ def get_websocket(guid):
     return success({'websocket': socket_uri})
 
 
-@offers.route('pending', methods=['GET'])
+@offers.route('/pending', methods=['GET'])
 @chain(chain_name='home')
 def get_pending():
     offers_pending = []
@@ -645,7 +645,7 @@ def get_pending():
     return success(offers_pending)
 
 
-@offers.route('opened', methods=['GET'])
+@offers.route('/opened', methods=['GET'])
 @chain(chain_name='home')
 def get_opened():
     offers_opened = []
@@ -664,7 +664,7 @@ def get_opened():
     return success(offers_opened)
 
 
-@offers.route('closed', methods=['GET'])
+@offers.route('/closed', methods=['GET'])
 @chain(chain_name='home')
 def get_closed():
     offers_closed = []
@@ -683,7 +683,7 @@ def get_closed():
     return success(offers_closed)
 
 
-@offers.route('myoffers', methods=['GET'])
+@offers.route('/myoffers', methods=['GET'])
 @chain(chain_name='home')
 def get_myoffers():
     account = g.chain.w3.toChecksumAddress(g.eth_address)

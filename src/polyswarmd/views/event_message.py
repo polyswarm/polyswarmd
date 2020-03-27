@@ -89,6 +89,7 @@ def init_websockets(app):
     start_time = time.time()
     message_sockets: Dict[uuid.UUID, List[WebSocketApplication]] = dict()
 
+    @sockets.route('/events/')
     @sockets.route('/events')
     @chain(account_required=False)
     def events(ws):
@@ -120,6 +121,8 @@ def init_websockets(app):
 
         rpc.unregister(wrapper)
 
+    # for receiving messages about offers that might need to be signed
+    @sockets.route('/events/<uuid:guid>/')
     @sockets.route('/events/<uuid:guid>')
     @chain(chain_name='home', account_required=False)
     def channel_events(ws, guid):
@@ -144,7 +147,7 @@ def init_websockets(app):
                 for msg in messages:
                     return ws.send(msg)
 
-    # for receiving messages about offers that might need to be signed
+    @sockets.route('/messages/<uuid:guid>/')
     @sockets.route('/messages/<uuid:guid>')
     @chain(chain_name='home', account_required=False)
     def messages(ws, guid):
@@ -201,3 +204,4 @@ def init_websockets(app):
             except Exception:
                 logger.exception('Exception in /events')
                 continue
+    # for receiving messages about offers that might need to be signed
