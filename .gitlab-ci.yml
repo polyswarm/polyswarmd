@@ -60,10 +60,21 @@ e2e:
   stage: e2e
   tags:
     - kube
+  variables:
+    SHARED_PATH: /builds/shared/$CI_PROJECT_PATH
   script:
     - pip install $END_TO_END_LIB@$CI_COMMIT_REF_NAME || pip install $END_TO_END_LIB
     - e2e init
     - e2e run
+  after_script:
+    - mkdir -p cypress-e2e/videos cypress-e2e/screenshots
+    - mv ${SHARED_PATH}/cypress/videos/e2e/* cypress-e2e/videos/
+    - mv ${SHARED_PATH}/cypress/screenshots/e2e/* cypress-e2e/screenshots/
+  artifacts:
+    when: always
+    paths:
+      - cypress-e2e
+    expire_in: 1 day
 
 ###############################################################
 # Release Stage
