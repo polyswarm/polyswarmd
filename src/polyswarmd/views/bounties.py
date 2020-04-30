@@ -148,7 +148,7 @@ def substitute_metadata(
 
     except json.JSONDecodeError:
         # Expected when people provide incorrect metadata. Not stack worthy
-        logger.warning('Metadata retrieved from IPFS does not match schema')
+        logger.exception('Metadata retrieved from IPFS does not match schema')
     except Exception:
         logger.exception(f'Error getting metadata from {artifact_client.name}')
 
