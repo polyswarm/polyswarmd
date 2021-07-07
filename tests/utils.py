@@ -9,6 +9,10 @@ import json
 import string
 
 
+def identity(x):
+    return x
+
+
 class heck(UserDict):
     """MappingProxy which allows functions as value to overide inner equality checks"""
     SUBSTITUTE = bytes([SUBSTITUTE])

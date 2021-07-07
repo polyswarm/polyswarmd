@@ -41,9 +41,6 @@ format-requirements:  ## sort requirements.txt
 	sort -u requirements.txt -o requirements.txt
 	sort -u requirements.dev.txt -o requirements.dev.txt
 
-msgstubs: ## generate websocket event definition type stubs
-	(cd $(SRCROOT) && python -m websockets.scripts.gen_stubs | yapf)
-
 quicktest: ## run tests
 	py.test -k "not test_SLOW"
 

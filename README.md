@@ -33,8 +33,6 @@ There are a selection of useful rules covering routine tasks made in the project
     + `make format-tests` - format test code
     + `make format-requirements` - format `requirements*.txt`
 - `make clean` - Clean `build/`, `*.pyc` and more
-- `make msgstubs` - Regenerate the dynamically generated type-stubs for the
-                    websocket messages in `polyswarmd.websockets.message`.
 - `make help` - Print available rules
 
 ## Example Config

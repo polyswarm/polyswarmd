@@ -13,11 +13,11 @@ from polyswarmd.utils import channel_to_dict, g, logging, state_to_dict, uuid
 from polyswarmd.utils.decorators.chains import chain
 from polyswarmd.websockets.filter import FilterManager
 from polyswarmd.websockets.messages import (
+    BaseEvent,
     ClosedAgreement,
     Connected,
     SettleStateChallenged,
     StartedSettle,
-    WebsocketFilterMessage,
 )
 
 logger = logging.getLogger(__name__)
@@ -132,7 +132,7 @@ def init_websockets(app):
         msig_address = offer_channel['msig_address']
         offer_msig = g.chain.offer_multi_sig.bind(msig_address)
         filter_manager = FilterManager()
-        filter_events: Any[Type[WebsocketFilterMessage]] = [
+        filter_events: Any[Type[BaseEvent]] = [
             ClosedAgreement,
             StartedSettle,
             SettleStateChallenged,
